@@ -2,14 +2,22 @@
 
 #include <CLI/CLI.hpp>
 
-#include <h5pp/h5pp.h>
+#include <igl/read_triangle_mesh.h>
+#include <igl/write_triangle_mesh.h>
+#include <igl/remove_duplicate_vertices.h>
+#include <igl/edges.h>
+
+#include <ipc/ipc.hpp>
+
+#include <polysolve/nonlinear/Solver.hpp>
 
 #include <polyfem/State.hpp>
-#include <polyfem/OptState.hpp>
-
+#include <polyfem/solver/forms/ContactForm.hpp>
+#include <polyfem/solver/forms/GarmentForm.hpp>
+#include <polyfem/solver/FullNLProblem.hpp>
+#include <polyfem/io/OBJWriter.hpp>
 #include <polyfem/utils/JSONUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
-#include <polyfem/io/YamlToJson.hpp>
 
 using namespace polyfem;
 using namespace solver;
@@ -38,21 +46,6 @@ bool load_json(const std::string &json_file, json &out)
 	return true;
 }
 
-bool load_yaml(const std::string &yaml_file, json &out)
-{
-	try
-	{
-		out = io::yaml_file_to_json(yaml_file);
-		if (!out.contains("root_path"))
-			out["root_path"] = yaml_file;
-	}
-	catch (...)
-	{
-		return false;
-	}
-	return true;
-}
-
 int forward_simulation(const CLI::App &command_line,
 					   const std::string &hdf5_file,
 					   const std::string output_dir,
@@ -61,12 +54,6 @@ int forward_simulation(const CLI::App &command_line,
 					   const bool fallback_solver,
 					   const spdlog::level::level_enum &log_level,
 					   json &in_args);
-
-int optimization_simulation(const CLI::App &command_line,
-							const unsigned max_threads,
-							const bool is_strict,
-							const spdlog::level::level_enum &log_level,
-							json &opt_args);
 
 int main(int argc, char **argv)
 {
@@ -86,22 +73,10 @@ int main(int argc, char **argv)
 	std::string json_file = "";
 	input->add_option("-j,--json", json_file, "Simulation JSON file")->check(CLI::ExistingFile);
 
-	std::string yaml_file = "";
-	input->add_option("-y,--yaml", yaml_file, "Simulation YAML file")->check(CLI::ExistingFile);
-
-	std::string hdf5_file = "";
-	input->add_option("--hdf5", hdf5_file, "Simulation HDF5 file")->check(CLI::ExistingFile);
-
 	input->require_option(1);
 
 	std::string output_dir = "";
 	command_line.add_option("-o,--output_dir", output_dir, "Directory for output files")->check(CLI::ExistingDirectory | CLI::NonexistentPath);
-
-	bool is_strict = true;
-	command_line.add_flag("-s,--strict_validation,!--ns,!--no_strict_validation", is_strict, "Disables strict validation of input JSON");
-
-	bool fallback_solver = false;
-	command_line.add_flag("--enable_overwrite_solver", fallback_solver, "If solver in input is not present, falls back to default.");
 
 	const std::vector<std::pair<std::string, spdlog::level::level_enum>>
 		SPDLOG_LEVEL_NAMES_TO_LEVELS = {
@@ -119,140 +94,158 @@ int main(int argc, char **argv)
 	CLI11_PARSE(command_line, argc, argv);
 
 	json in_args = json({});
-
-	if (!json_file.empty() || !yaml_file.empty())
 	{
-		const bool ok = !json_file.empty() ? load_json(json_file, in_args) : load_yaml(yaml_file, in_args);
-
-		if (!ok)
-			log_and_throw_error(fmt::format("unable to open {} file", json_file));
-
-		if (in_args.contains("states"))
-			return optimization_simulation(command_line, max_threads, is_strict, log_level, in_args);
-		else
-			return forward_simulation(command_line, "", output_dir, max_threads,
-									  is_strict, fallback_solver, log_level, in_args);
-	}
-	else
-		return forward_simulation(command_line, hdf5_file, output_dir, max_threads,
-								  is_strict, fallback_solver, log_level, in_args);
-}
-
-int forward_simulation(const CLI::App &command_line,
-					   const std::string &hdf5_file,
-					   const std::string output_dir,
-					   const unsigned max_threads,
-					   const bool is_strict,
-					   const bool fallback_solver,
-					   const spdlog::level::level_enum &log_level,
-					   json &in_args)
-{
-	std::vector<std::string> names;
-	std::vector<Eigen::MatrixXi> cells;
-	std::vector<Eigen::MatrixXd> vertices;
-
-	if (in_args.empty() && hdf5_file.empty())
-	{
-		logger().error("No input file specified!");
-		return command_line.exit(CLI::RequiredError("--json or --hdf5"));
-	}
-
-	if (in_args.empty() && !hdf5_file.empty())
-	{
-		using MatrixXl = Eigen::Matrix<int64_t, Eigen::Dynamic, Eigen::Dynamic>;
-
-		h5pp::File file(hdf5_file, h5pp::FileAccess::READONLY);
-		std::string json_string = file.readDataset<std::string>("json");
-
-		in_args = json::parse(json_string);
-		in_args["root_path"] = hdf5_file;
-
-		names = file.findGroups("", "/meshes");
-		cells.resize(names.size());
-		vertices.resize(names.size());
-
-		for (int i = 0; i < names.size(); ++i)
+		if (!json_file.empty())
 		{
-			const std::string &name = names[i];
-			cells[i] = file.readDataset<MatrixXl>("/meshes/" + name + "/c").cast<int>();
-			vertices[i] = file.readDataset<Eigen::MatrixXd>("/meshes/" + name + "/v");
+			const bool ok = load_json(json_file, in_args);
+
+			if (!ok)
+				log_and_throw_error(fmt::format("unable to open {} file", json_file));
+		}
+
+		if (in_args.empty())
+		{
+			logger().error("No input file specified!");
+			return command_line.exit(CLI::RequiredError("--json"));
+		}
+
+		json tmp = json::object();
+		if (has_arg(command_line, "log_level"))
+			tmp["/output/log/level"_json_pointer] = int(log_level);
+		if (has_arg(command_line, "max_threads"))
+			tmp["/solver/max_threads"_json_pointer] = max_threads;
+		if (has_arg(command_line, "output_dir"))
+			tmp["/output/directory"_json_pointer] = std::filesystem::absolute(output_dir);
+		
+		assert(tmp.is_object());
+		in_args.merge_patch(tmp);
+	}
+
+	State state;
+	state.init(in_args, false);
+
+	std::string root = "/Users/zizhouhuang/Desktop/cloth-fit/python_clothing_deformer/scripts/initialization/";
+	std::string avatar_mesh_path = root + "avatar.obj";
+	std::string skinny_avatar_mesh_path = root + "projected_standard.obj";
+	std::string garment_mesh_path = root + "garment.obj";
+
+	const double scaling = 1e2;
+
+	Eigen::MatrixXd avatar_v;
+	Eigen::MatrixXi avatar_f;
+	igl::read_triangle_mesh(avatar_mesh_path, avatar_v, avatar_f);
+	avatar_v *= scaling;
+
+	Eigen::MatrixXd skinny_avatar_v;
+	Eigen::MatrixXi skinny_avatar_f;
+	igl::read_triangle_mesh(skinny_avatar_mesh_path, skinny_avatar_v, skinny_avatar_f);
+	skinny_avatar_v *= scaling;
+
+	{
+		Eigen::Vector3d center = (skinny_avatar_v.colwise().sum() - avatar_v.colwise().sum()) / avatar_v.rows();
+		avatar_v.rowwise() += center.transpose();
+	}
+
+	Eigen::MatrixXd garment_v;
+	Eigen::MatrixXi garment_f;
+	igl::read_triangle_mesh(garment_mesh_path, garment_v, garment_f);
+	garment_v *= scaling;
+
+	// remove duplicate vertices in the garment
+	{
+		Eigen::VectorXi svi, svj;
+		Eigen::MatrixXi sf;
+		Eigen::MatrixXd sv;
+		igl::remove_duplicate_vertices(garment_v, garment_f, 1e-4, sv, svi, svj, sf);
+		std::swap(sv, garment_v);
+		std::swap(sf, garment_f);
+	}
+
+	logger().info("avatar n_verts: {}, garment n_verts: {}, total n_verts: {}", avatar_v.rows(), garment_v.rows(), avatar_v.rows() + garment_v.rows());
+
+	ipc::CollisionMesh collision_mesh;
+	Eigen::MatrixXd collision_vertices(skinny_avatar_v.rows() + garment_v.rows(), garment_v.cols());
+	Eigen::MatrixXi collision_triangles(skinny_avatar_f.rows() + garment_f.rows(), garment_f.cols());
+	Eigen::MatrixXi collision_edges;
+	{
+		collision_vertices << skinny_avatar_v, garment_v;
+		collision_triangles << skinny_avatar_f, garment_f.array() + skinny_avatar_v.rows();
+		igl::edges(collision_triangles, collision_edges);
+		collision_triangles = garment_f.array() + skinny_avatar_v.rows();
+		collision_mesh = ipc::CollisionMesh(
+			collision_vertices, collision_edges, collision_triangles);
+
+		collision_triangles.resize(skinny_avatar_f.rows() + garment_f.rows(), garment_f.cols());
+		collision_triangles << skinny_avatar_f, garment_f.array() + skinny_avatar_v.rows();
+
+		const int n_avatar_verts = skinny_avatar_v.rows();
+		collision_mesh.can_collide = [n_avatar_verts](size_t vi, size_t vj) {
+			return vi >= n_avatar_verts || vj >= n_avatar_verts;
+		};
+
+		auto ids = ipc::my_has_intersections(collision_mesh, collision_vertices, ipc::BroadPhaseMethod::BVH);
+		if (ids[0] >= 0)
+		{
+			io::OBJWriter::write(
+				"intersection.obj", collision_vertices,
+				collision_mesh.edges(), collision_mesh.faces());
+			Eigen::MatrixXi edge(1, 2);
+			edge << ids[0], ids[1];
+			Eigen::MatrixXi face(1, 3);
+			face << ids[2], ids[3], ids[4];
+			io::OBJWriter::write(
+				"intersecting_pair.obj", collision_vertices,
+				edge, face);
+			log_and_throw_error("Unable to solve, initial solution has intersections!");
 		}
 	}
 
-	json tmp = json::object();
-	if (has_arg(command_line, "log_level"))
-		tmp["/output/log/level"_json_pointer] = int(log_level);
-	if (has_arg(command_line, "max_threads"))
-		tmp["/solver/max_threads"_json_pointer] = max_threads;
-	if (has_arg(command_line, "output_dir"))
-		tmp["/output/directory"_json_pointer] = std::filesystem::absolute(output_dir);
-	if (has_arg(command_line, "enable_overwrite_solver"))
-		tmp["/solver/linear/enable_overwrite_solver"_json_pointer] = fallback_solver;
-	assert(tmp.is_object());
-	in_args.merge_patch(tmp);
-
-	State state;
-	state.init(in_args, is_strict);
-	state.load_mesh(/*non_conforming=*/false, names, cells, vertices);
-
-	// Mesh was not loaded successfully; load_mesh() logged the error.
-	if (state.mesh == nullptr)
+	std::shared_ptr<ContactForm> contact_form;
+	std::vector<std::shared_ptr<Form>> forms;
 	{
-		// Cannot proceed without a mesh.
-		return EXIT_FAILURE;
+		const double dhat = state.args["contact"]["dhat"];
+		contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
+		contact_form->set_weight(1);
+		contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
+		contact_form->vis_collision_mesh_ = ipc::CollisionMesh(
+				collision_vertices, collision_edges, collision_triangles);
+
+		std::vector<int> indices(avatar_v.size());
+		for (int i = 0; i < indices.size(); i++)
+			indices[i] = i;
+		auto penalty_form = std::make_shared<PenaltyForm>(utils::flatten(avatar_v - skinny_avatar_v), indices);
+		penalty_form->set_weight(1e2);
+
+		forms.push_back(penalty_form);
 	}
 
-	state.stats.compute_mesh_stats(*state.mesh);
+	forms.push_back(contact_form);
+	FullNLProblem nl_problem(forms);
 
-	state.build_basis();
+	Eigen::VectorXd sol = utils::flatten(collision_vertices);
+	sol.setZero();
 
-	state.assemble_rhs();
-	state.assemble_mass_mat();
+	auto nl_solver = polysolve::nonlinear::Solver::create(in_args["solver"]["nonlinear"], in_args["solver"]["linear"], 1, logger());
 
-	Eigen::MatrixXd sol;
-	Eigen::MatrixXd pressure;
+	igl::write_triangle_mesh("initial.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
 
-	state.solve_problem(sol, pressure);
+	nl_problem.line_search_begin(sol, sol);
+	if (!std::isfinite(nl_problem.value(sol))
+		|| !nl_problem.is_step_valid(sol, sol)
+		|| !nl_problem.is_step_collision_free(sol, sol))
+		log_and_throw_error("Failed to apply boundary conditions!");
 
-	state.compute_errors(sol);
-
-	logger().info("total time: {}s", state.timings.total_time());
-
-	state.save_json(sol);
-	state.export_data(sol, pressure);
-
-	return EXIT_SUCCESS;
-}
-
-int optimization_simulation(const CLI::App &command_line,
-							const unsigned max_threads,
-							const bool is_strict,
-							const spdlog::level::level_enum &log_level,
-							json &opt_args)
-{
-	json tmp = json::object();
-	if (has_arg(command_line, "log_level"))
-		tmp["/output/log/level"_json_pointer] = int(log_level);
-	if (has_arg(command_line, "max_threads"))
-		tmp["/solver/max_threads"_json_pointer] = max_threads;
-	opt_args.merge_patch(tmp);
-
-	OptState opt_state;
-	opt_state.init(opt_args, is_strict);
-
-	opt_state.create_states(opt_state.args["compute_objective"].get<bool>() ? polyfem::solver::CacheLevel::Solution : polyfem::solver::CacheLevel::Derivatives, opt_state.args["solver"]["max_threads"].get<int>());
-	opt_state.init_variables();
-	opt_state.create_problem();
-
-	Eigen::VectorXd x;
-	opt_state.initial_guess(x);
-
-	if (opt_state.args["compute_objective"].get<bool>())
+	nl_problem.init(sol);
+	try
 	{
-		logger().info("Objective is {}", opt_state.eval(x));
-		return EXIT_SUCCESS;
+		nl_solver->minimize(nl_problem, sol);
+	}
+	catch (const std::runtime_error &e)
+	{
+		throw e;
 	}
 
-	opt_state.solve(x);
+	igl::write_triangle_mesh("result.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
+
 	return EXIT_SUCCESS;
 }

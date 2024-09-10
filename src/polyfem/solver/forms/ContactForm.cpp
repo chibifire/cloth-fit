@@ -282,12 +282,19 @@ namespace polyfem::solver
 
 	void ContactForm::post_step(const polysolve::nonlinear::PostStepData &data)
 	{
+		const Eigen::MatrixXd displaced_surface = compute_displaced_surface(data.x);
+
+		const int stride = 10;
+		if (data.iter_num % stride == 0)
+			io::OBJWriter::write(
+				"debug_" + std::to_string(data.iter_num / stride) + ".obj", displaced_surface,
+				vis_collision_mesh_.edges(), vis_collision_mesh_.faces());
+
 		if (data.iter_num == 0)
 			return;
 
-		const Eigen::MatrixXd displaced_surface = compute_displaced_surface(data.x);
-
 		const double curr_distance = collision_set_.compute_minimum_distance(collision_mesh_, displaced_surface);
+		logger().debug("Min distance: {}", sqrt(curr_distance));
 
 		if (use_adaptive_barrier_stiffness_)
 		{
