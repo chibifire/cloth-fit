@@ -32,6 +32,7 @@ set(SOURCES
 	RayleighDampingForm.hpp
 	PressureForm.cpp
 	PressureForm.hpp
+	GarmentForm.cpp
 	GarmentForm.hpp
 )
 

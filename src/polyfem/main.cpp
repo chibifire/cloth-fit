@@ -145,6 +145,7 @@ int main(int argc, char **argv)
 		Eigen::Vector3d center = (skinny_avatar_v.colwise().sum() - avatar_v.colwise().sum()) / avatar_v.rows();
 		avatar_v.rowwise() += center.transpose();
 	}
+	skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-4;
 
 	Eigen::MatrixXd garment_v;
 	Eigen::MatrixXi garment_f;
@@ -171,7 +172,6 @@ int main(int argc, char **argv)
 		collision_vertices << skinny_avatar_v, garment_v;
 		collision_triangles << skinny_avatar_f, garment_f.array() + skinny_avatar_v.rows();
 		igl::edges(collision_triangles, collision_edges);
-		collision_triangles = garment_f.array() + skinny_avatar_v.rows();
 		collision_mesh = ipc::CollisionMesh(
 			collision_vertices, collision_edges, collision_triangles);
 
@@ -179,8 +179,8 @@ int main(int argc, char **argv)
 		collision_triangles << skinny_avatar_f, garment_f.array() + skinny_avatar_v.rows();
 
 		const int n_avatar_verts = skinny_avatar_v.rows();
-		collision_mesh.can_collide = [n_avatar_verts](size_t vi, size_t vj) {
-			return vi >= n_avatar_verts || vj >= n_avatar_verts;
+		collision_mesh.can_collide = [&collision_mesh, n_avatar_verts](size_t vi, size_t vj) {
+			return collision_mesh.to_full_vertex_id(vi) >= n_avatar_verts || collision_mesh.to_full_vertex_id(vj) >= n_avatar_verts;
 		};
 
 		auto ids = ipc::my_has_intersections(collision_mesh, collision_vertices, ipc::BroadPhaseMethod::BVH);
@@ -207,16 +207,37 @@ int main(int argc, char **argv)
 		contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
 		contact_form->set_weight(1);
 		contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
-		contact_form->vis_collision_mesh_ = ipc::CollisionMesh(
-				collision_vertices, collision_edges, collision_triangles);
+		contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
+
 
 		std::vector<int> indices(avatar_v.size());
 		for (int i = 0; i < indices.size(); i++)
 			indices[i] = i;
 		auto penalty_form = std::make_shared<PenaltyForm>(utils::flatten(avatar_v - skinny_avatar_v), indices);
-		penalty_form->set_weight(1e2);
-
+		penalty_form->set_weight(in_args["avatar_penalty_weight"]);
 		forms.push_back(penalty_form);
+
+
+		indices.resize(garment_v.size());
+		for (int i = 0; i < indices.size(); i++)
+			indices[i] = i + avatar_v.size();
+		penalty_form = std::make_shared<PenaltyForm>(Eigen::VectorXd::Zero(garment_v.size()), indices);
+		penalty_form->set_weight(in_args["cloth_penalty_weight"]);
+		forms.push_back(penalty_form);
+
+
+		// IPC is enough to prevent zero area
+		// auto area_form = std::make_shared<AreaForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()), in_args["area_penalty_threshold"]);
+		// area_form->set_weight(in_args["area_penalty_weight"]);
+		// forms.push_back(area_form);
+
+		auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
+		angle_form->set_weight(in_args["angle_penalty_weight"]);
+		forms.push_back(angle_form);
+
+		auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
+		similarity_form->set_weight(in_args["similarity_penalty_weight"]);
+		forms.push_back(similarity_form);
 	}
 
 	forms.push_back(contact_form);

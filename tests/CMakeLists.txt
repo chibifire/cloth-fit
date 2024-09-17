@@ -44,9 +44,6 @@ target_link_libraries(unit_tests PUBLIC polyfem::warnings)
 include(catch2)
 target_link_libraries(unit_tests PUBLIC Catch2::Catch2WithMain)
 
-include(finite_diff)
-target_link_libraries(unit_tests PUBLIC finitediff::finitediff)
-
 include(polyfem_data)
 target_link_libraries(unit_tests PUBLIC polyfem::data)
 

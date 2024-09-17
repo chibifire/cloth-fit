@@ -196,6 +196,9 @@ target_link_libraries(polyfem PUBLIC polysolve::polysolve)
 include(libigl)
 target_link_libraries(polyfem PUBLIC igl::core)
 
+include(finite_diff)
+target_link_libraries(polyfem PUBLIC finitediff::finitediff)
+
 if(NOT WIN32)
     # Eigen
     include(eigen)

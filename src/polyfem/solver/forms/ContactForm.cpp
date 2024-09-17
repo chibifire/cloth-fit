@@ -284,11 +284,11 @@ namespace polyfem::solver
 	{
 		const Eigen::MatrixXd displaced_surface = compute_displaced_surface(data.x);
 
-		const int stride = 10;
+		const int stride = 1;
 		if (data.iter_num % stride == 0)
 			io::OBJWriter::write(
 				"debug_" + std::to_string(data.iter_num / stride) + ".obj", displaced_surface,
-				vis_collision_mesh_.edges(), vis_collision_mesh_.faces());
+				collision_mesh_.edges(), collision_mesh_.faces());
 
 		if (data.iter_num == 0)
 			return;

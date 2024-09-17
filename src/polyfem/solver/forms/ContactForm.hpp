@@ -145,8 +145,6 @@ namespace polyfem::solver
 		const ipc::Collisions &collision_set() const { return collision_set_; }
 		const ipc::BarrierPotential &barrier_potential() const { return barrier_potential_; }
 
-		ipc::CollisionMesh vis_collision_mesh_;
-
 	protected:
 		/// @brief Update the cached candidate set for the current solution
 		/// @param displaced_surface Vertex positions displaced by the current solution
