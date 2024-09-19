@@ -3,6 +3,8 @@ set(SOURCES
 	ALSolver.hpp
 	FullNLProblem.cpp
 	FullNLProblem.hpp
+	GarmentNLProblem.cpp
+	GarmentNLProblem.hpp
 	NavierStokesSolver.cpp
 	NavierStokesSolver.hpp
 	NLProblem.cpp

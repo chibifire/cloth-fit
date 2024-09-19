@@ -142,7 +142,7 @@ namespace polyfem::mesh
 		constexpr int al_max_weight = 100 * al_initial_weight;
 		constexpr double al_eta_tol = 0.99;
 		constexpr size_t al_max_solver_iter = 1000;
-		ALSolver al_solver(
+		ALSolver<NLProblem, BCLagrangianForm, BCPenaltyForm> al_solver(
 			bc_lagrangian_form, bc_penalty_form, al_initial_weight,
 			al_scaling, al_max_weight, al_eta_tol,
 			/*update_barrier_stiffness=*/[&](const Eigen::MatrixXd &x) {});

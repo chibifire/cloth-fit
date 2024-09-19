@@ -1,12 +1,16 @@
 #include "ALSolver.hpp"
+#include <polyfem/solver/forms/BCLagrangianForm.hpp>
+#include <polyfem/solver/forms/BCPenaltyForm.hpp>
+#include <polyfem/solver/forms/GarmentForm.hpp>
 
 #include <polyfem/utils/Logger.hpp>
 
 namespace polyfem::solver
 {
-	ALSolver::ALSolver(
-		std::shared_ptr<BCLagrangianForm> lagr_form,
-		std::shared_ptr<BCPenaltyForm> pen_form,
+	template <class Problem, class LagrangianForm, class PenaltyForm>
+	ALSolver<Problem, LagrangianForm, PenaltyForm>::ALSolver(
+		std::shared_ptr<LagrangianForm> lagr_form,
+		std::shared_ptr<PenaltyForm> pen_form,
 		const double initial_al_weight,
 		const double scaling,
 		const double max_al_weight,
@@ -22,7 +26,8 @@ namespace polyfem::solver
 	{
 	}
 
-	void ALSolver::solve_al(std::shared_ptr<NLSolver> nl_solver, NLProblem &nl_problem, Eigen::MatrixXd &sol)
+	template <class Problem, class LagrangianForm, class PenaltyForm>
+	void ALSolver<Problem, LagrangianForm, PenaltyForm>::solve_al(std::shared_ptr<NLSolver> nl_solver, Problem &nl_problem, Eigen::MatrixXd &sol)
 	{
 		assert(sol.size() == nl_problem.full_size());
 
@@ -36,7 +41,7 @@ namespace polyfem::solver
 		int al_steps = 0;
 		const int iters = nl_solver->stop_criteria().iterations;
 
-		const double initial_error = pen_form->compute_error(sol);
+		const double initial_error = compute_error(nl_problem, sol);
 
 		nl_problem.line_search_begin(sol, tmp_sol);
 
@@ -64,7 +69,7 @@ namespace polyfem::solver
 			sol = tmp_sol;
 			set_al_weight(nl_problem, sol, -1);
 
-			const double current_error = pen_form->compute_error(sol);
+			const double current_error = compute_error(nl_problem, sol);
 			const double eta = 1 - sqrt(current_error / initial_error);
 
 			logger().debug("Current eta = {}", eta);
@@ -81,7 +86,7 @@ namespace polyfem::solver
 			if (eta < eta_tol && al_weight < max_al_weight)
 				al_weight *= scaling;
 			else
-				lagr_form->update_lagrangian(sol, al_weight);
+				update_lagrangian(nl_problem, sol, al_weight);
 
 			post_subsolve(al_weight);
 			++al_steps;
@@ -90,7 +95,8 @@ namespace polyfem::solver
 		nl_solver->stop_criteria().iterations = iters;
 	}
 
-	void ALSolver::solve_reduced(std::shared_ptr<NLSolver> nl_solver, NLProblem &nl_problem, Eigen::MatrixXd &sol)
+	template <class Problem, class LagrangianForm, class PenaltyForm>
+	void ALSolver<Problem, LagrangianForm, PenaltyForm>::solve_reduced(std::shared_ptr<NLSolver> nl_solver, Problem &nl_problem, Eigen::MatrixXd &sol)
 	{
 		assert(sol.size() == nl_problem.full_size());
 
@@ -123,7 +129,32 @@ namespace polyfem::solver
 		post_subsolve(0);
 	}
 
-	void ALSolver::set_al_weight(NLProblem &nl_problem, const Eigen::VectorXd &x, const double weight)
+	template <>
+	double ALSolver<NLProblem, BCLagrangianForm, BCPenaltyForm>::compute_error(NLProblem &nl_problem, const Eigen::MatrixXd &sol) const
+	{
+		return pen_form->compute_error(sol);
+	}
+
+	template <>
+	void ALSolver<NLProblem, BCLagrangianForm, BCPenaltyForm>::update_lagrangian(NLProblem &nl_problem, const Eigen::MatrixXd &sol, double al_weight)
+	{
+		lagr_form->update_lagrangian(sol, al_weight);
+	}
+
+	template <>
+	double ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm>::compute_error(GarmentNLProblem &nl_problem, const Eigen::MatrixXd &sol) const
+	{
+		return pen_form->compute_error(nl_problem.full_to_complete(sol));
+	}
+
+	template <>
+	void ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm>::update_lagrangian(GarmentNLProblem &nl_problem, const Eigen::MatrixXd &sol, double al_weight)
+	{
+		lagr_form->update_lagrangian(nl_problem.full_to_complete(sol), al_weight);
+	}
+
+	template <class Problem, class LagrangianForm, class PenaltyForm>
+	void ALSolver<Problem, LagrangianForm, PenaltyForm>::set_al_weight(Problem &nl_problem, const Eigen::VectorXd &x, const double weight)
 	{
 		if (pen_form == nullptr || lagr_form == nullptr)
 			return;
@@ -144,4 +175,6 @@ namespace polyfem::solver
 		}
 	}
 
+	template class ALSolver<NLProblem, BCLagrangianForm, BCPenaltyForm>;
+	template class ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm>;
 } // namespace polyfem::solver

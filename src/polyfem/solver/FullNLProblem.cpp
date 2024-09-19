@@ -1,4 +1,5 @@
 #include "FullNLProblem.hpp"
+#include <polyfem/utils/Logger.hpp>
 
 namespace polyfem::solver
 {
@@ -102,6 +103,7 @@ namespace polyfem::solver
 				continue;
 			TVector tmp;
 			f->first_derivative(x, tmp);
+			logger().trace("[{}] Gradient norm: {}", f->name(), tmp.norm());
 			grad += tmp;
 		}
 	}

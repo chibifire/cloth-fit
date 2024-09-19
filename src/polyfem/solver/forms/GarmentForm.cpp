@@ -1,6 +1,7 @@
 #include "GarmentForm.hpp"
 #include <igl/triangle_triangle_adjacency.h>
 #include <polyfem/utils/Logger.hpp>
+#include <polyfem/utils/Timer.hpp>
 #include <polyfem/autogen/auto_derivatives.hpp>
 #include <finitediff.hpp>
 
@@ -22,64 +23,53 @@ namespace {
 
         return normals;
     }
-
-    Eigen::Matrix<double, 3, 6> cross_product_gradient(
-        const Eigen::Ref<const Eigen::Vector3d>& t1,
-        const Eigen::Ref<const Eigen::Vector3d>& t2)
-    {
-        Eigen::Matrix<double, 3, 6> grad;
-        grad << 0, t2(2), -t2(1), 0, -t1(2), t1(1), -t2(2), 0, t2(0), t1(2), 0,
-            -t1(0), t2(1), -t2(0), 0, -t1(1), t1(0), 0;
-
-        return grad;
-    }
-
-    std::array<ipc::Matrix6d, 3> cross_product_hessian(
-        const Eigen::Ref<const Eigen::Vector3d>& t1,
-        const Eigen::Ref<const Eigen::Vector3d>& t2)
-    {
-        std::array<ipc::Matrix6d, 3> hess;
-        hess.fill(ipc::Matrix6d::Zero());
-        hess[0](1, 5) = 1;
-        hess[0](5, 1) = 1;
-        hess[0](2, 4) = -1;
-        hess[0](4, 2) = -1;
-
-        hess[1](0, 5) = -1;
-        hess[1](5, 0) = -1;
-        hess[1](2, 3) = 1;
-        hess[1](3, 2) = 1;
-
-        hess[2](0, 4) = 1;
-        hess[2](4, 0) = 1;
-        hess[2](1, 3) = -1;
-        hess[2](3, 1) = -1;
-
-        return hess;
-    }
 }
 
 namespace polyfem::solver {
     
-    double PenaltyForm::value_unweighted(const Eigen::VectorXd &x) const 
+    double PointPenaltyForm::value_unweighted(const Eigen::VectorXd &x) const 
     {
         return (x(indices_) - target_).squaredNorm() / 2.;
     }
 
-    void PenaltyForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
+    void PointPenaltyForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
     {
         gradv.setZero(x.size());
         gradv(indices_) = x(indices_) - target_;
     }
 
-    void PenaltyForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const 
+    void PointPenaltyForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const 
     {
+        POLYFEM_SCOPED_TIMER("penalty hessian");
         hessian.setZero();
         hessian.resize(x.size(), x.size());
         std::vector<Eigen::Triplet<double>> triplets;
         for (int i = 0; i < indices_.size(); i++)
             triplets.emplace_back(indices_[i], indices_[i], 1.);
         hessian.setFromTriplets(triplets.begin(), triplets.end());
+    }
+
+
+    double PointLagrangianForm::value_unweighted(const Eigen::VectorXd &x) const 
+    {
+        return -lagr_mults_.transpose() * (x(indices_) - target_);
+    }
+
+    void PointLagrangianForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
+    {
+        gradv.setZero(x.size());
+        gradv(indices_) = -lagr_mults_;
+    }
+
+    void PointLagrangianForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const 
+    {
+        hessian.setZero();
+        hessian.resize(x.size(), x.size());
+    }
+
+    void PointLagrangianForm::update_lagrangian(const Eigen::VectorXd &x, const double k_al)
+    {
+        lagr_mults_ -= k_al * (x(indices_) - target_);
     }
 
 
@@ -128,6 +118,7 @@ namespace polyfem::solver {
 
     void AreaForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const 
     {
+        POLYFEM_SCOPED_TIMER("area hessian");
         hessian.setZero();
         hessian.resize(x.size(), x.size());
         std::vector<Eigen::Triplet<double>> triplets;
@@ -303,6 +294,7 @@ namespace polyfem::solver {
 
     void AngleForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
     {
+        POLYFEM_SCOPED_TIMER("angle hessian");
         Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
         Eigen::MatrixXd normals = compute_normals(V, F_);
 
@@ -509,6 +501,7 @@ namespace polyfem::solver {
 
     void SimilarityForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
     {
+        POLYFEM_SCOPED_TIMER("similarity hessian");
         Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
         Eigen::VectorXd areas;

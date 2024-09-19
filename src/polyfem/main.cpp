@@ -14,7 +14,8 @@
 #include <polyfem/State.hpp>
 #include <polyfem/solver/forms/ContactForm.hpp>
 #include <polyfem/solver/forms/GarmentForm.hpp>
-#include <polyfem/solver/FullNLProblem.hpp>
+#include <polyfem/solver/GarmentNLProblem.hpp>
+#include <polyfem/solver/ALSolver.hpp>
 #include <polyfem/io/OBJWriter.hpp>
 #include <polyfem/utils/JSONUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
@@ -179,8 +180,8 @@ int main(int argc, char **argv)
 		collision_triangles << skinny_avatar_f, garment_f.array() + skinny_avatar_v.rows();
 
 		const int n_avatar_verts = skinny_avatar_v.rows();
-		collision_mesh.can_collide = [&collision_mesh, n_avatar_verts](size_t vi, size_t vj) {
-			return collision_mesh.to_full_vertex_id(vi) >= n_avatar_verts || collision_mesh.to_full_vertex_id(vj) >= n_avatar_verts;
+		collision_mesh.can_collide = [n_avatar_verts](size_t vi, size_t vj) {
+			return vi >= n_avatar_verts || vj >= n_avatar_verts;
 		};
 
 		auto ids = ipc::my_has_intersections(collision_mesh, collision_vertices, ipc::BroadPhaseMethod::BVH);
@@ -201,6 +202,8 @@ int main(int argc, char **argv)
 	}
 
 	std::shared_ptr<ContactForm> contact_form;
+	std::shared_ptr<PointPenaltyForm> pen_form;
+	std::shared_ptr<PointLagrangianForm> lagr_form;
 	std::vector<std::shared_ptr<Form>> forms;
 	{
 		const double dhat = state.args["contact"]["dhat"];
@@ -209,46 +212,34 @@ int main(int argc, char **argv)
 		contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
 		contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
 
-
 		std::vector<int> indices(avatar_v.size());
 		for (int i = 0; i < indices.size(); i++)
 			indices[i] = i;
-		auto penalty_form = std::make_shared<PenaltyForm>(utils::flatten(avatar_v - skinny_avatar_v), indices);
-		penalty_form->set_weight(in_args["avatar_penalty_weight"]);
-		forms.push_back(penalty_form);
+		pen_form = std::make_shared<PointPenaltyForm>(utils::flatten(avatar_v - skinny_avatar_v), indices);
+		forms.push_back(pen_form);
 
-
-		indices.resize(garment_v.size());
-		for (int i = 0; i < indices.size(); i++)
-			indices[i] = i + avatar_v.size();
-		penalty_form = std::make_shared<PenaltyForm>(Eigen::VectorXd::Zero(garment_v.size()), indices);
-		penalty_form->set_weight(in_args["cloth_penalty_weight"]);
-		forms.push_back(penalty_form);
-
+		lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(avatar_v - skinny_avatar_v), indices);
+		forms.push_back(lagr_form);
 
 		// IPC is enough to prevent zero area
-		// auto area_form = std::make_shared<AreaForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()), in_args["area_penalty_threshold"]);
-		// area_form->set_weight(in_args["area_penalty_weight"]);
+		// auto area_form = std::make_shared<AreaForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()), state.args["area_penalty_threshold"]);
+		// area_form->set_weight(state.args["area_penalty_weight"]);
 		// forms.push_back(area_form);
 
 		auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
-		angle_form->set_weight(in_args["angle_penalty_weight"]);
+		angle_form->set_weight(state.args["angle_penalty_weight"]);
 		forms.push_back(angle_form);
 
 		auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
-		similarity_form->set_weight(in_args["similarity_penalty_weight"]);
+		similarity_form->set_weight(state.args["similarity_penalty_weight"]);
 		forms.push_back(similarity_form);
 	}
 
 	forms.push_back(contact_form);
-	FullNLProblem nl_problem(forms);
+	GarmentNLProblem nl_problem(1 + garment_v.size(), avatar_v - skinny_avatar_v, forms);
 
-	Eigen::VectorXd sol = utils::flatten(collision_vertices);
+	Eigen::MatrixXd sol(nl_problem.full_size(), 1);
 	sol.setZero();
-
-	auto nl_solver = polysolve::nonlinear::Solver::create(in_args["solver"]["nonlinear"], in_args["solver"]["linear"], 1, logger());
-
-	igl::write_triangle_mesh("initial.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
 
 	nl_problem.line_search_begin(sol, sol);
 	if (!std::isfinite(nl_problem.value(sol))
@@ -256,17 +247,38 @@ int main(int argc, char **argv)
 		|| !nl_problem.is_step_collision_free(sol, sol))
 		log_and_throw_error("Failed to apply boundary conditions!");
 
-	nl_problem.init(sol);
-	try
-	{
-		nl_solver->minimize(nl_problem, sol);
-	}
-	catch (const std::runtime_error &e)
-	{
-		throw e;
-	}
 
-	igl::write_triangle_mesh("result.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
+	std::shared_ptr<polysolve::nonlinear::Solver> nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["augmented_lagrangian"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
+
+	ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm> al_solver(
+		lagr_form, pen_form,
+		state.args["solver"]["augmented_lagrangian"]["initial_weight"],
+		state.args["solver"]["augmented_lagrangian"]["scaling"],
+		state.args["solver"]["augmented_lagrangian"]["max_weight"],
+		state.args["solver"]["augmented_lagrangian"]["eta"],
+		[&](const Eigen::VectorXd &x) {
+			state.solve_data.update_barrier_stiffness(sol);
+		});
+
+	// al_solver.post_subsolve = [&](const double al_weight) {
+	// 	stats.solver_info.push_back(
+	// 		{{"type", al_weight > 0 ? "al" : "rc"},
+	// 			{"t", t}, // TODO: null if static?
+	// 			{"info", nl_solver->info()}});
+	// 	if (al_weight > 0)
+	// 		stats.solver_info.back()["weight"] = al_weight;
+	// 	save_subsolve(++subsolve_count, t, sol, Eigen::MatrixXd()); // no pressure
+	// };
+
+	Eigen::MatrixXd prev_sol = sol;
+	al_solver.solve_al(nl_solver, nl_problem, sol);
+
+	igl::write_triangle_mesh("resultA.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
+
+	nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
+	al_solver.solve_reduced(nl_solver, nl_problem, sol);
+
+	igl::write_triangle_mesh("resultB.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
 
 	return EXIT_SUCCESS;
 }

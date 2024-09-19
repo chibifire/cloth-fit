@@ -302,7 +302,7 @@ namespace polyfem
 
 		std::shared_ptr<polysolve::nonlinear::Solver> nl_solver = make_nl_solver(true);
 
-		ALSolver al_solver(
+		ALSolver<NLProblem, BCLagrangianForm, BCPenaltyForm> al_solver(
 			solve_data.al_lagr_form, solve_data.al_pen_form,
 			args["solver"]["augmented_lagrangian"]["initial_weight"],
 			args["solver"]["augmented_lagrangian"]["scaling"],
