@@ -125,10 +125,9 @@ int main(int argc, char **argv)
 	State state;
 	state.init(in_args, false);
 
-	std::string root = "/Users/zizhouhuang/Desktop/cloth-fit/python_clothing_deformer/scripts/initialization/";
-	std::string avatar_mesh_path = root + "avatar.obj";
-	std::string skinny_avatar_mesh_path = root + "projected_standard.obj";
-	std::string garment_mesh_path = root + "garment.obj";
+	const std::string avatar_mesh_path = in_args["avatar_mesh_path"];
+	const std::string skinny_avatar_mesh_path = in_args["skinny_avatar_mesh_path"];
+	const std::string garment_mesh_path = in_args["garment_mesh_path"];
 
 	const double scaling = 1e2;
 
@@ -221,11 +220,6 @@ int main(int argc, char **argv)
 		lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(avatar_v - skinny_avatar_v), indices);
 		forms.push_back(lagr_form);
 
-		// IPC is enough to prevent zero area
-		// auto area_form = std::make_shared<AreaForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()), state.args["area_penalty_threshold"]);
-		// area_form->set_weight(state.args["area_penalty_weight"]);
-		// forms.push_back(area_form);
-
 		auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
 		angle_form->set_weight(state.args["angle_penalty_weight"]);
 		forms.push_back(angle_form);
@@ -273,12 +267,12 @@ int main(int argc, char **argv)
 	Eigen::MatrixXd prev_sol = sol;
 	al_solver.solve_al(nl_solver, nl_problem, sol);
 
-	igl::write_triangle_mesh("resultA.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
+	// igl::write_triangle_mesh("resultA.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
 
 	nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
 	al_solver.solve_reduced(nl_solver, nl_problem, sol);
 
-	igl::write_triangle_mesh("resultB.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
+	// igl::write_triangle_mesh("resultB.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
 
 	return EXIT_SUCCESS;
 }
