@@ -146,7 +146,7 @@ namespace polyfem::solver
 		else
 		{
 			reduced.setZero();
-			reduced.resize(full.size() - 1, full.size() - 1);
+			reduced.resize(full.rows() - 1, full.cols() - 1);
 
 			std::vector<Eigen::Triplet<double>> T;
 			for (int k = 0; k < full.outerSize(); ++k)
