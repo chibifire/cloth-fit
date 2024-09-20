@@ -1,7 +1,7 @@
 #include "ALSolver.hpp"
 #include <polyfem/solver/forms/BCLagrangianForm.hpp>
 #include <polyfem/solver/forms/BCPenaltyForm.hpp>
-#include <polyfem/solver/forms/GarmentForm.hpp>
+#include <polyfem/solver/forms/GarmentALForm.hpp>
 
 #include <polyfem/utils/Logger.hpp>
 

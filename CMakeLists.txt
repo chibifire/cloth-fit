@@ -93,6 +93,9 @@ endif()
 set(POLYFEM_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/polyfem")
 set(POLYFEM_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/src")
 
+set(CPM_polysolve_SOURCE "/Users/zizhouhuang/Desktop/polysolve")
+set(CPM_ipc-toolkit_SOURCE "/Users/zizhouhuang/Desktop/ipc-toolkit")
+
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/polyfem/")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/recipes/")
 

@@ -14,6 +14,7 @@
 #include <polyfem/State.hpp>
 #include <polyfem/solver/forms/ContactForm.hpp>
 #include <polyfem/solver/forms/GarmentForm.hpp>
+#include <polyfem/solver/forms/GarmentALForm.hpp>
 #include <polyfem/solver/GarmentNLProblem.hpp>
 #include <polyfem/solver/ALSolver.hpp>
 #include <polyfem/io/OBJWriter.hpp>
@@ -276,3 +277,28 @@ int main(int argc, char **argv)
 
 	return EXIT_SUCCESS;
 }
+
+
+
+// #include <iostream>
+// #include <Eigen/SparseCore>
+
+// void assign(Eigen::SparseMatrix<double, Eigen::ColMajor> &mat)
+// {
+// 	mat.resize(0, 0);
+
+// 	Eigen::SparseMatrix<double, Eigen::ColMajor> A;
+	
+// 	A.resize(2206, 2206);
+// 	A.setIdentity();
+
+// 	mat = A;
+
+// 	std::cout << "mat:\n" << mat.rows() << std::endl;
+// 	std::cout << "A:\n" << A.rows() << std::endl;
+// }
+
+// int main() {
+// 	Eigen::SparseMatrix<double, Eigen::ColMajor> B;
+// 	assign(B);
+// }
