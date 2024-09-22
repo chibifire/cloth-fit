@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Form.hpp"
+#include <polyfem/solver/forms/Form.hpp>
 
 #include <polyfem/Common.hpp>
 #include <polyfem/utils/Types.hpp>

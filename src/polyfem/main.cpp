@@ -13,9 +13,9 @@
 
 #include <polyfem/State.hpp>
 #include <polyfem/solver/forms/ContactForm.hpp>
-#include <polyfem/solver/forms/GarmentForm.hpp>
-#include <polyfem/solver/forms/GarmentALForm.hpp>
-#include <polyfem/solver/forms/CurveConstraintForm.hpp>
+#include <polyfem/solver/forms/garment_forms/GarmentForm.hpp>
+#include <polyfem/solver/forms/garment_forms/GarmentALForm.hpp>
+#include <polyfem/solver/forms/garment_forms/CurveConstraintForm.hpp>
 #include <polyfem/solver/GarmentNLProblem.hpp>
 #include <polyfem/solver/ALSolver.hpp>
 #include <polyfem/io/OBJWriter.hpp>

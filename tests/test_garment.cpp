@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
-#include <polyfem/solver/forms/GarmentForm.hpp>
-#include <polyfem/solver/forms/CurveConstraintForm.hpp>
+#include <polyfem/solver/forms/garment_forms/GarmentForm.hpp>
+#include <polyfem/solver/forms/garment_forms/CurveConstraintForm.hpp>
 
 #include <finitediff.hpp>
 
