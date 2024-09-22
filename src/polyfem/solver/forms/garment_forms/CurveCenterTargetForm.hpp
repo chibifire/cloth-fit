@@ -10,16 +10,13 @@
 
 namespace polyfem::solver
 {
-	std::vector<Eigen::VectorXi> boundary_curves(const Eigen::MatrixXi &F);
-
-	class CurveCurvatureForm : public Form
+	class CurveCenterTargetForm : public Form
 	{
 	public:
-		CurveCurvatureForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
-		CurveCurvatureForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves);
-		virtual ~CurveCurvatureForm() = default;
+		CurveCenterTargetForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves, const Eigen::MatrixXd &target) : V_(V), curves_(curves), target_(target) {}
+		virtual ~CurveCenterTargetForm() = default;
 
-		std::string name() const override { return "curve-curvature"; }
+		std::string name() const override { return "curve-target"; }
 
 	protected:
 		/// @brief Compute the potential value
@@ -38,11 +35,9 @@ namespace polyfem::solver
 		void second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const override;
 
     private:
-        std::vector<Eigen::MatrixXd> compute_angles(const Eigen::MatrixXd &V) const;
+        const Eigen::MatrixXd V_;
 
-		const Eigen::MatrixXd V_;
         const std::vector<Eigen::VectorXi> curves_;
-
-		std::vector<Eigen::MatrixXd> orig_angles;
+        const Eigen::MatrixXd target_;
 	};
 }

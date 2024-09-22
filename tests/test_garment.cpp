@@ -1,6 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include <polyfem/solver/forms/garment_forms/GarmentForm.hpp>
 #include <polyfem/solver/forms/garment_forms/CurveConstraintForm.hpp>
+#include <polyfem/solver/forms/garment_forms/CurveCenterTargetForm.hpp>
 
 #include <finitediff.hpp>
 
@@ -70,8 +71,12 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 	Eigen::MatrixXi F;
     igl::read_triangle_mesh("/Users/zizhouhuang/Desktop/cloth-fit/cpp_clothing_deformer/garment.obj", V, F);
 	
+	auto curves = boundary_curves(F);
+	Eigen::MatrixXd target(curves.size(), 3);
+	target.setRandom();
+
 	std::vector<std::unique_ptr<Form>> forms;
-    forms.push_back(std::make_unique<CurveCurvatureForm>(V, F));
+    forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
 	forms.push_back(std::make_unique<AngleForm>(V, F));
 	forms.push_back(std::make_unique<SimilarityForm>(V, F));
 
@@ -93,6 +98,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
         REQUIRE(grad.norm() < 1e-12);
     }
 
+	forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, target));
     forms.push_back(std::make_unique<AreaForm>(V, F, 1));
 
 	for (auto &form : forms)

@@ -12,13 +12,13 @@ using namespace polyfem::autogen;
 
 namespace polyfem::solver
 {
-    CurveCurvatureForm::CurveCurvatureForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : V_(V)
-    {
+	std::vector<Eigen::VectorXi> boundary_curves(const Eigen::MatrixXi &F)
+	{
         Eigen::MatrixXi edges;
         igl::boundary_facets(F, edges);
 
         if (edges.size() == 0)
-            return;
+            return {};
         
         Eigen::SparseMatrix<int> A;
         igl::adjacency_matrix(edges, A);
@@ -26,8 +26,9 @@ namespace polyfem::solver
         Eigen::VectorXi C, K1;
         const int n_connected = igl::connected_components(A, C, K1);
 
-        logger().debug("[{}] Number of curve loops: {}", name(), n_connected);
+        // logger().debug("[{}] Number of curve loops: {}", name(), n_connected);
 
+        std::vector<Eigen::VectorXi> curves;
         for (int i = 0; i < n_connected; i++)
         {
             if (K1(i) < 2)
@@ -52,14 +53,22 @@ namespace polyfem::solver
 
             curves.push_back(std::move(I_prime));
         }
+        return curves;
+	}
 
+    CurveCurvatureForm::CurveCurvatureForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves) : V_(V), curves_(curves)
+    {
         orig_angles = compute_angles(V);
+    }
+
+    CurveCurvatureForm::CurveCurvatureForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : CurveCurvatureForm(V, boundary_curves(F))
+    {
     }
 
     std::vector<Eigen::MatrixXd> CurveCurvatureForm::compute_angles(const Eigen::MatrixXd &V) const
     {
         std::vector<Eigen::MatrixXd> out;
-        for (const auto &curve : curves)
+        for (const auto &curve : curves_)
         {
             Eigen::MatrixXd result(curve.size() - 2, 2);
             for (int i = 0; i < curve.size() - 2; i++)
@@ -97,9 +106,9 @@ namespace polyfem::solver
         const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
         gradv.setZero(x.size());
-        for (int c = 0; c < curves.size(); c++)
+        for (int c = 0; c < curves_.size(); c++)
         {
-            const auto &curve = curves[c];
+            const auto &curve = curves_[c];
             for (int i = 0; i < curve.size() - 2; i++)
             {
                 const Eigen::Ref<const Eigen::Vector3d> p1 = V.row(curve(i));
@@ -136,9 +145,9 @@ namespace polyfem::solver
         const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
         std::vector<Eigen::Triplet<double>> triplets;
-        for (int c = 0; c < curves.size(); c++)
+        for (int c = 0; c < curves_.size(); c++)
         {
-            const auto &curve = curves[c];
+            const auto &curve = curves_[c];
             for (int i = 0; i < curve.size() - 2; i++)
             {
                 const Eigen::Ref<const Eigen::Vector3d> p1 = V.row(curve(i));
