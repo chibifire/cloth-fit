@@ -16,7 +16,6 @@
 #include <polyfem/solver/forms/L2ProjectionForm.hpp>
 #include <polyfem/solver/forms/LaggedRegForm.hpp>
 #include <polyfem/solver/forms/RayleighDampingForm.hpp>
-#include <polyfem/solver/forms/GarmentForm.hpp>
 
 #include <polyfem/time_integrator/ImplicitEuler.hpp>
 
@@ -582,79 +581,4 @@ TEST_CASE("Fixed corotational form derivatives", "[form][form_derivatives][elast
 		state_ptr->mesh->is_volume());
 	form.update_quantities(0, Eigen::VectorXd::Ones(state_ptr->n_bases * dim));
 	test_form(form, *state_ptr, 1e-7, 1e-4);
-}
-
-TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
-{
-	const int dim = 3;
-	const auto state_ptr = get_state(dim);
-
-	Eigen::MatrixXd V;
-	state_ptr->get_vertices(V);
-
-	Eigen::MatrixXi T, F;
-	state_ptr->get_elements(T);
-
-	igl::boundary_facets(T, F);
-	
-	std::vector<std::unique_ptr<Form>> forms;
-	forms.push_back(std::make_unique<AngleForm>(V, F));
-	forms.push_back(std::make_unique<SimilarityForm>(V, F));
-	forms.push_back(std::make_unique<AreaForm>(V, F, 1));
-
-	static const int n_rand = 10;
-	const double step = 1e-8;
-	const double tol = 1e-6;
-
-	for (auto &form : forms)
-	{
-		Eigen::VectorXd x = Eigen::VectorXd::Zero(V.size());
-
-		form->init(x);
-		form->init_lagging(x);
-
-		for (int rand = 0; rand < n_rand; ++rand)
-		{
-			// Test gradient with finite differences
-			{
-				Eigen::VectorXd grad;
-				form->first_derivative(x, grad);
-
-				Eigen::VectorXd fgrad;
-				fd::finite_gradient(
-					x, [&form](const Eigen::VectorXd &x) -> double { return form->value(x); }, fgrad,
-					fd::AccuracyOrder::SECOND, step);
-
-				std::cout << std::setprecision(12) << "grad: " << grad.norm() << ", fd: " << fgrad.norm() << "\n";
-				std::cout << std::setprecision(12) << "relative error: " << (grad - fgrad).norm() / fgrad.norm() << "\n";
-				REQUIRE((grad - fgrad).norm() < tol * std::max(1.e-6, fgrad.norm()));
-				// std::cout << grad.transpose() << "\n\n" << fgrad.transpose() << "\n\n";
-			}
-
-			// Test hessian with finite differences
-			{
-				StiffnessMatrix hess;
-				form->second_derivative(x, hess);
-
-				Eigen::MatrixXd fhess;
-				fd::finite_jacobian(
-					x,
-					[&form](const Eigen::VectorXd &x) -> Eigen::VectorXd {
-						Eigen::VectorXd grad;
-						form->first_derivative(x, grad);
-						return grad;
-					},
-					fhess,
-					fd::AccuracyOrder::SECOND, step);
-
-				std::cout << std::setprecision(12) << "hess: " << hess.norm() << ", fd: " << fhess.norm() << "\n";
-				std::cout << std::setprecision(12) << "relative error: " << (hess - fhess).norm() / fhess.norm() << "\n";
-				REQUIRE((hess - fhess).norm() < tol * std::max(1.e-6, fhess.norm()));
-				// std::cout << (Eigen::MatrixXd)hess << "\n\n" << fhess << "\n\n";
-			}
-
-			x.setRandom();
-			x /= 100;
-		}
-	}
 }

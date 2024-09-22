@@ -216,7 +216,7 @@ namespace polyfem::solver {
                 // grad of cosine
                 {
                     Eigen::Matrix<double, 12, 1> local_grad;
-                    normalized_dot_gradient(
+                    normal_dot_product_gradient(
                         V(indices(0), 0), V(indices(0), 1), V(indices(0), 2),
                         V(indices(1), 0), V(indices(1), 1), V(indices(1), 2),
                         V(indices(2), 0), V(indices(2), 1), V(indices(2), 2),
@@ -231,7 +231,7 @@ namespace polyfem::solver {
                 {
                     Eigen::Matrix<double, 12, 1> local_grad;
 
-                    normalized_mix_prod_gradient(
+                    normal_triple_product_gradient(
                         V(indices(0), 0), V(indices(0), 1), V(indices(0), 2),
                         V(indices(1), 0), V(indices(1), 1), V(indices(1), 2),
                         V(indices(2), 0), V(indices(2), 1), V(indices(2), 2),
@@ -286,14 +286,14 @@ namespace polyfem::solver {
                 // hess of cosine
                 {
                     Eigen::Matrix<double, 12, 1> local_grad;
-                    normalized_dot_gradient(
+                    normal_dot_product_gradient(
                         V(indices(0), 0), V(indices(0), 1), V(indices(0), 2),
                         V(indices(1), 0), V(indices(1), 1), V(indices(1), 2),
                         V(indices(2), 0), V(indices(2), 1), V(indices(2), 2),
                         V(indices(3), 0), V(indices(3), 1), V(indices(3), 2),
                         local_grad.data());
                     Eigen::Matrix<double, 12, 12> tmp_hess;
-                    normalized_dot_hessian(
+                    normal_dot_product_hessian(
                         V(indices(0), 0), V(indices(0), 1), V(indices(0), 2),
                         V(indices(1), 0), V(indices(1), 1), V(indices(1), 2),
                         V(indices(2), 0), V(indices(2), 1), V(indices(2), 2),
@@ -306,7 +306,7 @@ namespace polyfem::solver {
                 // grad of sine
                 {
                     Eigen::Matrix<double, 12, 1> local_grad;                    
-                    normalized_mix_prod_gradient(
+                    normal_triple_product_gradient(
                         V(indices(0), 0), V(indices(0), 1), V(indices(0), 2),
                         V(indices(1), 0), V(indices(1), 1), V(indices(1), 2),
                         V(indices(2), 0), V(indices(2), 1), V(indices(2), 2),
@@ -314,7 +314,7 @@ namespace polyfem::solver {
                         local_grad.data());
 
                     Eigen::Matrix<double, 12, 12> tmp_hess;
-                    normalized_mix_prod_hessian(
+                    normal_triple_product_hessian(
                         V(indices(0), 0), V(indices(0), 1), V(indices(0), 2),
                         V(indices(1), 0), V(indices(1), 1), V(indices(1), 2),
                         V(indices(2), 0), V(indices(2), 1), V(indices(2), 2),

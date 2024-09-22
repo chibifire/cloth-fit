@@ -15,6 +15,7 @@
 #include <polyfem/solver/forms/ContactForm.hpp>
 #include <polyfem/solver/forms/GarmentForm.hpp>
 #include <polyfem/solver/forms/GarmentALForm.hpp>
+#include <polyfem/solver/forms/CurveConstraintForm.hpp>
 #include <polyfem/solver/GarmentNLProblem.hpp>
 #include <polyfem/solver/ALSolver.hpp>
 #include <polyfem/io/OBJWriter.hpp>
@@ -228,6 +229,10 @@ int main(int argc, char **argv)
 		auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
 		similarity_form->set_weight(state.args["similarity_penalty_weight"]);
 		forms.push_back(similarity_form);
+
+		auto curvature_form = std::make_shared<CurveCurvatureForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
+		curvature_form->set_weight(state.args["curvature_penalty_weight"]);
+		forms.push_back(curvature_form);
 	}
 
 	forms.push_back(contact_form);

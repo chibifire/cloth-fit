@@ -11,6 +11,7 @@ set(test_sources
   test_cmesh.cpp
   test_collision_proxy.cpp
   test_form_derivatives.cpp
+  test_garment.cpp
   test_geometry_utils.cpp
   test_hdf5.cpp
   test_interpolation.cpp

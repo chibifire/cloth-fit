@@ -72,7 +72,7 @@ namespace autogen {
     ///     n1 = numpy.cross((b - a), (c - a))
     ///     n2 = numpy.cross((e - d), (f - d))
     ///     return n1.dot(n2) / sympy.sqrt(n1.dot(n1) * n2.dot(n2))
-    void normalized_dot_gradient(
+    void normal_dot_product_gradient(
         double t0_x,
         double t0_y,
         double t0_z,
@@ -93,7 +93,7 @@ namespace autogen {
     ///     n2 = numpy.cross((e - d), (f - d))
     ///     return n1.dot(n2) / sympy.sqrt(n1.dot(n1) * n2.dot(n2))
     // dA is (324×1) flattened in column-major order
-    void normalized_dot_hessian(
+    void normal_dot_product_hessian(
         double t0_x,
         double t0_y,
         double t0_z,
@@ -108,7 +108,7 @@ namespace autogen {
         double t3_z,
         double dA[144]);
 
-    void normalized_mix_prod_gradient(
+    void normal_triple_product_gradient(
         double t0_x,
         double t0_y,
         double t0_z,
@@ -123,7 +123,7 @@ namespace autogen {
         double t3_z,
         double dA[12]);
     // dA is (144×1) flattened in column-major order
-    void normalized_mix_prod_hessian(
+    void normal_triple_product_hessian(
         double t0_x,
         double t0_y,
         double t0_z,
@@ -151,6 +151,56 @@ namespace autogen {
         double dA[9]);
     // dA is (81×1) flattened in column-major order
     void point_edge_distance_hessian(
+        double t0_x,
+        double t0_y,
+        double t0_z,
+        double t1_x,
+        double t1_y,
+        double t1_z,
+        double t2_x,
+        double t2_y,
+        double t2_z,
+        double dA[81]);
+
+
+    void curve_cross_product_norm_gradient(
+        double t0_x,
+        double t0_y,
+        double t0_z,
+        double t1_x,
+        double t1_y,
+        double t1_z,
+        double t2_x,
+        double t2_y,
+        double t2_z,
+        double dA[9]);
+    // dA is (81×1) flattened in column-major order
+    void curve_cross_product_norm_hessian(
+        double t0_x,
+        double t0_y,
+        double t0_z,
+        double t1_x,
+        double t1_y,
+        double t1_z,
+        double t2_x,
+        double t2_y,
+        double t2_z,
+        double dA[81]);
+
+
+    void curve_dot_product_norm_gradient(
+        double t0_x,
+        double t0_y,
+        double t0_z,
+        double t1_x,
+        double t1_y,
+        double t1_z,
+        double t2_x,
+        double t2_y,
+        double t2_z,
+        double dA[9]);
+    // dA is (81×1) flattened in column-major order
+    void curve_dot_product_norm_hessian(
         double t0_x,
         double t0_y,
         double t0_z,
