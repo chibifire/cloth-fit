@@ -12,18 +12,133 @@
 #include <polysolve/nonlinear/Solver.hpp>
 
 #include <polyfem/State.hpp>
+#include <polyfem/utils/StringUtils.hpp>
 #include <polyfem/solver/forms/ContactForm.hpp>
 #include <polyfem/solver/forms/garment_forms/GarmentForm.hpp>
 #include <polyfem/solver/forms/garment_forms/GarmentALForm.hpp>
 #include <polyfem/solver/forms/garment_forms/CurveConstraintForm.hpp>
+#include <polyfem/solver/forms/garment_forms/CurveCenterTargetForm.hpp>
 #include <polyfem/solver/GarmentNLProblem.hpp>
 #include <polyfem/solver/ALSolver.hpp>
 #include <polyfem/io/OBJWriter.hpp>
 #include <polyfem/utils/JSONUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
 
+#include <fstream>
+
 using namespace polyfem;
 using namespace solver;
+
+template <int dim>
+class Transformation {
+public:
+	/// @brief y = A * x + b
+	/// @param A 
+	/// @param b 
+	Transformation(const Eigen::Matrix<double, dim, dim> &A, const Eigen::Vector<double, dim> &b) : A_(A), b_(b)
+	{
+	}
+
+	void apply(Eigen::MatrixXd &V) const
+	{
+		V = (V * A_.transpose()).eval().rowwise() + b_.transpose();
+	}
+
+	void invert(Eigen::MatrixXd &V) const
+	{
+		V = (V.rowwise() - b_).eval() * A_.transpose().inv();
+	}
+
+private:
+	const Eigen::Matrix<double, dim, dim> A_;
+	const Eigen::Vector<double, dim> b_;
+};
+
+void read_edge_mesh(
+	const std::string &path,
+	Eigen::MatrixXd &V,
+	Eigen::MatrixXi &E)
+{
+	std::ifstream infile(path);
+
+	V.resize(0, 3);
+	E.resize(0, 2);
+	std::string line;
+	while (std::getline(infile, line))
+	{
+		std::istringstream iss(line.substr(2));
+		if (utils::StringUtils::startswith(line, "v "))
+		{
+			V.conservativeResize(V.rows() + 1, 3);
+
+			double a, b, c;
+			if (iss >> a >> b >> c)
+				V.row(V.rows()-1) << a, b, c;
+			else
+				log_and_throw_error("read_edge_mesh failed to load vertex {}", V.rows() - 1);
+		}
+		else if (utils::StringUtils::startswith(line, "l "))
+		{
+			E.conservativeResize(E.rows() + 1, 2);
+
+			int a, b;
+			if (iss >> a >> b)
+				E.row(E.rows()-1) << a - 1, b - 1;
+			else
+				log_and_throw_error("read_edge_mesh failed to load edge {}", E.rows() - 1);
+		}
+		else if (utils::StringUtils::startswith(line, "f "))
+		{
+			log_and_throw_error("read_edge_mesh does not support faces!");
+		}
+	}
+}
+
+Eigen::Vector2d point_edge_closest_distance(
+	const Eigen::Vector3d &p,
+	const Eigen::Vector3d &a,
+	const Eigen::Vector3d &b)
+{
+	const Eigen::Vector3d e = b - a;
+	const Eigen::Vector3d d = p - a;
+	const double t = e.dot(d) / e.squaredNorm();
+	const double dist = (d - t * e).squaredNorm();
+	return Eigen::Vector2d(dist, t);
+}
+
+Eigen::MatrixXd extract_curve_center_targets(
+	const Eigen::MatrixXd &garment_v,
+	const std::vector<Eigen::VectorXi> &curves,
+	const Eigen::MatrixXd &skeleton_v,
+	const Eigen::MatrixXi &skeleton_bones,
+	const Eigen::MatrixXd &target_skeleton_v)
+{
+	Eigen::MatrixXd targets(curves.size(), 3);
+	for (int j = 0; j < curves.size(); j++)
+	{
+		// Compute centers of curves
+		Eigen::Vector3d center = garment_v(curves[j], Eigen::all).colwise().sum() / curves[j].size();
+
+		// Project centers to original skeleton bones
+		int id = 0;
+		double closest_dist = std::numeric_limits<double>::max(), closest_uv = 0;
+		for (int i = 0; i < skeleton_bones.rows(); i++)
+		{
+			Eigen::Vector2d tmp = point_edge_closest_distance(center, skeleton_v.row(skeleton_bones(i, 0)), skeleton_v.row(skeleton_bones(i, 1)));
+			if (tmp(0) < closest_dist)
+			{
+				closest_dist = tmp(0);
+				closest_uv = tmp(1);
+				id = i;
+			}
+		}
+
+		// Map positions to new skeleton bones
+		targets.row(j) = closest_uv * (target_skeleton_v.row(skeleton_bones(id, 1)) - target_skeleton_v.row(skeleton_bones(id, 0))) + target_skeleton_v.row(skeleton_bones(id, 0));
+	}
+
+	return targets;
+}
 
 bool has_arg(const CLI::App &command_line, const std::string &value)
 {
@@ -136,17 +251,17 @@ int main(int argc, char **argv)
 	Eigen::MatrixXd avatar_v;
 	Eigen::MatrixXi avatar_f;
 	igl::read_triangle_mesh(avatar_mesh_path, avatar_v, avatar_f);
-	avatar_v *= scaling;
 
 	Eigen::MatrixXd skinny_avatar_v;
 	Eigen::MatrixXi skinny_avatar_f;
 	igl::read_triangle_mesh(skinny_avatar_mesh_path, skinny_avatar_v, skinny_avatar_f);
-	skinny_avatar_v *= scaling;
 
-	{
-		Eigen::Vector3d center = (skinny_avatar_v.colwise().sum() - avatar_v.colwise().sum()) / avatar_v.rows();
-		avatar_v.rowwise() += center.transpose();
-	}
+	const Eigen::Vector3d center = (skinny_avatar_v.colwise().sum() - avatar_v.colwise().sum()) / avatar_v.rows();
+	Transformation<3> trans(scaling * Eigen::Matrix3d::Identity(), scaling * center);
+
+	skinny_avatar_v *= scaling;
+	trans.apply(avatar_v);
+
 	skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-4;
 
 	Eigen::MatrixXd garment_v;
@@ -230,9 +345,30 @@ int main(int argc, char **argv)
 		similarity_form->set_weight(state.args["similarity_penalty_weight"]);
 		forms.push_back(similarity_form);
 
-		auto curvature_form = std::make_shared<CurveCurvatureForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
+		auto curves = boundary_curves(collision_triangles.bottomRows(garment_f.rows()));
+
+		auto curvature_form = std::make_shared<CurveCurvatureForm>(collision_vertices, curves);
 		curvature_form->set_weight(state.args["curvature_penalty_weight"]);
 		forms.push_back(curvature_form);
+
+		{
+			Eigen::MatrixXd skeleton_v, target_skeleton_v;
+			Eigen::MatrixXi skeleton_bones, target_skeleton_bones;
+			read_edge_mesh(state.args["original_skeleton_path"], skeleton_v, skeleton_bones);
+			read_edge_mesh(state.args["target_skeleton_path"], target_skeleton_v, target_skeleton_bones);
+			skeleton_v *= scaling;
+
+			assert((skeleton_bones - target_skeleton_bones).squaredNorm() < 1);
+
+			Eigen::MatrixXd centers = extract_curve_center_targets(collision_vertices, curves, skeleton_v, skeleton_bones, target_skeleton_v);
+			trans.apply(centers);
+
+			std::cout << centers << std::endl;
+			
+			auto center_target_form = std::make_shared<CurveCenterTargetForm>(collision_vertices, curves, centers);
+			center_target_form->set_weight(state.args["curve_center_target_weight"]);
+			forms.push_back(center_target_form);
+		}
 	}
 
 	forms.push_back(contact_form);
