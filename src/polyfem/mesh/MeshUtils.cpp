@@ -7,6 +7,8 @@
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/utils/MatrixUtils.hpp>
 #include <polyfem/utils/HashUtils.hpp>
+#include <polyfem/mesh/mesh2D/Navigation.hpp>
+#include <polyfem/mesh/mesh2D/Refinement.hpp>
 
 #include <unordered_set>
 
@@ -1282,4 +1284,65 @@ void polyfem::mesh::generate_edges(GEO::Mesh &M)
 			prev_e = e;
 		}
 	}
+}
+
+void polyfem::mesh::read_edge_mesh(
+	const std::string &path,
+	Eigen::MatrixXd &V,
+	Eigen::MatrixXi &E)
+{
+	std::ifstream infile(path);
+
+	V.resize(0, 3);
+	E.resize(0, 2);
+	std::string line;
+	while (std::getline(infile, line))
+	{
+		std::istringstream iss(line.substr(2));
+		if (utils::StringUtils::startswith(line, "v "))
+		{
+			V.conservativeResize(V.rows() + 1, 3);
+
+			double a, b, c;
+			if (iss >> a >> b >> c)
+				V.row(V.rows()-1) << a, b, c;
+			else
+				log_and_throw_error("read_edge_mesh failed to load vertex {}", V.rows() - 1);
+		}
+		else if (utils::StringUtils::startswith(line, "l "))
+		{
+			E.conservativeResize(E.rows() + 1, 2);
+
+			int a, b;
+			if (iss >> a >> b)
+				E.row(E.rows()-1) << a - 1, b - 1;
+			else
+				log_and_throw_error("read_edge_mesh failed to load edge {}", E.rows() - 1);
+		}
+		else if (utils::StringUtils::startswith(line, "f "))
+		{
+			log_and_throw_error("read_edge_mesh does not support faces!");
+		}
+	}
+}
+
+std::tuple<Eigen::MatrixXd, Eigen::MatrixXi> polyfem::mesh::refine(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F)
+{
+	GEO::Mesh mesh, mesh_ref;
+	to_geogram_mesh(V, F, mesh);
+	Navigation::prepare_mesh(mesh);
+	refine_triangle_mesh(mesh, mesh_ref);
+
+	Eigen::MatrixXd Vnew(mesh_ref.vertices.nb(), 3);
+	Eigen::MatrixXi Fnew(mesh_ref.facets.nb(), 3);
+
+	for (int i = 0; i < Fnew.rows(); i++)
+		for (int j = 0; j < 3; j++)
+			Fnew(i, j) = mesh_ref.facets.vertex(i, j);
+	
+	for (int i = 0; i < Vnew.rows(); i++)
+		for (int d = 0; d < 3; d++)
+			Vnew(i, d) = *(mesh_ref.vertices.point_ptr(i) + d);
+
+	return {Vnew, Fnew};
 }

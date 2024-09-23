@@ -66,6 +66,8 @@ namespace polyfem::solver
 
 		void set_apply_DBC(const TVector &x, const bool val);
 
+		std::function<void(const Eigen::VectorXd &sol)> post_step_call_back;
+
 	protected:
 		const int full_size_;    ///< Size of the full problem
 		const int reduced_size_; ///< Size of the reduced problem

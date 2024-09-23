@@ -12,6 +12,19 @@ using namespace polyfem::autogen;
 
 namespace polyfem::solver
 {
+    namespace {
+        Eigen::Vector2d point_edge_closest_distance(
+            const Eigen::Vector3d &p,
+            const Eigen::Vector3d &a,
+            const Eigen::Vector3d &b)
+        {
+            const Eigen::Vector3d e = b - a;
+            const Eigen::Vector3d d = p - a;
+            const double t = e.dot(d) / e.squaredNorm();
+            const double dist = (d - t * e).squaredNorm();
+            return Eigen::Vector2d(dist, t);
+        }
+    }
 	std::vector<Eigen::VectorXi> boundary_curves(const Eigen::MatrixXi &F)
 	{
         Eigen::MatrixXi edges;
@@ -55,6 +68,40 @@ namespace polyfem::solver
         }
         return curves;
 	}
+
+    Eigen::MatrixXd extract_curve_center_targets(
+        const Eigen::MatrixXd &garment_v,
+        const std::vector<Eigen::VectorXi> &curves,
+        const Eigen::MatrixXd &skeleton_v,
+        const Eigen::MatrixXi &skeleton_bones,
+        const Eigen::MatrixXd &target_skeleton_v)
+    {
+        Eigen::MatrixXd targets(curves.size(), 3);
+        for (int j = 0; j < curves.size(); j++)
+        {
+            // Compute centers of curves
+            Eigen::Vector3d center = garment_v(curves[j], Eigen::all).colwise().sum() / curves[j].size();
+
+            // Project centers to original skeleton bones
+            int id = 0;
+            double closest_dist = std::numeric_limits<double>::max(), closest_uv = 0;
+            for (int i = 0; i < skeleton_bones.rows(); i++)
+            {
+                Eigen::Vector2d tmp = point_edge_closest_distance(center, skeleton_v.row(skeleton_bones(i, 0)), skeleton_v.row(skeleton_bones(i, 1)));
+                if (tmp(0) < closest_dist)
+                {
+                    closest_dist = tmp(0);
+                    closest_uv = tmp(1);
+                    id = i;
+                }
+            }
+
+            // Map positions to new skeleton bones
+            targets.row(j) = closest_uv * (target_skeleton_v.row(skeleton_bones(id, 1)) - target_skeleton_v.row(skeleton_bones(id, 0))) + target_skeleton_v.row(skeleton_bones(id, 0));
+        }
+
+        return targets;
+    }
 
     CurveCurvatureForm::CurveCurvatureForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves) : V_(V), curves_(curves)
     {

@@ -23,121 +23,45 @@
 #include <polyfem/io/OBJWriter.hpp>
 #include <polyfem/utils/JSONUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
+#include <polyfem/mesh/MeshUtils.hpp>
+
+#include <paraviewo/ParaviewWriter.hpp>
+#include <paraviewo/VTUWriter.hpp>
 
 #include <fstream>
 
 using namespace polyfem;
 using namespace solver;
+using namespace mesh;
 
-template <int dim>
-class Transformation {
-public:
-	/// @brief y = A * x + b
-	/// @param A 
-	/// @param b 
-	Transformation(const Eigen::Matrix<double, dim, dim> &A, const Eigen::Vector<double, dim> &b) : A_(A), b_(b)
-	{
-	}
-
-	void apply(Eigen::MatrixXd &V) const
-	{
-		V = (V * A_.transpose()).eval().rowwise() + b_.transpose();
-	}
-
-	void invert(Eigen::MatrixXd &V) const
-	{
-		V = (V.rowwise() - b_).eval() * A_.transpose().inv();
-	}
-
-private:
-	const Eigen::Matrix<double, dim, dim> A_;
-	const Eigen::Vector<double, dim> b_;
-};
-
-void read_edge_mesh(
+void save_vtu(
 	const std::string &path,
-	Eigen::MatrixXd &V,
-	Eigen::MatrixXi &E)
+	GarmentNLProblem &prob,
+	const Eigen::MatrixXd &V,
+	const Eigen::MatrixXi &F,
+	const int n_avatar_vertices,
+	const Eigen::VectorXd &sol)
 {
-	std::ifstream infile(path);
+	std::shared_ptr<paraviewo::ParaviewWriter> tmpw = std::make_shared<paraviewo::VTUWriter>();
+	paraviewo::ParaviewWriter &writer = *tmpw;
 
-	V.resize(0, 3);
-	E.resize(0, 2);
-	std::string line;
-	while (std::getline(infile, line))
+	const Eigen::VectorXd complete_disp = prob.full_to_complete(prob.reduced_to_full(sol));
+
+	Eigen::VectorXd total_grad = Eigen::VectorXd::Zero(complete_disp.size());
+	for (const auto &form : prob.forms())
 	{
-		std::istringstream iss(line.substr(2));
-		if (utils::StringUtils::startswith(line, "v "))
-		{
-			V.conservativeResize(V.rows() + 1, 3);
-
-			double a, b, c;
-			if (iss >> a >> b >> c)
-				V.row(V.rows()-1) << a, b, c;
-			else
-				log_and_throw_error("read_edge_mesh failed to load vertex {}", V.rows() - 1);
-		}
-		else if (utils::StringUtils::startswith(line, "l "))
-		{
-			E.conservativeResize(E.rows() + 1, 2);
-
-			int a, b;
-			if (iss >> a >> b)
-				E.row(E.rows()-1) << a - 1, b - 1;
-			else
-				log_and_throw_error("read_edge_mesh failed to load edge {}", E.rows() - 1);
-		}
-		else if (utils::StringUtils::startswith(line, "f "))
-		{
-			log_and_throw_error("read_edge_mesh does not support faces!");
-		}
+		Eigen::VectorXd grad;
+		form->first_derivative(complete_disp, grad);
+		writer.add_field("grad_" + form->name(), utils::unflatten(grad, 3));
+		total_grad += grad;
 	}
-}
+	writer.add_field("grad", utils::unflatten(total_grad, 3));
 
-Eigen::Vector2d point_edge_closest_distance(
-	const Eigen::Vector3d &p,
-	const Eigen::Vector3d &a,
-	const Eigen::Vector3d &b)
-{
-	const Eigen::Vector3d e = b - a;
-	const Eigen::Vector3d d = p - a;
-	const double t = e.dot(d) / e.squaredNorm();
-	const double dist = (d - t * e).squaredNorm();
-	return Eigen::Vector2d(dist, t);
-}
+	Eigen::VectorXd body_ids = Eigen::VectorXd::Zero(V.rows());
+	body_ids.head(n_avatar_vertices).array() = 1;
+	writer.add_field("body_ids", body_ids);
 
-Eigen::MatrixXd extract_curve_center_targets(
-	const Eigen::MatrixXd &garment_v,
-	const std::vector<Eigen::VectorXi> &curves,
-	const Eigen::MatrixXd &skeleton_v,
-	const Eigen::MatrixXi &skeleton_bones,
-	const Eigen::MatrixXd &target_skeleton_v)
-{
-	Eigen::MatrixXd targets(curves.size(), 3);
-	for (int j = 0; j < curves.size(); j++)
-	{
-		// Compute centers of curves
-		Eigen::Vector3d center = garment_v(curves[j], Eigen::all).colwise().sum() / curves[j].size();
-
-		// Project centers to original skeleton bones
-		int id = 0;
-		double closest_dist = std::numeric_limits<double>::max(), closest_uv = 0;
-		for (int i = 0; i < skeleton_bones.rows(); i++)
-		{
-			Eigen::Vector2d tmp = point_edge_closest_distance(center, skeleton_v.row(skeleton_bones(i, 0)), skeleton_v.row(skeleton_bones(i, 1)));
-			if (tmp(0) < closest_dist)
-			{
-				closest_dist = tmp(0);
-				closest_uv = tmp(1);
-				id = i;
-			}
-		}
-
-		// Map positions to new skeleton bones
-		targets.row(j) = closest_uv * (target_skeleton_v.row(skeleton_bones(id, 1)) - target_skeleton_v.row(skeleton_bones(id, 0))) + target_skeleton_v.row(skeleton_bones(id, 0));
-	}
-
-	return targets;
+	writer.write_mesh(path, utils::unflatten(complete_disp, V.cols()) + V, F);
 }
 
 bool has_arg(const CLI::App &command_line, const std::string &value)
@@ -163,15 +87,6 @@ bool load_json(const std::string &json_file, json &out)
 
 	return true;
 }
-
-int forward_simulation(const CLI::App &command_line,
-					   const std::string &hdf5_file,
-					   const std::string output_dir,
-					   const unsigned max_threads,
-					   const bool is_strict,
-					   const bool fallback_solver,
-					   const spdlog::level::level_enum &log_level,
-					   json &in_args);
 
 int main(int argc, char **argv)
 {
@@ -267,6 +182,9 @@ int main(int argc, char **argv)
 	Eigen::MatrixXd garment_v;
 	Eigen::MatrixXi garment_f;
 	igl::read_triangle_mesh(garment_mesh_path, garment_v, garment_f);
+	int n_refs = state.args["geometry"][0]["n_refs"];
+	while (n_refs-- > 0)
+		std::tie(garment_v, garment_f) = refine(garment_v, garment_f);
 	garment_v *= scaling;
 
 	// remove duplicate vertices in the garment
@@ -362,8 +280,6 @@ int main(int argc, char **argv)
 
 			Eigen::MatrixXd centers = extract_curve_center_targets(collision_vertices, curves, skeleton_v, skeleton_bones, target_skeleton_v);
 			trans.apply(centers);
-
-			std::cout << centers << std::endl;
 			
 			auto center_target_form = std::make_shared<CurveCenterTargetForm>(collision_vertices, curves, centers);
 			center_target_form->set_weight(state.args["curve_center_target_weight"]);
@@ -395,26 +311,18 @@ int main(int argc, char **argv)
 		[&](const Eigen::VectorXd &x) {
 			state.solve_data.update_barrier_stiffness(sol);
 		});
-
-	// al_solver.post_subsolve = [&](const double al_weight) {
-	// 	stats.solver_info.push_back(
-	// 		{{"type", al_weight > 0 ? "al" : "rc"},
-	// 			{"t", t}, // TODO: null if static?
-	// 			{"info", nl_solver->info()}});
-	// 	if (al_weight > 0)
-	// 		stats.solver_info.back()["weight"] = al_weight;
-	// 	save_subsolve(++subsolve_count, t, sol, Eigen::MatrixXd()); // no pressure
-	// };
+	
+	nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
+		static int id = 1;
+		const std::string path = "step_" + std::to_string(id++) + ".vtu";
+		save_vtu(path, nl_problem, collision_vertices, collision_triangles, skinny_avatar_v.rows(), sol);
+	};
 
 	Eigen::MatrixXd prev_sol = sol;
 	al_solver.solve_al(nl_solver, nl_problem, sol);
 
-	// igl::write_triangle_mesh("resultA.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
-
 	nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
 	al_solver.solve_reduced(nl_solver, nl_problem, sol);
-
-	// igl::write_triangle_mesh("resultB.obj", contact_form->compute_displaced_surface(sol), collision_triangles);
 
 	return EXIT_SUCCESS;
 }

@@ -12,6 +12,13 @@ namespace polyfem::solver
 {
 	std::vector<Eigen::VectorXi> boundary_curves(const Eigen::MatrixXi &F);
 
+	Eigen::MatrixXd extract_curve_center_targets(
+		const Eigen::MatrixXd &garment_v,
+		const std::vector<Eigen::VectorXi> &curves,
+		const Eigen::MatrixXd &skeleton_v,
+		const Eigen::MatrixXi &skeleton_bones,
+		const Eigen::MatrixXd &target_skeleton_v);
+
 	class CurveCurvatureForm : public Form
 	{
 	public:

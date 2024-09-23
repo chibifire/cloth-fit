@@ -3,6 +3,7 @@
 #include <polyfem/mesh/Mesh.hpp>
 #include <polyfem/mesh/mesh3D/Mesh3D.hpp>
 #include <geogram/mesh/mesh.h>
+
 #include <Eigen/Dense>
 #include <vector>
 #include <memory>
@@ -210,5 +211,35 @@ namespace polyfem
 		/// @brief      assing edges to M
 		/// @param[in/out]  M       geogram mesh to appen edges to
 		void generate_edges(GEO::Mesh &M);
+
+		template <int dim>
+		class Transformation {
+		public:
+			/// @brief y = A * x + b
+			/// @param A 
+			/// @param b 
+			Transformation(const Eigen::Matrix<double, dim, dim> &A, const Eigen::Vector<double, dim> &b) : A_(A), b_(b)
+			{
+			}
+
+			void apply(Eigen::MatrixXd &V) const
+			{
+				V = (V * A_.transpose()).eval().rowwise() + b_.transpose();
+			}
+
+			void invert(Eigen::MatrixXd &V) const
+			{
+				V = (V.rowwise() - b_).eval() * A_.transpose().inv();
+			}
+
+		private:
+			const Eigen::Matrix<double, dim, dim> A_;
+			const Eigen::Vector<double, dim> b_;
+		};
+
+		void read_edge_mesh(const std::string &path, Eigen::MatrixXd &V, Eigen::MatrixXi &E);
+
+		std::tuple<Eigen::MatrixXd, Eigen::MatrixXi> refine(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
+
 	} // namespace mesh
 } // namespace polyfem

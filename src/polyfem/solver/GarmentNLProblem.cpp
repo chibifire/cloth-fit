@@ -94,6 +94,9 @@ namespace polyfem::solver
 
 	void GarmentNLProblem::post_step(const polysolve::nonlinear::PostStepData &data)
 	{
+		if (post_step_call_back)
+			post_step_call_back(data.x);
+
 		FullNLProblem::post_step(polysolve::nonlinear::PostStepData(data.iter_num, data.solver_info, full_to_complete(reduced_to_full(data.x)), full_to_complete(reduced_to_full(data.grad))));
 
 		// TODO: add me back
