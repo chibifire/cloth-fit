@@ -289,7 +289,7 @@ int main(int argc, char **argv)
 		}
 
 		{
-			fit_form = std::make_shared<FitForm>(collision_vertices, avatar_v, avatar_f, 0, 0.2);
+			fit_form = std::make_shared<FitForm>(collision_vertices, avatar_v, avatar_f, 0, 0.02);
 			fit_form->disable();
 			fit_form->set_weight(state.args["fit_weight"]);
 			forms.push_back(fit_form);

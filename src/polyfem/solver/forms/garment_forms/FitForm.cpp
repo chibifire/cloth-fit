@@ -107,7 +107,7 @@ namespace polyfem::solver
 
         points.reserve(surface_v.rows());
         for (int i = 0; i < surface_v.rows(); i++)
-            points.push_back(Vec3s(surface_v(i, 0), surface_v(i, 1), surface_v(i, 2)) / voxel_size);
+            points.push_back(Vec3s(surface_v(i, 0), surface_v(i, 1), surface_v(i, 2)));
         
         for (int i = 0; i < surface_f.rows(); i++)
             triangles.push_back(Vec3I(surface_f(i, 0), surface_f(i, 1), surface_f(i, 2)));
