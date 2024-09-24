@@ -18,6 +18,7 @@
 #include <polyfem/solver/forms/garment_forms/GarmentALForm.hpp>
 #include <polyfem/solver/forms/garment_forms/CurveConstraintForm.hpp>
 #include <polyfem/solver/forms/garment_forms/CurveCenterTargetForm.hpp>
+#include <polyfem/solver/forms/garment_forms/FitForm.hpp>
 #include <polyfem/solver/GarmentNLProblem.hpp>
 #include <polyfem/solver/ALSolver.hpp>
 #include <polyfem/io/OBJWriter.hpp>
@@ -238,6 +239,7 @@ int main(int argc, char **argv)
 	std::shared_ptr<ContactForm> contact_form;
 	std::shared_ptr<PointPenaltyForm> pen_form;
 	std::shared_ptr<PointLagrangianForm> lagr_form;
+	std::shared_ptr<FitForm> fit_form;
 	std::vector<std::shared_ptr<Form>> forms;
 	{
 		const double dhat = state.args["contact"]["dhat"];
@@ -285,6 +287,13 @@ int main(int argc, char **argv)
 			center_target_form->set_weight(state.args["curve_center_target_weight"]);
 			forms.push_back(center_target_form);
 		}
+
+		{
+			fit_form = std::make_shared<FitForm>(collision_vertices, avatar_v, avatar_f, 0, 0.2);
+			fit_form->disable();
+			fit_form->set_weight(state.args["fit_weight"]);
+			forms.push_back(fit_form);
+		}
 	}
 
 	forms.push_back(contact_form);
@@ -320,6 +329,8 @@ int main(int argc, char **argv)
 
 	Eigen::MatrixXd prev_sol = sol;
 	al_solver.solve_al(nl_solver, nl_problem, sol);
+
+	fit_form->enable();
 
 	nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
 	al_solver.solve_reduced(nl_solver, nl_problem, sol);

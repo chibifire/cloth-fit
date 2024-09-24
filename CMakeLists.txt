@@ -191,6 +191,10 @@ if(WIN32)
     target_link_libraries(polyfem PUBLIC Eigen3::Eigen)
 endif()
 
+# openvdb library
+include(openvdb)
+target_link_libraries(polyfem PUBLIC openvdb)
+
 # polysolve
 include(polysolve)
 target_link_libraries(polyfem PUBLIC polysolve::polysolve)

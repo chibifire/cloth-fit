@@ -2,6 +2,7 @@
 #include <polyfem/solver/forms/garment_forms/GarmentForm.hpp>
 #include <polyfem/solver/forms/garment_forms/CurveConstraintForm.hpp>
 #include <polyfem/solver/forms/garment_forms/CurveCenterTargetForm.hpp>
+#include <polyfem/solver/forms/garment_forms/FitForm.hpp>
 
 #include <finitediff.hpp>
 
@@ -81,7 +82,6 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 	forms.push_back(std::make_unique<SimilarityForm>(V, F));
 
 	static const int n_rand = 10;
-	const double step = 1e-8;
 	const double tol = 1e-6;
 
 
@@ -100,19 +100,32 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 
 	forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, target));
     forms.push_back(std::make_unique<AreaForm>(V, F, 1));
+	
+	{
+		Eigen::MatrixXd avatar_v;
+		Eigen::MatrixXi avatar_f;
+		igl::read_triangle_mesh("/Users/zizhouhuang/Desktop/cloth-fit/cpp_clothing_deformer/avatar.obj", avatar_v, avatar_f);
+		
+		forms.push_back(std::make_unique<FitForm>(V, avatar_v, avatar_f, 0, 0.2));
+	}
 
 	for (auto &form : forms)
 	{
 		Eigen::VectorXd x = Eigen::VectorXd::Zero(V.size());
 
-        x.setRandom();
-        x /= 100;
-
-		form->init(x);
-		form->init_lagging(x);
-
 		for (int rand = 0; rand < n_rand; ++rand)
 		{
+			x.setRandom();
+			x /= 100;
+
+			double step;
+			if (form->name() != "garment-fit")
+				step = 1e-8;
+			else
+				step = 1e-6;
+
+			form->init(x);
+			form->init_lagging(x);
 			// Test gradient with finite differences
 			{
 				Eigen::VectorXd grad;
