@@ -112,7 +112,7 @@ namespace polyfem::solver
         for (int i = 0; i < surface_f.rows(); i++)
             triangles.push_back(Vec3I(surface_f(i, 0), surface_f(i, 1), surface_f(i, 2)));
 
-        grid = tools::meshToSignedDistanceField<DoubleGrid>(*xform, points, triangles, quads, 50, 1);
+        grid = tools::meshToSignedDistanceField<DoubleGrid>(*xform, points, triangles, quads, 150, 1);
         
         {
             tools::volumeToMesh(*grid, points, quads, 0.);

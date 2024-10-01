@@ -63,6 +63,47 @@ namespace
 	}
 } // namespace
 
+TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
+{
+	Eigen::Matrix3d R;
+	{
+		Eigen::AngleAxisd rollAngle(0.31*M_PI, Eigen::Vector3d::UnitZ());
+		Eigen::AngleAxisd yawAngle(0.28*M_PI, Eigen::Vector3d::UnitY());
+		Eigen::AngleAxisd pitchAngle(0.13*M_PI, Eigen::Vector3d::UnitX());
+		Eigen::Quaternion<double> q = rollAngle * yawAngle * pitchAngle;
+		R = q.matrix();
+	}
+
+	const int dim = 3;
+	const auto state_ptr = get_state(dim);
+
+	Eigen::MatrixXd V;
+	Eigen::MatrixXi F;
+    igl::read_triangle_mesh("/Users/zizhouhuang/Desktop/cloth-fit/cpp_clothing_deformer/garment.obj", V, F);
+	
+	auto curves = boundary_curves(F);
+
+	std::vector<std::unique_ptr<Form>> forms;
+    forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
+	forms.push_back(std::make_unique<AngleForm>(V, F));
+	forms.push_back(std::make_unique<SimilarityForm>(V, F));
+	forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
+
+	Eigen::VectorXd x = utils::flatten(1.2 * V * R.transpose() - V);
+
+	for (auto &form : forms)
+	{
+		form->init(x);
+		form->init_lagging(x);
+
+        Eigen::VectorXd grad;
+        form->first_derivative(x, grad);
+
+        REQUIRE(form->value(x) < 1e-10);
+		REQUIRE(grad.norm() < 1e-4);
+    }
+}
+
 TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 {
 	const int dim = 3;
@@ -77,6 +118,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 	target.setRandom();
 
 	std::vector<std::unique_ptr<Form>> forms;
+	forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
     forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
 	forms.push_back(std::make_unique<AngleForm>(V, F));
 	forms.push_back(std::make_unique<SimilarityForm>(V, F));

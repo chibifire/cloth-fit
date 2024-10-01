@@ -271,10 +271,14 @@ int main(int argc, char **argv)
 		curvature_form->set_weight(state.args["curvature_penalty_weight"]);
 		forms.push_back(curvature_form);
 
+		auto twist_form = std::make_shared<CurveTwistForm>(collision_vertices, curves);
+		twist_form->set_weight(state.args["twist_penalty_weight"]);
+		forms.push_back(twist_form);
+
 		{
 			Eigen::MatrixXd skeleton_v, target_skeleton_v;
 			Eigen::MatrixXi skeleton_bones, target_skeleton_bones;
-			read_edge_mesh(state.args["original_skeleton_path"], skeleton_v, skeleton_bones);
+			read_edge_mesh(state.args["source_skeleton_path"], skeleton_v, skeleton_bones);
 			read_edge_mesh(state.args["target_skeleton_path"], target_skeleton_v, target_skeleton_bones);
 			skeleton_v *= scaling;
 
