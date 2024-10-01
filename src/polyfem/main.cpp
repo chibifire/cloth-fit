@@ -158,15 +158,25 @@ int main(int argc, char **argv)
 	State state;
 	state.init(in_args, false);
 
-	const std::string avatar_mesh_path = in_args["avatar_mesh_path"];
-	const std::string skinny_avatar_mesh_path = in_args["skinny_avatar_mesh_path"];
-	const std::string garment_mesh_path = in_args["garment_mesh_path"];
+	const std::string avatar_mesh_path = state.args["avatar_mesh_path"];
+	const std::string skinny_avatar_mesh_path = state.args["skinny_avatar_mesh_path"];
+	const std::string garment_mesh_path = state.args["garment_mesh_path"];
+	const std::string source_skeleton_path = state.args["source_skeleton_path"];
+	const std::string target_skeleton_path = state.args["target_skeleton_path"];
 
 	const double scaling = 1e2;
 
 	Eigen::MatrixXd avatar_v;
 	Eigen::MatrixXi avatar_f;
 	igl::read_triangle_mesh(avatar_mesh_path, avatar_v, avatar_f);
+
+	Eigen::MatrixXd skeleton_v, target_skeleton_v;
+	Eigen::MatrixXi skeleton_bones, target_skeleton_bones;
+	read_edge_mesh(source_skeleton_path, skeleton_v, skeleton_bones);
+	read_edge_mesh(target_skeleton_path, target_skeleton_v, target_skeleton_bones);
+	skeleton_v *= scaling;
+
+	assert((skeleton_bones - target_skeleton_bones).squaredNorm() < 1);
 
 	Eigen::MatrixXd skinny_avatar_v;
 	Eigen::MatrixXi skinny_avatar_f;
@@ -177,6 +187,7 @@ int main(int argc, char **argv)
 
 	skinny_avatar_v *= scaling;
 	trans.apply(avatar_v);
+	trans.apply(target_skeleton_v);
 
 	skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-4;
 
@@ -276,16 +287,7 @@ int main(int argc, char **argv)
 		forms.push_back(twist_form);
 
 		{
-			Eigen::MatrixXd skeleton_v, target_skeleton_v;
-			Eigen::MatrixXi skeleton_bones, target_skeleton_bones;
-			read_edge_mesh(state.args["source_skeleton_path"], skeleton_v, skeleton_bones);
-			read_edge_mesh(state.args["target_skeleton_path"], target_skeleton_v, target_skeleton_bones);
-			skeleton_v *= scaling;
-
-			assert((skeleton_bones - target_skeleton_bones).squaredNorm() < 1);
-
 			Eigen::MatrixXd centers = extract_curve_center_targets(collision_vertices, curves, skeleton_v, skeleton_bones, target_skeleton_v);
-			trans.apply(centers);
 			
 			auto center_target_form = std::make_shared<CurveCenterTargetForm>(collision_vertices, curves, centers);
 			center_target_form->set_weight(state.args["curve_center_target_weight"]);
