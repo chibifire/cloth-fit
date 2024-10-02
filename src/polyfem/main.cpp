@@ -178,6 +178,26 @@ int main(int argc, char **argv)
 
 	assert((skeleton_bones - target_skeleton_bones).squaredNorm() < 1);
 
+	Eigen::MatrixXd garment_v;
+	Eigen::MatrixXi garment_f;
+	{
+		igl::read_triangle_mesh(garment_mesh_path, garment_v, garment_f);
+		int n_refs = state.args["geometry"][0]["n_refs"];
+		while (n_refs-- > 0)
+			std::tie(garment_v, garment_f) = refine(garment_v, garment_f);
+		garment_v *= scaling;
+
+		// remove duplicate vertices in the garment
+		{
+			Eigen::VectorXi svi, svj;
+			Eigen::MatrixXi sf;
+			Eigen::MatrixXd sv;
+			igl::remove_duplicate_vertices(garment_v, garment_f, 1e-4, sv, svi, svj, sf);
+			std::swap(sv, garment_v);
+			std::swap(sf, garment_f);
+		}
+	}
+
 	Eigen::MatrixXd skinny_avatar_v;
 	Eigen::MatrixXi skinny_avatar_f;
 	igl::read_triangle_mesh(skinny_avatar_mesh_path, skinny_avatar_v, skinny_avatar_f);
@@ -191,155 +211,155 @@ int main(int argc, char **argv)
 
 	skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-4;
 
-	Eigen::MatrixXd garment_v;
-	Eigen::MatrixXi garment_f;
-	igl::read_triangle_mesh(garment_mesh_path, garment_v, garment_f);
-	int n_refs = state.args["geometry"][0]["n_refs"];
-	while (n_refs-- > 0)
-		std::tie(garment_v, garment_f) = refine(garment_v, garment_f);
-	garment_v *= scaling;
-
-	// remove duplicate vertices in the garment
-	{
-		Eigen::VectorXi svi, svj;
-		Eigen::MatrixXi sf;
-		Eigen::MatrixXd sv;
-		igl::remove_duplicate_vertices(garment_v, garment_f, 1e-4, sv, svi, svj, sf);
-		std::swap(sv, garment_v);
-		std::swap(sf, garment_f);
-	}
-
 	logger().info("avatar n_verts: {}, garment n_verts: {}, total n_verts: {}", avatar_v.rows(), garment_v.rows(), avatar_v.rows() + garment_v.rows());
 
-	ipc::CollisionMesh collision_mesh;
-	Eigen::MatrixXd collision_vertices(skinny_avatar_v.rows() + garment_v.rows(), garment_v.cols());
 	Eigen::MatrixXi collision_triangles(skinny_avatar_f.rows() + garment_f.rows(), garment_f.cols());
+	collision_triangles << skinny_avatar_f, garment_f.array() + skinny_avatar_v.rows();
 	Eigen::MatrixXi collision_edges;
+	igl::edges(collision_triangles, collision_edges);
+
+	Eigen::MatrixXd collision_vertices(skinny_avatar_v.rows() + garment_v.rows(), garment_v.cols());
+	collision_vertices << skinny_avatar_v, garment_v;
+
+	const auto curves = boundary_curves(collision_triangles.bottomRows(garment_f.rows()));
+	const Eigen::MatrixXd source_curve_centers = extract_curve_center_targets(collision_vertices, curves, skeleton_v, skeleton_bones, skeleton_v);
+	const Eigen::MatrixXd target_curve_centers = extract_curve_center_targets(collision_vertices, curves, skeleton_v, skeleton_bones, target_skeleton_v);
+
+	Eigen::MatrixXd cur_garment_v = garment_v;
+	int save_id = 1;
+	const int total_steps = state.args["incremental_steps"];
+	for (int substep = 0; substep < total_steps; ++substep)
 	{
-		collision_vertices << skinny_avatar_v, garment_v;
-		collision_triangles << skinny_avatar_f, garment_f.array() + skinny_avatar_v.rows();
-		igl::edges(collision_triangles, collision_edges);
-		collision_mesh = ipc::CollisionMesh(
-			collision_vertices, collision_edges, collision_triangles);
+		const double prev_alpha = substep / (double)total_steps;
+		const double next_alpha = (substep + 1) / (double)total_steps;
 
-		collision_triangles.resize(skinny_avatar_f.rows() + garment_f.rows(), garment_f.cols());
-		collision_triangles << skinny_avatar_f, garment_f.array() + skinny_avatar_v.rows();
+		// continuation
+		const Eigen::MatrixXd prev_skeleton_v = (target_skeleton_v - skeleton_v) * prev_alpha + skeleton_v;
+		const Eigen::MatrixXd next_skeleton_v = (target_skeleton_v - skeleton_v) * next_alpha + skeleton_v;
+		const Eigen::MatrixXd prev_avatar_v = (avatar_v - skinny_avatar_v) * prev_alpha + skinny_avatar_v;
+		const Eigen::MatrixXd next_avatar_v = (avatar_v - skinny_avatar_v) * next_alpha + skinny_avatar_v;
 
-		const int n_avatar_verts = skinny_avatar_v.rows();
-		collision_mesh.can_collide = [n_avatar_verts](size_t vi, size_t vj) {
-			return vi >= n_avatar_verts || vj >= n_avatar_verts;
+		const Eigen::MatrixXd next_curve_centers = (target_curve_centers - source_curve_centers) * next_alpha + source_curve_centers;
+
+		ipc::CollisionMesh collision_mesh;
+		{
+			collision_vertices << prev_avatar_v, cur_garment_v;
+			collision_mesh = ipc::CollisionMesh(
+				collision_vertices, collision_edges, collision_triangles);
+
+			const int n_avatar_verts = skinny_avatar_v.rows();
+			collision_mesh.can_collide = [n_avatar_verts](size_t vi, size_t vj) {
+				return vi >= n_avatar_verts || vj >= n_avatar_verts;
+			};
+
+			auto ids = ipc::my_has_intersections(collision_mesh, collision_vertices, ipc::BroadPhaseMethod::BVH);
+			if (ids[0] >= 0)
+			{
+				io::OBJWriter::write(
+					"intersection.obj", collision_vertices,
+					collision_mesh.edges(), collision_mesh.faces());
+				Eigen::MatrixXi edge(1, 2);
+				edge << ids[0], ids[1];
+				Eigen::MatrixXi face(1, 3);
+				face << ids[2], ids[3], ids[4];
+				io::OBJWriter::write(
+					"intersecting_pair.obj", collision_vertices,
+					edge, face);
+				log_and_throw_error("Unable to solve, initial solution has intersections!");
+			}
+		}
+
+		std::shared_ptr<ContactForm> contact_form;
+		std::shared_ptr<PointPenaltyForm> pen_form;
+		std::shared_ptr<PointLagrangianForm> lagr_form;
+		std::shared_ptr<FitForm> fit_form;
+		std::vector<std::shared_ptr<Form>> forms;
+		{
+			const double dhat = state.args["contact"]["dhat"];
+			contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
+			contact_form->set_weight(1);
+			contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
+			contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
+
+			std::vector<int> indices(avatar_v.size());
+			for (int i = 0; i < indices.size(); i++)
+				indices[i] = i;
+			pen_form = std::make_shared<PointPenaltyForm>(utils::flatten(next_avatar_v - prev_avatar_v), indices);
+			forms.push_back(pen_form);
+
+			lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(next_avatar_v - prev_avatar_v), indices);
+			forms.push_back(lagr_form);
+
+			auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
+			angle_form->set_weight(state.args["angle_penalty_weight"]);
+			forms.push_back(angle_form);
+
+			auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
+			similarity_form->set_weight(state.args["similarity_penalty_weight"]);
+			forms.push_back(similarity_form);
+
+			auto curvature_form = std::make_shared<CurveCurvatureForm>(collision_vertices, curves);
+			curvature_form->set_weight(state.args["curvature_penalty_weight"]);
+			forms.push_back(curvature_form);
+
+			auto twist_form = std::make_shared<CurveTwistForm>(collision_vertices, curves);
+			twist_form->set_weight(state.args["twist_penalty_weight"]);
+			forms.push_back(twist_form);
+
+			{
+				auto center_target_form = std::make_shared<CurveCenterTargetForm>(collision_vertices, curves, next_curve_centers);
+				center_target_form->set_weight(state.args["curve_center_target_weight"]);
+				forms.push_back(center_target_form);
+			}
+
+			{
+				fit_form = std::make_shared<FitForm>(collision_vertices, avatar_v, avatar_f, 0, 0.02);
+				fit_form->disable();
+				fit_form->set_weight(state.args["fit_weight"]);
+				forms.push_back(fit_form);
+			}
+		}
+
+		forms.push_back(contact_form);
+		GarmentNLProblem nl_problem(1 + garment_v.size(), utils::flatten(next_avatar_v - prev_avatar_v), forms);
+
+		Eigen::MatrixXd sol(nl_problem.full_size(), 1);
+		sol.setZero();
+
+		nl_problem.line_search_begin(sol, sol);
+		if (!std::isfinite(nl_problem.value(sol))
+			|| !nl_problem.is_step_valid(sol, sol)
+			|| !nl_problem.is_step_collision_free(sol, sol))
+			log_and_throw_error("Failed to apply boundary conditions!");
+
+
+		std::shared_ptr<polysolve::nonlinear::Solver> nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["augmented_lagrangian"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
+
+		ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm> al_solver(
+			lagr_form, pen_form,
+			state.args["solver"]["augmented_lagrangian"]["initial_weight"],
+			state.args["solver"]["augmented_lagrangian"]["scaling"],
+			state.args["solver"]["augmented_lagrangian"]["max_weight"],
+			state.args["solver"]["augmented_lagrangian"]["eta"],
+			[&](const Eigen::VectorXd &x) {
+				state.solve_data.update_barrier_stiffness(sol);
+			});
+		
+		nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
+			const std::string path = "step_" + std::to_string(save_id++) + ".vtu";
+			save_vtu(path, nl_problem, collision_vertices, collision_triangles, skinny_avatar_v.rows(), sol);
 		};
 
-		auto ids = ipc::my_has_intersections(collision_mesh, collision_vertices, ipc::BroadPhaseMethod::BVH);
-		if (ids[0] >= 0)
-		{
-			io::OBJWriter::write(
-				"intersection.obj", collision_vertices,
-				collision_mesh.edges(), collision_mesh.faces());
-			Eigen::MatrixXi edge(1, 2);
-			edge << ids[0], ids[1];
-			Eigen::MatrixXi face(1, 3);
-			face << ids[2], ids[3], ids[4];
-			io::OBJWriter::write(
-				"intersecting_pair.obj", collision_vertices,
-				edge, face);
-			log_and_throw_error("Unable to solve, initial solution has intersections!");
-		}
+		Eigen::MatrixXd prev_sol = sol;
+		al_solver.solve_al(nl_solver, nl_problem, sol);
+
+		fit_form->enable();
+
+		nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
+		al_solver.solve_reduced(nl_solver, nl_problem, sol);
+
+		cur_garment_v += utils::unflatten(sol.bottomRows(cur_garment_v.size()), 3);
 	}
-
-	std::shared_ptr<ContactForm> contact_form;
-	std::shared_ptr<PointPenaltyForm> pen_form;
-	std::shared_ptr<PointLagrangianForm> lagr_form;
-	std::shared_ptr<FitForm> fit_form;
-	std::vector<std::shared_ptr<Form>> forms;
-	{
-		const double dhat = state.args["contact"]["dhat"];
-		contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
-		contact_form->set_weight(1);
-		contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
-		contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
-
-		std::vector<int> indices(avatar_v.size());
-		for (int i = 0; i < indices.size(); i++)
-			indices[i] = i;
-		pen_form = std::make_shared<PointPenaltyForm>(utils::flatten(avatar_v - skinny_avatar_v), indices);
-		forms.push_back(pen_form);
-
-		lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(avatar_v - skinny_avatar_v), indices);
-		forms.push_back(lagr_form);
-
-		auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
-		angle_form->set_weight(state.args["angle_penalty_weight"]);
-		forms.push_back(angle_form);
-
-		auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
-		similarity_form->set_weight(state.args["similarity_penalty_weight"]);
-		forms.push_back(similarity_form);
-
-		auto curves = boundary_curves(collision_triangles.bottomRows(garment_f.rows()));
-
-		auto curvature_form = std::make_shared<CurveCurvatureForm>(collision_vertices, curves);
-		curvature_form->set_weight(state.args["curvature_penalty_weight"]);
-		forms.push_back(curvature_form);
-
-		auto twist_form = std::make_shared<CurveTwistForm>(collision_vertices, curves);
-		twist_form->set_weight(state.args["twist_penalty_weight"]);
-		forms.push_back(twist_form);
-
-		{
-			Eigen::MatrixXd centers = extract_curve_center_targets(collision_vertices, curves, skeleton_v, skeleton_bones, target_skeleton_v);
-			
-			auto center_target_form = std::make_shared<CurveCenterTargetForm>(collision_vertices, curves, centers);
-			center_target_form->set_weight(state.args["curve_center_target_weight"]);
-			forms.push_back(center_target_form);
-		}
-
-		{
-			fit_form = std::make_shared<FitForm>(collision_vertices, avatar_v, avatar_f, 0, 0.02);
-			fit_form->disable();
-			fit_form->set_weight(state.args["fit_weight"]);
-			forms.push_back(fit_form);
-		}
-	}
-
-	forms.push_back(contact_form);
-	GarmentNLProblem nl_problem(1 + garment_v.size(), avatar_v - skinny_avatar_v, forms);
-
-	Eigen::MatrixXd sol(nl_problem.full_size(), 1);
-	sol.setZero();
-
-	nl_problem.line_search_begin(sol, sol);
-	if (!std::isfinite(nl_problem.value(sol))
-		|| !nl_problem.is_step_valid(sol, sol)
-		|| !nl_problem.is_step_collision_free(sol, sol))
-		log_and_throw_error("Failed to apply boundary conditions!");
-
-
-	std::shared_ptr<polysolve::nonlinear::Solver> nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["augmented_lagrangian"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
-
-	ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm> al_solver(
-		lagr_form, pen_form,
-		state.args["solver"]["augmented_lagrangian"]["initial_weight"],
-		state.args["solver"]["augmented_lagrangian"]["scaling"],
-		state.args["solver"]["augmented_lagrangian"]["max_weight"],
-		state.args["solver"]["augmented_lagrangian"]["eta"],
-		[&](const Eigen::VectorXd &x) {
-			state.solve_data.update_barrier_stiffness(sol);
-		});
-	
-	nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
-		static int id = 1;
-		const std::string path = "step_" + std::to_string(id++) + ".vtu";
-		save_vtu(path, nl_problem, collision_vertices, collision_triangles, skinny_avatar_v.rows(), sol);
-	};
-
-	Eigen::MatrixXd prev_sol = sol;
-	al_solver.solve_al(nl_solver, nl_problem, sol);
-
-	fit_form->enable();
-
-	nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
-	al_solver.solve_reduced(nl_solver, nl_problem, sol);
 
 	return EXIT_SUCCESS;
 }
