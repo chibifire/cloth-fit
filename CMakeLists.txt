@@ -329,6 +329,11 @@ if(POLYFEM_TOPLEVEL_PROJECT)
         set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME}_bin)
     endif()
 
+    add_executable(mytest src/polyfem/mytest.cpp)
+    target_compile_features(mytest PUBLIC cxx_std_14)
+    target_link_libraries(mytest PUBLIC polyfem::polyfem polyfem::warnings)
+    target_link_libraries(mytest PUBLIC CLI11::CLI11)
+
     if(POLYFEM_BUILD_DOCS)
         # check if Doxygen is installed
         find_package(Doxygen)

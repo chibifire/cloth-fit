@@ -13,7 +13,7 @@ namespace polyfem::solver
 	class FitForm : public Form
 	{
 	public:
-		FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const int n_refs, const double voxel_size);
+		FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const int n_refs, const double voxel_size);
 
 		std::string name() const override { return "garment-fit"; }
 
@@ -34,9 +34,13 @@ namespace polyfem::solver
 
     private:
         const Eigen::MatrixXd V_;
+		const Eigen::MatrixXi F_;
         const int n_refs_;
         const double voxel_size_;
         const bool use_spline = true;
+
+		Eigen::MatrixXd P;
+		Eigen::VectorXd weights;
 
         openvdb::DoubleGrid::Ptr grid;
 	};

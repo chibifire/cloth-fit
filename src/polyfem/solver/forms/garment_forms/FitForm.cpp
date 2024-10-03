@@ -10,94 +10,41 @@
 #include <polyfem/io/OBJWriter.hpp>
 #include <polyfem/utils/Logger.hpp>
 
-// #include <polyfem/utils/MaybeParallelFor.hpp>
-
 using namespace openvdb;
 
-// namespace
-// {
-//     class LocalThreadMatStorage
-//     {
-//     public:
-//         std::unique_ptr<MatrixCache> cache = nullptr;
-//         ElementAssemblyValues vals;
-//         QuadratureVector da;
+namespace {
 
-//         LocalThreadMatStorage() = delete;
+    Eigen::MatrixXd upsample_standard(int N)
+    {
+        const int num = ((N+1)*(N+2))/2;
 
-//         LocalThreadMatStorage(const int buffer_size, const int rows, const int cols)
-//         {
-//             init(buffer_size, rows, cols);
-//         }
+        Eigen::MatrixXd out(num, 4);
+        for (int i = 0, k = 0; i <= N; i++)
+            for (int j = 0; i + j <= N; j++)
+            {
+                std::array<int, 3> arr = {i, j, N - i - j};
+                std::sort(arr.begin(), arr.end());
 
-//         LocalThreadMatStorage(const int buffer_size, const MatrixCache &c)
-//         {
-//             init(buffer_size, c);
-//         }
-
-//         LocalThreadMatStorage(const LocalThreadMatStorage &other)
-//             : cache(other.cache->copy()), vals(other.vals), da(other.da)
-//         {
-//         }
-
-//         LocalThreadMatStorage &operator=(const LocalThreadMatStorage &other)
-//         {
-//             assert(other.cache != nullptr);
-//             cache = other.cache->copy();
-//             vals = other.vals;
-//             da = other.da;
-//             return *this;
-//         }
-
-//         void init(const int buffer_size, const int rows, const int cols)
-//         {
-//             // assert(rows == cols);
-//             // cache = std::make_unique<DenseMatrixCache>();
-//             cache = std::make_unique<SparseMatrixCache>();
-//             cache->reserve(buffer_size);
-//             cache->init(rows, cols);
-//         }
-
-//         void init(const int buffer_size, const MatrixCache &c)
-//         {
-//             if (cache == nullptr)
-//                 cache = c.copy();
-//             cache->reserve(buffer_size);
-//             cache->init(c);
-//         }
-//     };
-
-//     class LocalThreadVecStorage
-//     {
-//     public:
-//         Eigen::MatrixXd vec;
-//         ElementAssemblyValues vals;
-//         QuadratureVector da;
-
-//         LocalThreadVecStorage(const int size)
-//         {
-//             vec.resize(size, 1);
-//             vec.setZero();
-//         }
-//     };
-
-//     class LocalThreadScalarStorage
-//     {
-//     public:
-//         double val;
-//         ElementAssemblyValues vals;
-//         QuadratureVector da;
-
-//         LocalThreadScalarStorage()
-//         {
-//             val = 0;
-//         }
-//     };
-// } // namespace
+                double w;
+                if (arr[1] == 0)        // vertex node
+                    w = 1;
+                else if (arr[0] == 0)   // edge node
+                    w = 3;
+                else                    // face node
+                    w = 6;
+                
+                out.row(k) << i, j, N - i - j, w;
+            }
+        
+        out.leftCols<3>() /= N;
+        out.col(3) /= N * N;
+        return out;
+    }
+}
 
 namespace polyfem::solver
 {
-    FitForm::FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const int n_refs, const double voxel_size) : V_(V), n_refs_(n_refs), voxel_size_(voxel_size)
+    FitForm::FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const int n_refs, const double voxel_size) : V_(V), F_(F), n_refs_(n_refs), voxel_size_(voxel_size)
     {
         math::Transform::Ptr xform = math::Transform::createLinearTransform(voxel_size);
 
@@ -114,42 +61,55 @@ namespace polyfem::solver
 
         grid = tools::meshToSignedDistanceField<DoubleGrid>(*xform, points, triangles, quads, 150, 1);
         
+        // build upsampling scheme on the garment mesh
         {
-            tools::volumeToMesh(*grid, points, quads, 0.);
-            Eigen::MatrixXd outpoints(points.size(), 3);
-            Eigen::MatrixXi outtriangles(2 * quads.size(), 3);
-            for (int i = 0; i < points.size(); i++)
-            {
-                outpoints.row(i) << points[i](0), points[i](1), points[i](2);
-            }
-            for (int i = 0; i < quads.size(); i++)
-            {
-                outtriangles.row(2 * i) << quads[i](0), quads[i](1), quads[i](2);
-                outtriangles.row(2 * i + 1) << quads[i](0), quads[i](2), quads[i](3);
-            }
-
-			io::OBJWriter::write(
-				"sdf.obj", outpoints, Eigen::MatrixXi(), outtriangles);
+            Eigen::MatrixXd tmp = upsample_standard(n_refs);
+            P = tmp.leftCols<3>();
+            weights = tmp.col(3);
         }
+
+        // export SDF as a triangle mesh
+        // {
+        //     tools::volumeToMesh(*grid, points, quads, 0.);
+        //     Eigen::MatrixXd outpoints(points.size(), 3);
+        //     Eigen::MatrixXi outtriangles(2 * quads.size(), 3);
+        //     for (int i = 0; i < points.size(); i++)
+        //     {
+        //         outpoints.row(i) << points[i](0), points[i](1), points[i](2);
+        //     }
+        //     for (int i = 0; i < quads.size(); i++)
+        //     {
+        //         outtriangles.row(2 * i) << quads[i](0), quads[i](1), quads[i](2);
+        //         outtriangles.row(2 * i + 1) << quads[i](0), quads[i](2), quads[i](3);
+        //     }
+
+		// 	io::OBJWriter::write(
+		// 		"sdf.obj", outpoints, Eigen::MatrixXi(), outtriangles);
+        // }
     }
 
     double FitForm::value_unweighted(const Eigen::VectorXd &x) const 
     {
-        Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
         double val = 0;
         double max_dist = 0;
-        for (int i = 0; i < V.rows(); i++) {
-            typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
-            math::Vec3<double> p(V(i, 0), V(i, 1), V(i, 2));
-            const double tmp = use_spline ? tools::SplineSampler::sample(acc, grid->transformPtr()->worldToIndex(p)) :
-                                            tools::BoxSampler::sample(acc, grid->transformPtr()->worldToIndex(p));
+        typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
+        for (int f = 0; f < F_.rows(); f++) {
+            Eigen::Matrix3d M = V({F_(f, 0),F_(f, 1),F_(f, 2)}, Eigen::all);
+            Eigen::MatrixXd samples = P * M;
+            const double area = (V_.row(F_(f, 1)) - V_.row(F_(f, 0))).head<3>().cross((V_.row(F_(f, 2)) - V_.row(F_(f, 0))).head<3>()).norm() / 2;
+            for (int i = 0; i < P.rows(); i++) {
+                math::Vec3<double> p(samples(i, 0), samples(i, 1), samples(i, 2));
+                const double tmp = use_spline ? tools::SplineSampler::sample(acc, grid->transformPtr()->worldToIndex(p)) :
+                                                tools::BoxSampler::sample(acc, grid->transformPtr()->worldToIndex(p));
 
-            if (std::isnan(tmp))
-                log_and_throw_error("Invalid sdf values!");
-            
-            if (tmp > 0)
-                val += tmp*tmp / 2.;
+                if (std::isnan(tmp))
+                    log_and_throw_error("Invalid sdf values!");
+                
+                if (tmp > 0)
+                    val += area * weights(i) * tmp*tmp / 2.;
+            }
         }
 
         return val;
@@ -157,19 +117,28 @@ namespace polyfem::solver
 
     void FitForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
     {
-        Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
         gradv.setZero(x.size());
-        for (int i = 0; i < V.rows(); i++) {
-            typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
-            math::Vec3<double> p(V(i, 0), V(i, 1), V(i, 2));
-            auto tmp = use_spline ? tools::SplineSampler::sampleGradient(acc, grid->transformPtr()->worldToIndex(p)) :
-                                          tools::BoxSampler::sampleGradient(acc, grid->transformPtr()->worldToIndex(p));
-            tmp.g = tmp.g * (tmp.x / voxel_size_);
-            
-            if (tmp.x > 0)
-                for (int d = 0; d < 3; d++)
-                    gradv(3 * i + d) += tmp.g(d);
+        typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
+        for (int f = 0; f < F_.rows(); f++) {
+            Eigen::Matrix3d M = V({F_(f, 0),F_(f, 1),F_(f, 2)}, Eigen::all);
+            Eigen::MatrixXd samples = P * M;
+            const double area = (V_.row(F_(f, 1)) - V_.row(F_(f, 0))).head<3>().cross((V_.row(F_(f, 2)) - V_.row(F_(f, 0))).head<3>()).norm() / 2;
+            for (int i = 0; i < P.rows(); i++) {
+                math::Vec3<double> p(samples(i, 0), samples(i, 1), samples(i, 2));
+                auto tmp = use_spline ? tools::SplineSampler::sampleGradient(acc, grid->transformPtr()->worldToIndex(p)) :
+                                            tools::BoxSampler::sampleGradient(acc, grid->transformPtr()->worldToIndex(p));
+                tmp.g = tmp.g * (tmp.x / voxel_size_);
+                
+                if (tmp.x > 0)
+                    for (int d = 0; d < 3; d++)
+                    {
+                        const double val = area * weights(i) * tmp.g(d);
+                        for (int k = 0; k < P.cols(); k++)
+                            gradv(3 * F_(f, k) + d) += val * P(i, k);
+                    }
+            }
         }
     }
 
@@ -180,27 +149,37 @@ namespace polyfem::solver
         if (!use_spline)
             return;
         
-        Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
         std::vector<Eigen::Triplet<double>> triplets;
-        for (int i = 0; i < V.rows(); i++) {
-            typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
-            math::Vec3<double> p(V(i, 0), V(i, 1), V(i, 2));
-            auto tmp = tools::SplineSampler::sampleHessian(acc, grid->transformPtr()->worldToIndex(p));
-            tmp.g = tmp.g / voxel_size_;
-            
-            Eigen::Vector3d g;
-            g << tmp.g(0), tmp.g(1), tmp.g(2);
-            Eigen::Matrix3d h;
-            h << tmp.h(0, 0), tmp.h(0, 1), tmp.h(0, 2), 
-                tmp.h(1, 0), tmp.h(1, 1), tmp.h(1, 2),
-                tmp.h(2, 0), tmp.h(2, 1), tmp.h(2, 2);
-            h *= tmp.x / voxel_size_ / voxel_size_;
-            h += g * g.transpose();
-            if (tmp.x > 0)
-                for (int d = 0; d < 3; d++)
-                    for (int k = 0; k < 3; k++)
-                        triplets.emplace_back(i * 3 + d, i * 3 + k, h(d, k));
+        typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
+        for (int f = 0; f < F_.rows(); f++) {
+            Eigen::Matrix3d M = V({F_(f, 0),F_(f, 1),F_(f, 2)}, Eigen::all);
+            Eigen::MatrixXd samples = P * M;
+            const double area = (V_.row(F_(f, 1)) - V_.row(F_(f, 0))).head<3>().cross((V_.row(F_(f, 2)) - V_.row(F_(f, 0))).head<3>()).norm() / 2;
+            for (int i = 0; i < P.rows(); i++) {
+                math::Vec3<double> p(samples(i, 0), samples(i, 1), samples(i, 2));
+                auto tmp = tools::SplineSampler::sampleHessian(acc, grid->transformPtr()->worldToIndex(p));
+                tmp.g = tmp.g / voxel_size_;
+                
+                Eigen::Vector3d g;
+                g << tmp.g(0), tmp.g(1), tmp.g(2);
+                Eigen::Matrix3d h;
+                h << tmp.h(0, 0), tmp.h(0, 1), tmp.h(0, 2), 
+                    tmp.h(1, 0), tmp.h(1, 1), tmp.h(1, 2),
+                    tmp.h(2, 0), tmp.h(2, 1), tmp.h(2, 2);
+                h *= tmp.x / voxel_size_ / voxel_size_;
+                h += g * g.transpose();
+                h *= area * weights(i);
+                if (tmp.x > 0)
+                {
+                    for (int d = 0; d < 3; d++)
+                        for (int k = 0; k < 3; k++)
+                            for (int s = 0; s < 3; s++)
+                                for (int l = 0; l < 3; l++)
+                                    triplets.emplace_back(F_(f, s) * 3 + d, F_(f, l) * 3 + k, P(i, s) * P(i, l) * h(d, k));
+                }
+            }
         }
 
         hessian.setFromTriplets(triplets.begin(), triplets.end());

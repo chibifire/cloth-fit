@@ -15,6 +15,7 @@ namespace polyfem::solver
 		const double scaling,
 		const double max_al_weight,
 		const double eta_tol,
+		const double error_threshold,
 		const std::function<void(const Eigen::VectorXd &)> &update_barrier_stiffness)
 		: lagr_form(lagr_form),
 		  pen_form(pen_form),
@@ -22,6 +23,7 @@ namespace polyfem::solver
 		  scaling(scaling),
 		  max_al_weight(max_al_weight),
 		  eta_tol(eta_tol),
+		  error_threshold(error_threshold),
 		  update_barrier_stiffness(update_barrier_stiffness)
 	{
 	}
@@ -42,12 +44,14 @@ namespace polyfem::solver
 		const int iters = nl_solver->stop_criteria().iterations;
 
 		const double initial_error = compute_error(nl_problem, sol);
+		double current_error = initial_error;
 
 		nl_problem.line_search_begin(sol, tmp_sol);
 
 		while (!std::isfinite(nl_problem.value(tmp_sol))
 			   || !nl_problem.is_step_valid(sol, tmp_sol)
-			   || !nl_problem.is_step_collision_free(sol, tmp_sol))
+			   || !nl_problem.is_step_collision_free(sol, tmp_sol)
+			   || current_error > error_threshold)
 		{
 			nl_problem.line_search_end();
 
@@ -69,7 +73,7 @@ namespace polyfem::solver
 			sol = tmp_sol;
 			set_al_weight(nl_problem, sol, -1);
 
-			const double current_error = compute_error(nl_problem, sol);
+			current_error = compute_error(nl_problem, sol);
 			const double eta = 1 - sqrt(current_error / initial_error);
 
 			logger().debug("Current eta = {}", eta);
