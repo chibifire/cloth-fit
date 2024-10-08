@@ -272,7 +272,7 @@ int main(int argc, char **argv)
 		std::shared_ptr<ContactForm> contact_form;
 		std::shared_ptr<PointPenaltyForm> pen_form;
 		std::shared_ptr<PointLagrangianForm> lagr_form;
-		std::shared_ptr<FitForm> fit_form;
+		std::shared_ptr<FitForm<4>> fit_form;
 		std::vector<std::shared_ptr<Form>> forms;
 		{
 			const double dhat = state.args["contact"]["dhat"];
@@ -313,7 +313,7 @@ int main(int argc, char **argv)
 			}
 
 			{
-				fit_form = std::make_shared<FitForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()), avatar_v, avatar_f, 0, 0.02);
+				fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()), avatar_v, avatar_f, 0.1);
 				fit_form->disable();
 				fit_form->set_weight(state.args["fit_weight"]);
 				forms.push_back(fit_form);
@@ -365,7 +365,42 @@ int main(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+// #include <Eigen/core>
+// #include <array>
+// #include <iostream>
 
+// template <int N>
+// constexpr Eigen::Matrix<double, ((N+1)*(N+2))/2, 4> upsample_standard()
+// {
+// 	constexpr int num = ((N+1)*(N+2))/2;
+
+// 	Eigen::Matrix<double, num, 4> out;
+// 	for (int i = 0, k = 0; i <= N; i++)
+// 		for (int j = 0; i + j <= N; j++, k++)
+// 		{
+// 			std::array<int, 3> arr = {i, j, N - i - j};
+// 			std::sort(arr.begin(), arr.end());
+
+// 			double w = 6;
+// 			if (arr[1] == 0)        // vertex node
+// 				w = 1;
+// 			else if (arr[0] == 0)   // edge node
+// 				w = 3;
+// 			else                    // face node
+// 				w = 6;
+			
+// 			out.row(k) << i, j, N - i - j, w;
+// 		}
+	
+// 	out.template leftCols<3>() /= N;
+// 	out.col(3) /= N * N;
+// 	return out;
+// }
+
+// int main()
+// {
+// 	std::cout << upsample_standard<3>() << std::endl;
+// }
 
 // #include <iostream>
 // #include <Eigen/SparseCore>

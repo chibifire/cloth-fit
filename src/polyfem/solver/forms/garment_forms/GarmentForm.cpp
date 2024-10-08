@@ -371,7 +371,7 @@ namespace polyfem::solver {
 
     double SimilarityForm::value_unweighted(const Eigen::VectorXd &x) const
     {
-        Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
         Eigen::VectorXd areas;
         {
@@ -405,7 +405,7 @@ namespace polyfem::solver {
 
     void SimilarityForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
     {
-        Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
         Eigen::VectorXd areas;
         {
@@ -455,7 +455,7 @@ namespace polyfem::solver {
     void SimilarityForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
     {
         POLYFEM_SCOPED_TIMER("similarity hessian");
-        Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
         Eigen::VectorXd areas;
         {

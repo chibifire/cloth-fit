@@ -179,18 +179,26 @@ int main(int argc, char **argv)
 		}
 	}
 
+	auto curves = boundary_curves(garment_f);
+
+	Eigen::Vector3d min_, max_;
+	min_ = garment_v.colwise().minCoeff();
+	max_ = garment_v.colwise().maxCoeff();
+
 	// reorder indices so that vertices on two ends are at the front
 	std::vector<bool> mask(garment_v.rows(), false);
 	{
-		auto curves = boundary_curves(garment_f);
 		std::vector<int> indices;
 		for (auto &c : curves)
 		{
 			for (auto i : c)
 			{
-				if (!mask[i])
-					indices.push_back(i);
-				mask[i] = true;
+				if (garment_v(i, 0) < min_(0) + 1e-5 || garment_v(i, 0) > max_(0) - 1e-5)
+				{
+					if (!mask[i])
+						indices.push_back(i);
+					mask[i] = true;
+				}
 			}
 		}
 		
@@ -223,7 +231,6 @@ int main(int argc, char **argv)
 		std::swap(new_mask, mask);
 	}
 
-
 	ipc::CollisionMesh collision_mesh;
 	{
 		Eigen::MatrixXi collision_edges;
@@ -250,6 +257,7 @@ int main(int argc, char **argv)
 
 	Eigen::MatrixXd target_v = garment_v * 0.5;
 	int save_id = 0;
+	int stride = state.args["output"]["paraview"]["skip_frame"];
 	const int total_steps = state.args["incremental_steps"];
 	Eigen::MatrixXd sol;
 	for (int substep = 0; substep < total_steps; ++substep)
@@ -280,6 +288,16 @@ int main(int argc, char **argv)
 		similarity_form->set_weight(state.args["similarity_penalty_weight"]);
 		forms.push_back(similarity_form);
 
+		auto curvature_form = std::make_shared<CurveCurvatureForm>(garment_v, curves);
+		curvature_form->set_weight(state.args["curvature_penalty_weight"]);
+		forms.push_back(curvature_form);
+
+		// auto twist_form = std::make_shared<CurveTwistForm>(garment_v, curves);
+		// twist_form->set_weight(state.args["twist_penalty_weight"]);
+		// forms.push_back(twist_form);
+
+		assert(true);
+
 		if (state.args["contact"]["enabled"])
 		{
 			const double dhat = state.args["contact"]["dhat"];
@@ -291,6 +309,8 @@ int main(int argc, char **argv)
 		}
 
 		GarmentNLProblem nl_problem(1 + garment_v.size() - target_diff.size(), target_diff, forms);
+
+		logger().info("Total nodes {}, number of constrained nodes {}", garment_v.size() / 3, target_diff.size() / 3);
 
 		if (sol.size() == 0)
 			sol.setZero(nl_problem.full_size(), 1);
@@ -317,8 +337,12 @@ int main(int argc, char **argv)
 			});
 		
 		nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
-			const std::string path = "step_" + std::to_string(save_id++) + ".vtu";
-			save_vtu(path, nl_problem, garment_v, garment_f, 0, sol);
+			if (save_id % stride == 0)
+			{
+				const std::string path = "step_" + std::to_string(save_id / stride) + ".vtu";
+				save_vtu(path, nl_problem, garment_v, garment_f, target_diff.size() / 3, sol);
+			}
+			save_id++;
 		};
 
 		save_vtu("step_" + std::to_string(save_id++) + ".vtu", nl_problem, garment_v, garment_f, 0, sol);

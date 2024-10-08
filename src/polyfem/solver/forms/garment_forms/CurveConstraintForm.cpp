@@ -61,10 +61,10 @@ namespace polyfem::solver
             assert(I2(0) == I2(I2.size() - 1));
             assert(I2.size() >= 4);
 
-            Eigen::VectorXi I_prime(I2.size() + 1);
-            I_prime << I2, I2(1);
+            // Eigen::VectorXi I_prime(I2.size() + 1);
+            // I_prime << I2, I2(1);
 
-            curves.push_back(std::move(I_prime));
+            curves.push_back(std::move(I2));
         }
         return curves;
 	}
@@ -103,12 +103,20 @@ namespace polyfem::solver
         return targets;
     }
 
-    CurveCurvatureForm::CurveCurvatureForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves) : V_(V), curves_(curves)
+    CurveCurvatureForm::CurveCurvatureForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves) : V_(V)
     {
         for (const auto &c : curves)
         {
-            assert(c(0) == c(c.size() - 2));
-            assert(c(1) == c(c.size() - 1));
+            assert(c(0) == c(c.size() - 1));
+
+            Eigen::VectorXi c_(c.size() + 1);
+            c_.head(c.size()) = c;
+            c_(c.size()) = c(1);
+
+            assert(c_(0) == c_(c_.size() - 2));
+            assert(c_(1) == c_(c_.size() - 1));
+
+            curves_.push_back(c_);
         }
         orig_angles = compute_angles(V);
     }
@@ -256,12 +264,17 @@ namespace polyfem::solver
     {
         for (const auto &c : curves)
         {
-            assert(c(0) == c(c.size() - 2));
-            assert(c(1) == c(c.size() - 1));
+            assert(c(0) == c(c.size() - 1));
 
-            Eigen::VectorXi c_(c.size() + 1);
+            Eigen::VectorXi c_(c.size() + 2);
             c_.head(c.size()) = c;
+            c_(c.size() - 1) = c(1);
             c_(c.size()) = c(2);
+
+            assert(c_(0) == c_(c_.size() - 3));
+            assert(c_(1) == c_(c_.size() - 2));
+            assert(c_(2) == c_(c_.size() - 1));
+
             curves_.push_back(c_);
         }
         orig_angles = compute_angles(V);
@@ -338,6 +351,9 @@ namespace polyfem::solver
                     p1(0), p1(1), p1(2),
                     p2(0), p2(1), p2(2), 
                     p3(0), p3(1), p3(2), g.data());
+                
+                if (!std::isfinite(g.squaredNorm()))
+                    log_and_throw_error("NAN curve twist");
 
                 for (int k = 0; k < 4; k++)
                     gradv.segment(curve(i + k) * 3, 3) += g.segment<3>(k * 3) * err;
@@ -395,5 +411,139 @@ namespace polyfem::solver
         hessian.setZero();
         hessian.resize(x.size(), x.size());
         hessian.setFromTriplets(triplets.begin(), triplets.end());
+    }
+
+    SymmetryForm::SymmetryForm(const Eigen::MatrixXd &V, const Eigen::VectorXi &curve): V_(V)
+    {
+        {
+            assert(curve(0) == curve(curve.size() - 1));
+            curve_ = curve.head(curve.size() - 1);
+        }
+
+        const Eigen::MatrixXd P = V(curve_, Eigen::all);
+        const Eigen::Vector3d bbox_min = P.colwise().minCoeff();
+        const Eigen::Vector3d bbox_max = P.colwise().maxCoeff();
+        const double bbox_size = (bbox_max - bbox_min).maxCoeff();
+
+        const Eigen::Vector3d center = V(curve_, Eigen::all).colwise().sum() / curve_.size();
+
+        std::vector<Eigen::Vector3d> coordinates;
+        for (int i = 0; i < curve_.size(); i++)
+        {
+            Eigen::Vector3d x = P.row(i);
+            x(dim) = P(i, dim) - center(dim);
+            coordinates.push_back(x);
+        }
+        
+        correspondence.setZero(coordinates.size());
+        double max_err = 0;
+        for (int i = 0; i < coordinates.size(); i++)
+        {
+            Eigen::Vector3d x = coordinates[i];
+            bool found = false;
+            double min_err = std::numeric_limits<double>::max();
+            int min_id = -1;
+            for (int j = 0; j < coordinates.size(); j++)
+            {
+                Eigen::Vector3d y = coordinates[j];
+                double err = abs(x(dim) + y(dim));
+                for (int d = 0; d < 3; d++)
+                    if (d != dim)
+                        err += abs(x(d) - y(d));
+                if (err < tol * bbox_size)
+                {
+                    max_err = std::max(max_err, err);
+                    found = true;
+                    correspondence(i) = j;
+                    break;
+                }
+                if (err < min_err)
+                {
+                    min_err = err;
+                    min_id = j;
+                }
+            }
+            if (!found)
+            {
+                // logger().error("Asymmetric vertex (ID {}, pos {}) on the curve with error {} (ID {}, pos {}) found! Set weight to zero!", 
+                //     curve_(i), x.transpose(), min_err / bbox_size, curve_(min_id), coordinates[min_id].transpose());
+
+                disable();
+                break;
+            }
+        }
+
+        if (enabled())
+        {
+            logger().debug("Symmetric curve identified! Error is {}", max_err / bbox_size);
+        }
+    }
+
+    double SymmetryForm::value_unweighted(const Eigen::VectorXd &x) const
+    {
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+        const Eigen::Vector3d center = V(curve_, Eigen::all).colwise().sum() / curve_.size();
+
+        Eigen::MatrixXd tmp = V(curve_(correspondence), Eigen::all) - V(curve_, Eigen::all);
+        tmp.col(dim) = (V(curve_(correspondence), dim) + V(curve_, dim)).array() - 2 * center(dim);
+
+        return tmp.squaredNorm() / 2.;
+    }
+
+    void SymmetryForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
+    {
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+        const Eigen::Vector3d center = V(curve_, Eigen::all).colwise().sum() / curve_.size();
+
+        Eigen::MatrixXd tmp = V(curve_(correspondence), Eigen::all) - V(curve_, Eigen::all);
+        tmp.col(dim) = (V(curve_(correspondence), dim) + V(curve_, dim)).array() - 2 * center(dim);
+
+        Eigen::MatrixXd g = Eigen::MatrixXd::Zero(V.rows(), V.cols());
+        for (int d = 0; d < 3; d++)
+        {
+            if (d != dim)
+            {
+                g(curve_(correspondence), d) += tmp.col(d);
+                g(curve_, d) -= tmp.col(d);
+            }
+        }
+        
+        g(curve_(correspondence), dim) += tmp.col(dim);
+        g(curve_, dim) += tmp.col(dim);
+
+        const double deriv_wrt_c = -2 * tmp.col(dim).sum();
+        g(curve_, dim).array() += deriv_wrt_c / curve_.size();
+
+        gradv = utils::flatten(g);
+    }
+
+    void SymmetryForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
+    {
+        const int N = curve_.size();
+        // const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+
+        hessian.setZero();
+        hessian.resize(x.size(), x.size());
+        std::vector<Eigen::Triplet<double>> T;
+        
+        Eigen::MatrixXd H(N, N);
+        for (int d = 0; d < 3; d++)
+        {
+            H.setZero();
+            H.diagonal().array() += 2;
+            
+            for (int i = 0; i < N; i++)
+                H(i, correspondence(i)) += 2 * (d == dim ? 1 : -1);
+            
+            if (d == dim)
+                H.array() += (-4. / N);
+
+            for (int i = 0; i < N; i++)
+                for (int j = 0; j < N; j++)
+                    if (H(i, j) != 0)
+                        T.emplace_back(curve_(i) * 3 + d, curve_(j) * 3 + d, H(i, j));
+        }
+
+        hessian.setFromTriplets(T.begin(), T.end());
     }
 }

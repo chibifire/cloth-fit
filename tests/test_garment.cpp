@@ -3,7 +3,7 @@
 #include <polyfem/solver/forms/garment_forms/CurveConstraintForm.hpp>
 #include <polyfem/solver/forms/garment_forms/CurveCenterTargetForm.hpp>
 #include <polyfem/solver/forms/garment_forms/FitForm.hpp>
-
+#include <polyfem/utils/par_for.hpp>
 #include <finitediff.hpp>
 
 #include <polyfem/State.hpp>
@@ -12,6 +12,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <igl/read_triangle_mesh.h>
+#include <igl/remove_duplicate_vertices.h>
 
 #include <iostream>
 #include <memory>
@@ -109,23 +110,34 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 	const int dim = 3;
 	const auto state_ptr = get_state(dim);
 
+	utils::NThread::get().set_num_threads(16);
+
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi F;
     igl::read_triangle_mesh("/Users/zizhouhuang/Desktop/cloth-fit/cpp_clothing_deformer/garment.obj", V, F);
-	
+
+	// remove duplicate vertices in the garment
+	// {
+	// 	Eigen::VectorXi svi, svj;
+	// 	Eigen::MatrixXi sf;
+	// 	Eigen::MatrixXd sv;
+	// 	igl::remove_duplicate_vertices(V, F, 1e-4, sv, svi, svj, sf);
+	// 	std::swap(sv, V);
+	// 	std::swap(sf, F);
+	// }
+
 	auto curves = boundary_curves(F);
 	Eigen::MatrixXd target(curves.size(), 3);
 	target.setRandom();
 
+	static const int n_rand = 5;
+	const double tol = 1e-5;
+
 	std::vector<std::unique_ptr<Form>> forms;
-	// forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
-    // forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
-	// forms.push_back(std::make_unique<AngleForm>(V, F));
-	// forms.push_back(std::make_unique<SimilarityForm>(V, F));
-
-	static const int n_rand = 10;
-	const double tol = 1e-6;
-
+	forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
+    forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
+	forms.push_back(std::make_unique<AngleForm>(V, F));
+	forms.push_back(std::make_unique<SimilarityForm>(V, F));
 
 	for (auto &form : forms)
 	{
@@ -140,20 +152,29 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
         REQUIRE(grad.norm() < 1e-12);
     }
 
-	// forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, target));
-    // forms.push_back(std::make_unique<AreaForm>(V, F, 1));
-	
+	forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, target));
+    forms.push_back(std::make_unique<AreaForm>(V, F, 1));
+
+	for (int i = 0; i < curves.size(); i++)
+	{
+		auto form = std::make_unique<SymmetryForm>(V, curves[i]);
+		if (form->enabled())
+			forms.push_back(std::move(form));
+	}
+
 	{
 		Eigen::MatrixXd avatar_v;
 		Eigen::MatrixXi avatar_f;
 		igl::read_triangle_mesh("/Users/zizhouhuang/Desktop/cloth-fit/cpp_clothing_deformer/avatar.obj", avatar_v, avatar_f);
 		
-		forms.push_back(std::make_unique<FitForm>(V, F, avatar_v, avatar_f, 3, 0.2));
+		forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1));
 	}
 
 	for (auto &form : forms)
 	{
 		Eigen::VectorXd x = Eigen::VectorXd::Zero(V.size());
+
+		std::cout << "Test on " << form->name() << " next ...\n";
 
 		for (int rand = 0; rand < n_rand; ++rand)
 		{
@@ -171,11 +192,12 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 			// Test gradient with finite differences
 			{
 				Eigen::VectorXd grad;
+				form->solution_changed(x);
 				form->first_derivative(x, grad);
 
 				Eigen::VectorXd fgrad;
 				fd::finite_gradient(
-					x, [&form](const Eigen::VectorXd &x) -> double { return form->value(x); }, fgrad,
+					x, [&form](const Eigen::VectorXd &x) -> double { form->solution_changed(x); return form->value(x); }, fgrad,
 					fd::AccuracyOrder::SECOND, step);
 
 				std::cout << std::setprecision(12) << "grad: " << grad.norm() << ", fd: " << fgrad.norm() << "\n";
@@ -187,13 +209,18 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 			// Test hessian with finite differences
 			{
 				StiffnessMatrix hess;
+				form->solution_changed(x);
 				form->second_derivative(x, hess);
+
+				Eigen::VectorXd theta1(x.size());
+				theta1.setRandom();
 
 				Eigen::MatrixXd fhess;
 				fd::finite_jacobian(
 					x,
 					[&form](const Eigen::VectorXd &x) -> Eigen::VectorXd {
 						Eigen::VectorXd grad;
+						form->solution_changed(x);
 						form->first_derivative(x, grad);
 						return grad;
 					},

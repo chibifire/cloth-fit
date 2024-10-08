@@ -5,15 +5,20 @@
 #include <polyfem/Common.hpp>
 #include <polyfem/utils/Types.hpp>
 #include <polyfem/utils/MatrixUtils.hpp>
+#include <polyfem/utils/MatrixCache.hpp>
 
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/Interpolation.h>
 
 namespace polyfem::solver
 {
+	template <int n_refs>
 	class FitForm : public Form
 	{
 	public:
-		FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const int n_refs, const double voxel_size);
+		constexpr static int n_loc_samples = ((n_refs+1)*(n_refs+2))/2;
+
+		FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const double voxel_size);
 
 		std::string name() const override { return "garment-fit"; }
 
@@ -32,16 +37,21 @@ namespace polyfem::solver
 		/// @param[out] hessian Output Hessian of the value wrt x
 		void second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const override;
 
+		void solution_changed(const Eigen::VectorXd &new_x) override;
+
     private:
         const Eigen::MatrixXd V_;
 		const Eigen::MatrixXi F_;
-        const int n_refs_;
         const double voxel_size_;
         const bool use_spline = true;
 
-		Eigen::MatrixXd P;
-		Eigen::VectorXd weights;
+		Eigen::Matrix<double, n_loc_samples, 3> P;
+		Eigen::Vector<double, n_loc_samples> weights;
+
+		std::vector<openvdb::tools::HessType<double>> totalP;
 
         openvdb::DoubleGrid::Ptr grid;
+
+		mutable std::unique_ptr<utils::MatrixCache> mat_cache_;
 	};
 } // namespace polyfem::solver
