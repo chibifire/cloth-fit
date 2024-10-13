@@ -194,10 +194,6 @@ int main(int argc, char **argv)
 	Eigen::MatrixXi garment_f;
 	{
 		igl::read_triangle_mesh(garment_mesh_path, garment_v, garment_f);
-		int n_refs = state.args["geometry"][0]["n_refs"];
-		while (n_refs-- > 0)
-			std::tie(garment_v, garment_f) = refine(garment_v, garment_f);
-		garment_v *= source_scaling;
 
 		// remove duplicate vertices in the garment
 		{
@@ -208,6 +204,11 @@ int main(int argc, char **argv)
 			std::swap(sv, garment_v);
 			std::swap(sf, garment_f);
 		}
+
+		int n_refs = state.args["geometry"][0]["n_refs"];
+		while (n_refs-- > 0)
+			std::tie(garment_v, garment_f) = refine(garment_v, garment_f);
+		garment_v *= source_scaling;
 	}
 
 	Eigen::MatrixXd skinny_avatar_v;
