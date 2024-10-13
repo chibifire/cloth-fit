@@ -20,7 +20,8 @@ namespace polyfem::solver
         {
             const Eigen::Vector3d e = b - a;
             const Eigen::Vector3d d = p - a;
-            const double t = e.dot(d) / e.squaredNorm();
+            double t = e.dot(d) / e.squaredNorm();
+            t = std::min(1., std::max(0., t));
             const double dist = (d - t * e).squaredNorm();
             return Eigen::Vector2d(dist, t);
         }
@@ -264,12 +265,13 @@ namespace polyfem::solver
     {
         for (const auto &c : curves)
         {
-            assert(c(0) == c(c.size() - 1));
+            const int N = c.size() - 1;
+            assert(c(0) == c(N));
 
-            Eigen::VectorXi c_(c.size() + 2);
-            c_.head(c.size()) = c;
-            c_(c.size() - 1) = c(1);
-            c_(c.size()) = c(2);
+            Eigen::VectorXi c_(N + 3);
+            c_.head(N + 1) = c;
+            c_(N + 1) = c(1);
+            c_(N + 2) = c(2);
 
             assert(c_(0) == c_(c_.size() - 3));
             assert(c_(1) == c_(c_.size() - 2));
@@ -465,8 +467,8 @@ namespace polyfem::solver
             }
             if (!found)
             {
-                // logger().error("Asymmetric vertex (ID {}, pos {}) on the curve with error {} (ID {}, pos {}) found! Set weight to zero!", 
-                //     curve_(i), x.transpose(), min_err / bbox_size, curve_(min_id), coordinates[min_id].transpose());
+                logger().error("Asymmetric vertex (ID {}, pos {}) on the curve with error {} (ID {}, pos {}) found! Set weight to zero!", 
+                    curve_(i), x.transpose(), min_err / bbox_size, curve_(min_id), coordinates[min_id].transpose());
 
                 disable();
                 break;

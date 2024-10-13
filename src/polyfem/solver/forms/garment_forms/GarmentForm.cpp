@@ -4,6 +4,7 @@
 #include <polyfem/utils/Timer.hpp>
 #include <polyfem/autogen/auto_derivatives.hpp>
 #include <finitediff.hpp>
+#include <unordered_set>
 
 using namespace polyfem::autogen;
 
@@ -121,16 +122,39 @@ namespace polyfem::solver {
     {
         igl::triangle_triangle_adjacency(F_, TT, TTi);
 
-        Eigen::MatrixXd normals = compute_normals(V, F_);
-
-        areas = normals.rowwise().norm() / 2.;
-
         Eigen::Matrix<int, 3, 2> le;
         le << 0, 1, 
               1, 2, 
               2, 0;
         Eigen::Vector3i lv;
         lv << 2, 0, 1;
+
+        for (int i = 0; i < TT.rows(); i++)
+        {
+            for (int j = 0; j < TT.cols(); j++)
+            {
+                if (TT(i, j) < 0)
+                    continue;
+                // std::unordered_set<int> edge1 = {F_(TT(i, j), le(TTi(i, j), 0)), F_(TT(i, j), le(TTi(i, j), 1))};
+                std::unordered_set<int> edge2 = {F_(i, le(j, 0)), F_(i, le(j, 1))};
+                if (TTi(i, j) < 0)
+                {
+                    for (int k = 0; k < 3; k++)
+                    {
+                        std::unordered_set<int> edge = {F_(TT(i, j), le(k, 0)), F_(TT(i, j), le(k, 1))};
+                        if (edge == edge2)
+                        {
+                            TTi(i, j) = k;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        Eigen::MatrixXd normals = compute_normals(V, F_);
+
+        areas = normals.rowwise().norm() / 2.;
 
         orig_angles = Eigen::MatrixXd::Ones(TT.rows(), TT.cols() * 2);
         for (int i = 0; i < TT.rows(); i++)
@@ -199,6 +223,8 @@ namespace polyfem::solver {
                 if (TT(i, j) < 0)
                     continue;
 
+                assert(TTi(i, j) >= 0);
+
                 const double normal_len_i = normals.row(i).norm();
                 const double normal_len_j = normals.row(TT(i, j)).norm();
                 const double normal_len = normal_len_i * normal_len_j;
@@ -209,6 +235,8 @@ namespace polyfem::solver {
                 const double fac = areas(i) + areas(TT(i, j));
 
                 Eigen::Vector4i indices;
+                assert(TTi(i, j) < lv.size());
+                assert(TT(i, j) < F_.rows());
                 indices << F_(i, le(j, 0)), F_(i, le(j, 1)), F_(i, lv(j)), F_(TT(i, j), lv(TTi(i, j)));
                 assert(F_(TT(i, j), lv(TTi(i, j))) != F_(i, le(j, 0)));
                 assert(F_(TT(i, j), lv(TTi(i, j))) != F_(i, le(j, 1)));
@@ -353,6 +381,29 @@ namespace polyfem::solver {
               2, 0;
         Eigen::Vector3i lv;
         lv << 2, 0, 1;
+
+        for (int i = 0; i < TT.rows(); i++)
+        {
+            for (int j = 0; j < TT.cols(); j++)
+            {
+                if (TT(i, j) < 0)
+                    continue;
+                // std::unordered_set<int> edge1 = {F_(TT(i, j), le(TTi(i, j), 0)), F_(TT(i, j), le(TTi(i, j), 1))};
+                std::unordered_set<int> edge2 = {F_(i, le(j, 0)), F_(i, le(j, 1))};
+                if (TTi(i, j) < 0)
+                {
+                    for (int k = 0; k < 3; k++)
+                    {
+                        std::unordered_set<int> edge = {F_(TT(i, j), le(k, 0)), F_(TT(i, j), le(k, 1))};
+                        if (edge == edge2)
+                        {
+                            TTi(i, j) = k;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
 
         orig_dists = Eigen::MatrixXd::Ones(TT.rows(), TT.cols() * 2);
         for (int i = 0; i < TT.rows(); i++)

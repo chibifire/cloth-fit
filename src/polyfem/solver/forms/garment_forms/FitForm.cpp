@@ -246,12 +246,19 @@ namespace polyfem::solver
 
         auto storage = create_thread_storage(LocalThreadSparseMatStorage(long(1e7), hessian.rows(), hessian.cols()));
 
+        igl::Timer timer;
+        timer.start();
         maybe_parallel_for(F_.rows(), [&](int start, int end, int thread_id) {
             LocalThreadSparseMatStorage &local_storage = get_local_thread_storage(storage, thread_id);
+            Eigen::Matrix<double, 9, 9> local_hess;
             for (int f = start; f < end; f++) {
                 const double area = (V_.row(F_(f, 1)) - V_.row(F_(f, 0))).template head<3>().cross((V_.row(F_(f, 2)) - V_.row(F_(f, 0))).template head<3>()).norm() / 2;
+                local_hess.setZero();
                 for (int i = 0; i < P.rows(); i++) {
                     const auto &tmp = totalP[f * n_loc_samples + i];
+
+                    if (tmp.x <= 0)
+                        continue;
                     
                     Eigen::Vector3d g;
                     g << tmp.g(0), tmp.g(1), tmp.g(2);
@@ -262,17 +269,23 @@ namespace polyfem::solver
                     h *= tmp.x;
                     h += g * g.transpose();
                     h *= area * weights(i);
-                    if (tmp.x > 0)
-                    {
-                        for (int d = 0; d < 3; d++)
-                            for (int k = 0; k < 3; k++)
-                                for (int s = 0; s < 3; s++)
-                                    for (int l = 0; l < 3; l++)
-                                        local_storage.cache->add_value(f, F_(f, s) * 3 + d, F_(f, l) * 3 + k, P(i, s) * P(i, l) * h(d, k));
-                    }
+
+                    for (int d = 0; d < 3; d++)
+                        for (int k = 0; k < 3; k++)
+                            for (int s = 0; s < 3; s++)
+                                for (int l = 0; l < 3; l++)
+                                    local_hess(s * 3 + d, l * 3 + k) += P(i, s) * P(i, l) * h(d, k);
                 }
+                for (int d = 0; d < 3; d++)
+                    for (int k = 0; k < 3; k++)
+                        for (int s = 0; s < 3; s++)
+                            for (int l = 0; l < 3; l++)
+                                local_storage.cache->add_value(f, F_(f, s) * 3 + d, F_(f, l) * 3 + k, local_hess(s * 3 + d, l * 3 + k));
             }
         });
+
+        timer.stop();
+        logger().trace("done separate assembly {}s...", timer.getElapsedTime());
 
         // Assemble the hessian matrix by concatenating the tuples in each local storage
 
@@ -284,7 +297,6 @@ namespace polyfem::solver
             storages[index++] = &local_storage;
         }
 
-        igl::Timer timer;
         timer.start();
         maybe_parallel_for(storages.size(), [&](int i) {
             storages[i]->cache->prune();

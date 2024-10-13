@@ -115,7 +115,7 @@ namespace polyfem::solver
 	private:
 		const Eigen::MatrixXd V_;
         Eigen::VectorXi curve_;
-		const double tol = 2e-2;
+		const double tol = 5e-2;
 		const int dim = 0;
 
 		Eigen::VectorXi correspondence;

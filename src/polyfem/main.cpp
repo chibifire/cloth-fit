@@ -49,11 +49,16 @@ void save_vtu(
 	const Eigen::VectorXd complete_disp = prob.full_to_complete(prob.reduced_to_full(sol));
 
 	Eigen::VectorXd total_grad = Eigen::VectorXd::Zero(complete_disp.size());
+	std::unordered_set<std::string> existing_names;
 	for (const auto &form : prob.forms())
 	{
 		Eigen::VectorXd grad;
 		form->first_derivative(complete_disp, grad);
-		writer.add_field("grad_" + form->name(), utils::unflatten(grad, 3));
+		std::string name = "grad_" + form->name();
+		while (existing_names.count(name) != 0)
+			name += '_';
+		existing_names.insert(name);
+		writer.add_field(name, utils::unflatten(grad, 3));
 		total_grad += grad;
 	}
 	writer.add_field("grad", utils::unflatten(total_grad, 3));
@@ -221,9 +226,21 @@ int main(int argc, char **argv)
 	Eigen::MatrixXd collision_vertices(skinny_avatar_v.rows() + garment_v.rows(), garment_v.cols());
 	collision_vertices << skinny_avatar_v, garment_v;
 
+	// std::cout << "target skeleton\n";
+	// std::cout << target_skeleton_v << std::endl;
+
+	// std::cout << "source skeleton\n";
+	// std::cout << skeleton_v << std::endl;
+
 	const auto curves = boundary_curves(collision_triangles.bottomRows(garment_f.rows()));
 	const Eigen::MatrixXd source_curve_centers = extract_curve_center_targets(collision_vertices, curves, skeleton_v, skeleton_bones, skeleton_v);
 	const Eigen::MatrixXd target_curve_centers = extract_curve_center_targets(collision_vertices, curves, skeleton_v, skeleton_bones, target_skeleton_v);
+
+	// std::cout << "target curve centers\n";
+	// std::cout << target_curve_centers << std::endl;
+
+	// std::cout << "source curve centers\n";
+	// std::cout << source_curve_centers << std::endl;
 
 	Eigen::MatrixXd cur_garment_v = garment_v;
 	int save_id = 1;
@@ -280,6 +297,7 @@ int main(int argc, char **argv)
 			contact_form->set_weight(1);
 			contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
 			contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
+			forms.push_back(contact_form);
 
 			std::vector<int> indices(avatar_v.size());
 			for (int i = 0; i < indices.size(); i++)
@@ -302,9 +320,9 @@ int main(int argc, char **argv)
 			curvature_form->set_weight(state.args["curvature_penalty_weight"]);
 			forms.push_back(curvature_form);
 
-			auto twist_form = std::make_shared<CurveTwistForm>(collision_vertices, curves);
-			twist_form->set_weight(state.args["twist_penalty_weight"]);
-			forms.push_back(twist_form);
+			// auto twist_form = std::make_shared<CurveTwistForm>(collision_vertices, curves);
+			// twist_form->set_weight(state.args["twist_penalty_weight"]);
+			// forms.push_back(twist_form);
 
 			{
 				auto center_target_form = std::make_shared<CurveCenterTargetForm>(collision_vertices, curves, next_curve_centers);
@@ -318,9 +336,16 @@ int main(int argc, char **argv)
 				fit_form->set_weight(state.args["fit_weight"]);
 				forms.push_back(fit_form);
 			}
+
+			for (int i = 0; i < curves.size(); i++)
+			{
+				auto form = std::make_shared<SymmetryForm>(collision_vertices, curves[i]);
+				form->set_weight(state.args["symmetry_weight"]);
+				if (form->enabled())
+					forms.push_back(form);
+			}
 		}
 
-		forms.push_back(contact_form);
 		GarmentNLProblem nl_problem(1 + garment_v.size(), utils::flatten(next_avatar_v - prev_avatar_v), forms);
 
 		Eigen::MatrixXd sol(nl_problem.full_size(), 1);
