@@ -91,7 +91,7 @@ namespace polyfem::solver
 	class SymmetryForm : public Form
 	{
 	public:
-		SymmetryForm(const Eigen::MatrixXd &V, const Eigen::VectorXi &curve);
+		SymmetryForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves);
 		virtual ~SymmetryForm() = default;
 
 		std::string name() const override { return "symmetry"; }
@@ -114,10 +114,10 @@ namespace polyfem::solver
 
 	private:
 		const Eigen::MatrixXd V_;
-        Eigen::VectorXi curve_;
+        std::vector<Eigen::VectorXi> curves_;
 		const double tol = 5e-2;
 		const int dim = 0;
 
-		Eigen::VectorXi correspondence;
+		std::vector<Eigen::VectorXi> correspondences_;
 	};
 }

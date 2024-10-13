@@ -4,10 +4,7 @@
 
 #include <igl/read_triangle_mesh.h>
 #include <igl/write_triangle_mesh.h>
-#include <igl/remove_duplicate_vertices.h>
 #include <igl/edges.h>
-
-#include <ipc/ipc.hpp>
 
 #include <polysolve/nonlinear/Solver.hpp>
 
@@ -21,59 +18,16 @@
 #include <polyfem/solver/forms/garment_forms/FitForm.hpp>
 #include <polyfem/solver/GarmentNLProblem.hpp>
 #include <polyfem/solver/ALSolver.hpp>
-#include <polyfem/io/OBJWriter.hpp>
 #include <polyfem/utils/JSONUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/mesh/MeshUtils.hpp>
-
-#include <paraviewo/ParaviewWriter.hpp>
-#include <paraviewo/VTUWriter.hpp>
+#include <polyfem/garment/optimize.hpp>
 
 #include <fstream>
 
 using namespace polyfem;
 using namespace solver;
 using namespace mesh;
-
-void save_vtu(
-	const std::string &path,
-	GarmentNLProblem &prob,
-	const Eigen::MatrixXd &V,
-	const Eigen::MatrixXi &F,
-	const int n_avatar_vertices,
-	const Eigen::VectorXd &sol)
-{
-	std::shared_ptr<paraviewo::ParaviewWriter> tmpw = std::make_shared<paraviewo::VTUWriter>();
-	paraviewo::ParaviewWriter &writer = *tmpw;
-
-	const Eigen::VectorXd complete_disp = prob.full_to_complete(prob.reduced_to_full(sol));
-
-	Eigen::VectorXd total_grad = Eigen::VectorXd::Zero(complete_disp.size());
-	std::unordered_set<std::string> existing_names;
-	for (const auto &form : prob.forms())
-	{
-		Eigen::VectorXd grad;
-		form->first_derivative(complete_disp, grad);
-		std::string name = "grad_" + form->name();
-		while (existing_names.count(name) != 0)
-			name += "_";
-		existing_names.insert(name);
-		writer.add_field(name, utils::unflatten(grad, 3));
-		total_grad += grad;
-	}
-	writer.add_field("grad", utils::unflatten(total_grad, 3));
-
-	Eigen::VectorXd body_ids = Eigen::VectorXd::Zero(V.rows());
-	body_ids.head(n_avatar_vertices).array() = 1;
-	writer.add_field("body_ids", body_ids);
-
-	writer.write_mesh(path, utils::unflatten(complete_disp, V.cols()) + V, F);
-}
-
-Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V)
-{
-	return V.colwise().maxCoeff() - V.colwise().minCoeff();
-}
 
 bool has_arg(const CLI::App &command_line, const std::string &value)
 {
@@ -168,97 +122,42 @@ int main(int argc, char **argv)
 	State state;
 	state.init(in_args, false);
 
+	GarmentSolver gstate;
+
 	const std::string out_folder = state.args["/output/directory"_json_pointer];
 	const std::string avatar_mesh_path = state.args["avatar_mesh_path"];
-	const std::string skinny_avatar_mesh_path = state.args["skinny_avatar_mesh_path"];
 	const std::string garment_mesh_path = state.args["garment_mesh_path"];
 	const std::string source_skeleton_path = state.args["source_skeleton_path"];
 	const std::string target_skeleton_path = state.args["target_skeleton_path"];
 
-	// To scale the source mannequin and garment to around unit size
-	const double source_scaling = 1e2;
+	gstate.out_folder = out_folder;
 
-	Eigen::MatrixXd avatar_v;
-	Eigen::MatrixXi avatar_f;
-	igl::read_triangle_mesh(avatar_mesh_path, avatar_v, avatar_f);
+	gstate.read_meshes(avatar_mesh_path, source_skeleton_path, target_skeleton_path);
+	gstate.load_garment_mesh(garment_mesh_path, state.args["geometry"][0]["n_refs"]);
+	gstate.project_avatar_to_skeleton();
+	gstate.normalize_meshes();
 
-	Eigen::MatrixXd skeleton_v, target_skeleton_v;
-	Eigen::MatrixXi skeleton_bones, target_skeleton_bones;
-	read_edge_mesh(source_skeleton_path, skeleton_v, skeleton_bones);
-	read_edge_mesh(target_skeleton_path, target_skeleton_v, target_skeleton_bones);
-	skeleton_v *= source_scaling;
+	igl::write_triangle_mesh(out_folder + "/target_avatar.obj", gstate.avatar_v, gstate.avatar_f);
+	igl::write_triangle_mesh(out_folder + "/projected_avatar.obj", gstate.skinny_avatar_v, gstate.avatar_f);
+	write_edge_mesh(out_folder + "/target_skeleton.obj", gstate.target_skeleton_v, gstate.target_skeleton_b);
+	write_edge_mesh(out_folder + "/source_skeleton.obj", gstate.skeleton_v, gstate.skeleton_b);
+	igl::write_triangle_mesh(out_folder + "/garment.obj", gstate.garment_v, gstate.garment_f);
 
-	assert((skeleton_bones - target_skeleton_bones).squaredNorm() < 1);
+	logger().info("avatar n_verts: {}, garment n_verts: {}, total n_verts: {}", gstate.avatar_v.rows(), gstate.garment_v.rows(), gstate.avatar_v.rows() + gstate.garment_v.rows());
 
-	Eigen::MatrixXd garment_v;
-	Eigen::MatrixXi garment_f;
-	{
-		igl::read_triangle_mesh(garment_mesh_path, garment_v, garment_f);
-
-		// remove duplicate vertices in the garment
-		{
-			Eigen::VectorXi svi, svj;
-			Eigen::MatrixXi sf;
-			Eigen::MatrixXd sv;
-			igl::remove_duplicate_vertices(garment_v, garment_f, 1e-4, sv, svi, svj, sf);
-			std::swap(sv, garment_v);
-			std::swap(sf, garment_f);
-		}
-
-		int n_refs = state.args["geometry"][0]["n_refs"];
-		while (n_refs-- > 0)
-			std::tie(garment_v, garment_f) = refine(garment_v, garment_f);
-		garment_v *= source_scaling;
-	}
-
-	Eigen::MatrixXd skinny_avatar_v;
-	Eigen::MatrixXi skinny_avatar_f;
-	igl::read_triangle_mesh(skinny_avatar_mesh_path, skinny_avatar_v, skinny_avatar_f);
-
-	skinny_avatar_v *= source_scaling;
-
-	const double target_scaling = bbox_size(skinny_avatar_v).maxCoeff() / bbox_size(target_skeleton_v).maxCoeff();
-	const Eigen::Vector3d center = (skinny_avatar_v.colwise().sum() - target_scaling * avatar_v.colwise().sum()) / avatar_v.rows();
-	Transformation<3> trans(target_scaling * Eigen::Matrix3d::Identity(), center);
-
-	trans.apply(avatar_v);
-	trans.apply(target_skeleton_v);
-
-	skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-4;
-
-	igl::write_triangle_mesh(out_folder + "/target_avatar.obj", avatar_v, avatar_f);
-	igl::write_triangle_mesh(out_folder + "/projected_avatar.obj", skinny_avatar_v, avatar_f);
-	write_edge_mesh(out_folder + "/target_skeleton.obj", target_skeleton_v, target_skeleton_bones);
-	write_edge_mesh(out_folder + "/source_skeleton.obj", skeleton_v, skeleton_bones);
-	igl::write_triangle_mesh(out_folder + "/garment.obj", garment_v, garment_f);
-
-	logger().info("avatar n_verts: {}, garment n_verts: {}, total n_verts: {}", avatar_v.rows(), garment_v.rows(), avatar_v.rows() + garment_v.rows());
-
-	Eigen::MatrixXi collision_triangles(skinny_avatar_f.rows() + garment_f.rows(), garment_f.cols());
-	collision_triangles << skinny_avatar_f, garment_f.array() + skinny_avatar_v.rows();
+	Eigen::MatrixXi collision_triangles(gstate.avatar_f.rows() + gstate.garment_f.rows(), gstate.garment_f.cols());
+	collision_triangles << gstate.avatar_f, gstate.garment_f.array() + gstate.skinny_avatar_v.rows();
 	Eigen::MatrixXi collision_edges;
 	igl::edges(collision_triangles, collision_edges);
 
-	Eigen::MatrixXd collision_vertices(skinny_avatar_v.rows() + garment_v.rows(), garment_v.cols());
-	collision_vertices << skinny_avatar_v, garment_v;
+	Eigen::MatrixXd collision_vertices(gstate.skinny_avatar_v.rows() + gstate.garment_v.rows(), gstate.garment_v.cols());
+	collision_vertices << gstate.skinny_avatar_v, gstate.garment_v;
 
-	// std::cout << "target skeleton\n";
-	// std::cout << target_skeleton_v << std::endl;
+	const auto curves = boundary_curves(collision_triangles.bottomRows(gstate.garment_f.rows()));
+	const Eigen::MatrixXd source_curve_centers = extract_curve_center_targets(collision_vertices, curves, gstate.skeleton_v, gstate.skeleton_b, gstate.skeleton_v);
+	const Eigen::MatrixXd target_curve_centers = extract_curve_center_targets(collision_vertices, curves, gstate.skeleton_v, gstate.skeleton_b, gstate.target_skeleton_v);
 
-	// std::cout << "source skeleton\n";
-	// std::cout << skeleton_v << std::endl;
-
-	const auto curves = boundary_curves(collision_triangles.bottomRows(garment_f.rows()));
-	const Eigen::MatrixXd source_curve_centers = extract_curve_center_targets(collision_vertices, curves, skeleton_v, skeleton_bones, skeleton_v);
-	const Eigen::MatrixXd target_curve_centers = extract_curve_center_targets(collision_vertices, curves, skeleton_v, skeleton_bones, target_skeleton_v);
-
-	// std::cout << "target curve centers\n";
-	// std::cout << target_curve_centers << std::endl;
-
-	// std::cout << "source curve centers\n";
-	// std::cout << source_curve_centers << std::endl;
-
-	Eigen::MatrixXd cur_garment_v = garment_v;
+	Eigen::MatrixXd cur_garment_v = gstate.garment_v;
 	int save_id = 1;
 	const int total_steps = state.args["incremental_steps"];
 	for (int substep = 0; substep < total_steps; ++substep)
@@ -267,10 +166,10 @@ int main(int argc, char **argv)
 		const double next_alpha = (substep + 1) / (double)total_steps;
 
 		// continuation
-		const Eigen::MatrixXd prev_skeleton_v = (target_skeleton_v - skeleton_v) * prev_alpha + skeleton_v;
-		const Eigen::MatrixXd next_skeleton_v = (target_skeleton_v - skeleton_v) * next_alpha + skeleton_v;
-		const Eigen::MatrixXd prev_avatar_v = (avatar_v - skinny_avatar_v) * prev_alpha + skinny_avatar_v;
-		const Eigen::MatrixXd next_avatar_v = (avatar_v - skinny_avatar_v) * next_alpha + skinny_avatar_v;
+		const Eigen::MatrixXd prev_skeleton_v = (gstate.target_skeleton_v - gstate.skeleton_v) * prev_alpha + gstate.skeleton_v;
+		const Eigen::MatrixXd next_skeleton_v = (gstate.target_skeleton_v - gstate.skeleton_v) * next_alpha + gstate.skeleton_v;
+		const Eigen::MatrixXd prev_avatar_v = (gstate.avatar_v - gstate.skinny_avatar_v) * prev_alpha + gstate.skinny_avatar_v;
+		const Eigen::MatrixXd next_avatar_v = (gstate.avatar_v - gstate.skinny_avatar_v) * next_alpha + gstate.skinny_avatar_v;
 
 		const Eigen::MatrixXd next_curve_centers = (target_curve_centers - source_curve_centers) * next_alpha + source_curve_centers;
 
@@ -280,26 +179,12 @@ int main(int argc, char **argv)
 			collision_mesh = ipc::CollisionMesh(
 				collision_vertices, collision_edges, collision_triangles);
 
-			const int n_avatar_verts = skinny_avatar_v.rows();
+			const int n_avatar_verts = gstate.skinny_avatar_v.rows();
 			collision_mesh.can_collide = [n_avatar_verts](size_t vi, size_t vj) {
 				return vi >= n_avatar_verts || vj >= n_avatar_verts;
 			};
 
-			auto ids = ipc::my_has_intersections(collision_mesh, collision_vertices, ipc::BroadPhaseMethod::BVH);
-			if (ids[0] >= 0)
-			{
-				io::OBJWriter::write(
-					out_folder + "/intersection.obj", collision_vertices,
-					collision_mesh.edges(), collision_mesh.faces());
-				Eigen::MatrixXi edge(1, 2);
-				edge << ids[0], ids[1];
-				Eigen::MatrixXi face(1, 3);
-				face << ids[2], ids[3], ids[4];
-				io::OBJWriter::write(
-					out_folder + "/intersecting_pair.obj", collision_vertices,
-					edge, face);
-				log_and_throw_error("Unable to solve, initial solution has intersections!");
-			}
+			gstate.check_intersections(collision_mesh, collision_vertices);
 		}
 
 		std::shared_ptr<ContactForm> contact_form;
@@ -315,7 +200,7 @@ int main(int argc, char **argv)
 			contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
 			forms.push_back(contact_form);
 
-			std::vector<int> indices(avatar_v.size());
+			std::vector<int> indices(gstate.avatar_v.size());
 			for (int i = 0; i < indices.size(); i++)
 				indices[i] = i;
 			pen_form = std::make_shared<PointPenaltyForm>(utils::flatten(next_avatar_v - prev_avatar_v), indices);
@@ -324,11 +209,11 @@ int main(int argc, char **argv)
 			lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(next_avatar_v - prev_avatar_v), indices);
 			forms.push_back(lagr_form);
 
-			auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
+			auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
 			angle_form->set_weight(state.args["angle_penalty_weight"]);
 			forms.push_back(angle_form);
 
-			auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()));
+			auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
 			similarity_form->set_weight(state.args["similarity_penalty_weight"]);
 			forms.push_back(similarity_form);
 
@@ -347,22 +232,19 @@ int main(int argc, char **argv)
 			}
 
 			{
-				fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(garment_f.rows()), avatar_v, avatar_f, 0.1);
+				fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()), gstate.avatar_v, gstate.avatar_f, 0.1);
 				fit_form->disable();
 				fit_form->set_weight(state.args["fit_weight"]);
 				forms.push_back(fit_form);
 			}
 
-			for (int i = 0; i < curves.size(); i++)
-			{
-				auto form = std::make_shared<SymmetryForm>(collision_vertices, curves[i]);
-				form->set_weight(state.args["symmetry_weight"]);
-				if (form->enabled())
-					forms.push_back(form);
-			}
+			auto form = std::make_shared<SymmetryForm>(collision_vertices, curves);
+			form->set_weight(state.args["symmetry_weight"]);
+			if (form->enabled())
+				forms.push_back(form);
 		}
 
-		GarmentNLProblem nl_problem(1 + garment_v.size(), utils::flatten(next_avatar_v - prev_avatar_v), forms);
+		GarmentNLProblem nl_problem(1 + gstate.garment_v.size(), utils::flatten(next_avatar_v - prev_avatar_v), forms);
 
 		Eigen::MatrixXd sol(nl_problem.full_size(), 1);
 		sol.setZero();
@@ -372,7 +254,6 @@ int main(int argc, char **argv)
 			|| !nl_problem.is_step_valid(sol, sol)
 			|| !nl_problem.is_step_collision_free(sol, sol))
 			log_and_throw_error("Failed to apply boundary conditions!");
-
 
 		std::shared_ptr<polysolve::nonlinear::Solver> nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["augmented_lagrangian"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
 
@@ -389,7 +270,7 @@ int main(int argc, char **argv)
 		
 		nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
 			const std::string path = out_folder + "/step_" + std::to_string(save_id++) + ".vtu";
-			save_vtu(path, nl_problem, collision_vertices, collision_triangles, skinny_avatar_v.rows(), sol);
+			save_vtu(path, nl_problem, collision_vertices, collision_triangles, gstate.skinny_avatar_v.rows(), sol);
 		};
 
 		Eigen::MatrixXd prev_sol = sol;

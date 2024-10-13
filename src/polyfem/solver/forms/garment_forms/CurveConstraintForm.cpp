@@ -415,135 +415,161 @@ namespace polyfem::solver
         hessian.setFromTriplets(triplets.begin(), triplets.end());
     }
 
-    SymmetryForm::SymmetryForm(const Eigen::MatrixXd &V, const Eigen::VectorXi &curve): V_(V)
+    SymmetryForm::SymmetryForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves): V_(V)
     {
+        for (const auto &curve : curves)
         {
             assert(curve(0) == curve(curve.size() - 1));
-            curve_ = curve.head(curve.size() - 1);
-        }
+            Eigen::VectorXi curve_ = curve.head(curve.size() - 1);
 
-        const Eigen::MatrixXd P = V(curve_, Eigen::all);
-        const Eigen::Vector3d bbox_min = P.colwise().minCoeff();
-        const Eigen::Vector3d bbox_max = P.colwise().maxCoeff();
-        const double bbox_size = (bbox_max - bbox_min).maxCoeff();
+            const Eigen::MatrixXd P = V(curve_, Eigen::all);
+            const Eigen::Vector3d bbox_min = P.colwise().minCoeff();
+            const Eigen::Vector3d bbox_max = P.colwise().maxCoeff();
+            const double bbox_size = (bbox_max - bbox_min).maxCoeff();
 
-        const Eigen::Vector3d center = V(curve_, Eigen::all).colwise().sum() / curve_.size();
+            const Eigen::Vector3d center = V(curve_, Eigen::all).colwise().sum() / curve_.size();
 
-        std::vector<Eigen::Vector3d> coordinates;
-        for (int i = 0; i < curve_.size(); i++)
-        {
-            Eigen::Vector3d x = P.row(i);
-            x(dim) = P(i, dim) - center(dim);
-            coordinates.push_back(x);
-        }
-        
-        correspondence.setZero(coordinates.size());
-        double max_err = 0;
-        for (int i = 0; i < coordinates.size(); i++)
-        {
-            Eigen::Vector3d x = coordinates[i];
-            bool found = false;
-            double min_err = std::numeric_limits<double>::max();
-            int min_id = -1;
-            for (int j = 0; j < coordinates.size(); j++)
+            std::vector<Eigen::Vector3d> coordinates;
+            for (int i = 0; i < curve_.size(); i++)
             {
-                Eigen::Vector3d y = coordinates[j];
-                double err = abs(x(dim) + y(dim));
-                for (int d = 0; d < 3; d++)
-                    if (d != dim)
-                        err += abs(x(d) - y(d));
-                if (err < tol * bbox_size)
+                Eigen::Vector3d x = P.row(i);
+                x(dim) = P(i, dim) - center(dim);
+                coordinates.push_back(x);
+            }
+            
+            Eigen::VectorXi correspondence = Eigen::VectorXi::Zero(coordinates.size());
+            double max_err = 0;
+            bool has_correspondence = true;
+            for (int i = 0; i < coordinates.size(); i++)
+            {
+                Eigen::Vector3d x = coordinates[i];
+                bool found = false;
+                double min_err = std::numeric_limits<double>::max();
+                int min_id = -1;
+                for (int j = 0; j < coordinates.size(); j++)
                 {
-                    max_err = std::max(max_err, err);
-                    found = true;
-                    correspondence(i) = j;
+                    Eigen::Vector3d y = coordinates[j];
+                    double err = abs(x(dim) + y(dim));
+                    for (int d = 0; d < 3; d++)
+                        if (d != dim)
+                            err += abs(x(d) - y(d));
+                    if (err < tol * bbox_size)
+                    {
+                        max_err = std::max(max_err, err);
+                        found = true;
+                        correspondence(i) = j;
+                        break;
+                    }
+                    if (err < min_err)
+                    {
+                        min_err = err;
+                        min_id = j;
+                    }
+                }
+                if (!found)
+                {
+                    logger().error("Asymmetric vertex (ID {}, pos {}) on the curve with error {} (ID {}, pos {}) found! Set weight to zero!", 
+                        curve_(i), x.transpose(), min_err / bbox_size, curve_(min_id), coordinates[min_id].transpose());
+
+                    has_correspondence = false;
                     break;
                 }
-                if (err < min_err)
-                {
-                    min_err = err;
-                    min_id = j;
-                }
             }
-            if (!found)
+
+            if (has_correspondence)
             {
-                logger().error("Asymmetric vertex (ID {}, pos {}) on the curve with error {} (ID {}, pos {}) found! Set weight to zero!", 
-                    curve_(i), x.transpose(), min_err / bbox_size, curve_(min_id), coordinates[min_id].transpose());
-
-                disable();
-                break;
+                logger().debug("Symmetric curve identified! Error is {}", max_err / bbox_size);
+                curves_.push_back(curve_);
+                correspondences_.push_back(correspondence);
             }
         }
 
-        if (enabled())
-        {
-            logger().debug("Symmetric curve identified! Error is {}", max_err / bbox_size);
-        }
+        if (curves_.size() == 0)
+            disable();
     }
 
     double SymmetryForm::value_unweighted(const Eigen::VectorXd &x) const
     {
         const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
-        const Eigen::Vector3d center = V(curve_, Eigen::all).colwise().sum() / curve_.size();
+        double out = 0.;
+        for (int i = 0; i < curves_.size(); i++)
+        {
+            const auto &curve = curves_[i];
+            const auto &correspondence = correspondences_[i];
 
-        Eigen::MatrixXd tmp = V(curve_(correspondence), Eigen::all) - V(curve_, Eigen::all);
-        tmp.col(dim) = (V(curve_(correspondence), dim) + V(curve_, dim)).array() - 2 * center(dim);
+            const Eigen::Vector3d center = V(curve, Eigen::all).colwise().sum() / curve.size();
 
-        return tmp.squaredNorm() / 2.;
+            Eigen::MatrixXd tmp = V(curve(correspondence), Eigen::all) - V(curve, Eigen::all);
+            tmp.col(dim) = (V(curve(correspondence), dim) + V(curve, dim)).array() - 2 * center(dim);
+
+            out += tmp.squaredNorm() / 2.;
+        }
+        return out;
     }
 
     void SymmetryForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
     {
         const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
-        const Eigen::Vector3d center = V(curve_, Eigen::all).colwise().sum() / curve_.size();
-
-        Eigen::MatrixXd tmp = V(curve_(correspondence), Eigen::all) - V(curve_, Eigen::all);
-        tmp.col(dim) = (V(curve_(correspondence), dim) + V(curve_, dim)).array() - 2 * center(dim);
 
         Eigen::MatrixXd g = Eigen::MatrixXd::Zero(V.rows(), V.cols());
-        for (int d = 0; d < 3; d++)
+        for (int i = 0; i < curves_.size(); i++)
         {
-            if (d != dim)
-            {
-                g(curve_(correspondence), d) += tmp.col(d);
-                g(curve_, d) -= tmp.col(d);
-            }
-        }
-        
-        g(curve_(correspondence), dim) += tmp.col(dim);
-        g(curve_, dim) += tmp.col(dim);
+            const auto &curve = curves_[i];
+            const auto &correspondence = correspondences_[i];
 
-        const double deriv_wrt_c = -2 * tmp.col(dim).sum();
-        g(curve_, dim).array() += deriv_wrt_c / curve_.size();
+            const Eigen::Vector3d center = V(curve, Eigen::all).colwise().sum() / curve.size();
+
+            Eigen::MatrixXd tmp = V(curve(correspondence), Eigen::all) - V(curve, Eigen::all);
+            tmp.col(dim) = (V(curve(correspondence), dim) + V(curve, dim)).array() - 2 * center(dim);
+
+            for (int d = 0; d < 3; d++)
+            {
+                if (d != dim)
+                {
+                    g(curve(correspondence), d) += tmp.col(d);
+                    g(curve, d) -= tmp.col(d);
+                }
+            }
+            
+            g(curve(correspondence), dim) += tmp.col(dim);
+            g(curve, dim) += tmp.col(dim);
+
+            const double deriv_wrt_c = -2 * tmp.col(dim).sum();
+            g(curve, dim).array() += deriv_wrt_c / curve.size();
+        }
 
         gradv = utils::flatten(g);
     }
 
     void SymmetryForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
     {
-        const int N = curve_.size();
-        // const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
-
         hessian.setZero();
         hessian.resize(x.size(), x.size());
-        std::vector<Eigen::Triplet<double>> T;
-        
-        Eigen::MatrixXd H(N, N);
-        for (int d = 0; d < 3; d++)
-        {
-            H.setZero();
-            H.diagonal().array() += 2;
-            
-            for (int i = 0; i < N; i++)
-                H(i, correspondence(i)) += 2 * (d == dim ? 1 : -1);
-            
-            if (d == dim)
-                H.array() += (-4. / N);
 
-            for (int i = 0; i < N; i++)
-                for (int j = 0; j < N; j++)
-                    if (H(i, j) != 0)
-                        T.emplace_back(curve_(i) * 3 + d, curve_(j) * 3 + d, H(i, j));
+        std::vector<Eigen::Triplet<double>> T;
+        for (int i = 0; i < curves_.size(); i++)
+        {
+            const auto &curve = curves_[i];
+            const auto &correspondence = correspondences_[i];
+            
+            const int N = curve.size();
+            Eigen::MatrixXd H(N, N);
+            for (int d = 0; d < 3; d++)
+            {
+                H.setZero();
+                H.diagonal().array() += 2;
+                
+                for (int i = 0; i < N; i++)
+                    H(i, correspondence(i)) += 2 * (d == dim ? 1 : -1);
+                
+                if (d == dim)
+                    H.array() += (-4. / N);
+
+                for (int i = 0; i < N; i++)
+                    for (int j = 0; j < N; j++)
+                        if (H(i, j) != 0)
+                            T.emplace_back(curve(i) * 3 + d, curve(j) * 3 + d, H(i, j));
+            }
         }
 
         hessian.setFromTriplets(T.begin(), T.end());
