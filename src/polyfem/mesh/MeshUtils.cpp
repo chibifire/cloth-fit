@@ -1286,6 +1286,24 @@ void polyfem::mesh::generate_edges(GEO::Mesh &M)
 	}
 }
 
+void polyfem::mesh::write_edge_mesh(
+	const std::string &path, 
+	const Eigen::MatrixXd &V, 
+	const Eigen::MatrixXi &E)
+{
+	std::ofstream outfile(path);
+
+	for (int i = 0; i < V.rows(); i++)
+	{
+		outfile << "v " << V(i, 0) << " " << V(i, 1) << " " << V(i, 2) << "\n";
+	}
+
+	for (int j = 0; j < E.rows(); j++)
+	{
+		outfile << "l " << E(j, 0) + 1 << " " << E(j, 1) + 1 << "\n";
+	}
+}
+
 void polyfem::mesh::read_edge_mesh(
 	const std::string &path,
 	Eigen::MatrixXd &V,

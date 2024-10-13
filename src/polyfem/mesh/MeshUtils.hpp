@@ -238,6 +238,7 @@ namespace polyfem
 		};
 
 		void read_edge_mesh(const std::string &path, Eigen::MatrixXd &V, Eigen::MatrixXi &E);
+		void write_edge_mesh(const std::string &path, const Eigen::MatrixXd &V, const Eigen::MatrixXi &E);
 
 		std::tuple<Eigen::MatrixXd, Eigen::MatrixXi> refine(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
 

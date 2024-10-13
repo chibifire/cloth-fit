@@ -56,7 +56,7 @@ void save_vtu(
 		form->first_derivative(complete_disp, grad);
 		std::string name = "grad_" + form->name();
 		while (existing_names.count(name) != 0)
-			name += '_';
+			name += "_";
 		existing_names.insert(name);
 		writer.add_field(name, utils::unflatten(grad, 3));
 		total_grad += grad;
@@ -68,6 +68,11 @@ void save_vtu(
 	writer.add_field("body_ids", body_ids);
 
 	writer.write_mesh(path, utils::unflatten(complete_disp, V.cols()) + V, F);
+}
+
+Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V)
+{
+	return V.colwise().maxCoeff() - V.colwise().minCoeff();
 }
 
 bool has_arg(const CLI::App &command_line, const std::string &value)
@@ -163,13 +168,15 @@ int main(int argc, char **argv)
 	State state;
 	state.init(in_args, false);
 
+	const std::string out_folder = state.args["/output/directory"_json_pointer];
 	const std::string avatar_mesh_path = state.args["avatar_mesh_path"];
 	const std::string skinny_avatar_mesh_path = state.args["skinny_avatar_mesh_path"];
 	const std::string garment_mesh_path = state.args["garment_mesh_path"];
 	const std::string source_skeleton_path = state.args["source_skeleton_path"];
 	const std::string target_skeleton_path = state.args["target_skeleton_path"];
 
-	const double scaling = 1e2;
+	// To scale the source mannequin and garment to around unit size
+	const double source_scaling = 1e2;
 
 	Eigen::MatrixXd avatar_v;
 	Eigen::MatrixXi avatar_f;
@@ -179,7 +186,7 @@ int main(int argc, char **argv)
 	Eigen::MatrixXi skeleton_bones, target_skeleton_bones;
 	read_edge_mesh(source_skeleton_path, skeleton_v, skeleton_bones);
 	read_edge_mesh(target_skeleton_path, target_skeleton_v, target_skeleton_bones);
-	skeleton_v *= scaling;
+	skeleton_v *= source_scaling;
 
 	assert((skeleton_bones - target_skeleton_bones).squaredNorm() < 1);
 
@@ -190,7 +197,7 @@ int main(int argc, char **argv)
 		int n_refs = state.args["geometry"][0]["n_refs"];
 		while (n_refs-- > 0)
 			std::tie(garment_v, garment_f) = refine(garment_v, garment_f);
-		garment_v *= scaling;
+		garment_v *= source_scaling;
 
 		// remove duplicate vertices in the garment
 		{
@@ -207,14 +214,22 @@ int main(int argc, char **argv)
 	Eigen::MatrixXi skinny_avatar_f;
 	igl::read_triangle_mesh(skinny_avatar_mesh_path, skinny_avatar_v, skinny_avatar_f);
 
-	const Eigen::Vector3d center = (skinny_avatar_v.colwise().sum() - avatar_v.colwise().sum()) / avatar_v.rows();
-	Transformation<3> trans(scaling * Eigen::Matrix3d::Identity(), scaling * center);
+	skinny_avatar_v *= source_scaling;
 
-	skinny_avatar_v *= scaling;
+	const double target_scaling = bbox_size(skinny_avatar_v).maxCoeff() / bbox_size(target_skeleton_v).maxCoeff();
+	const Eigen::Vector3d center = (skinny_avatar_v.colwise().sum() - target_scaling * avatar_v.colwise().sum()) / avatar_v.rows();
+	Transformation<3> trans(target_scaling * Eigen::Matrix3d::Identity(), center);
+
 	trans.apply(avatar_v);
 	trans.apply(target_skeleton_v);
 
 	skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-4;
+
+	igl::write_triangle_mesh(out_folder + "/target_avatar.obj", avatar_v, avatar_f);
+	igl::write_triangle_mesh(out_folder + "/projected_avatar.obj", skinny_avatar_v, avatar_f);
+	write_edge_mesh(out_folder + "/target_skeleton.obj", target_skeleton_v, target_skeleton_bones);
+	write_edge_mesh(out_folder + "/source_skeleton.obj", skeleton_v, skeleton_bones);
+	igl::write_triangle_mesh(out_folder + "/garment.obj", garment_v, garment_f);
 
 	logger().info("avatar n_verts: {}, garment n_verts: {}, total n_verts: {}", avatar_v.rows(), garment_v.rows(), avatar_v.rows() + garment_v.rows());
 
@@ -273,14 +288,14 @@ int main(int argc, char **argv)
 			if (ids[0] >= 0)
 			{
 				io::OBJWriter::write(
-					"intersection.obj", collision_vertices,
+					out_folder + "/intersection.obj", collision_vertices,
 					collision_mesh.edges(), collision_mesh.faces());
 				Eigen::MatrixXi edge(1, 2);
 				edge << ids[0], ids[1];
 				Eigen::MatrixXi face(1, 3);
 				face << ids[2], ids[3], ids[4];
 				io::OBJWriter::write(
-					"intersecting_pair.obj", collision_vertices,
+					out_folder + "/intersecting_pair.obj", collision_vertices,
 					edge, face);
 				log_and_throw_error("Unable to solve, initial solution has intersections!");
 			}
@@ -372,7 +387,7 @@ int main(int argc, char **argv)
 			});
 		
 		nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
-			const std::string path = "step_" + std::to_string(save_id++) + ".vtu";
+			const std::string path = out_folder + "/step_" + std::to_string(save_id++) + ".vtu";
 			save_vtu(path, nl_problem, collision_vertices, collision_triangles, skinny_avatar_v.rows(), sol);
 		};
 
