@@ -80,7 +80,7 @@ TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
 
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi F;
-    igl::read_triangle_mesh("/Users/zizhouhuang/Desktop/cloth-fit/cpp_clothing_deformer/garment.obj", V, F);
+    igl::read_triangle_mesh(POLYFEM_DATA_DIR + std::string("/../tests/garment.obj"), V, F);
 	
 	auto curves = boundary_curves(F);
 
@@ -114,7 +114,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi F;
-    igl::read_triangle_mesh("/Users/zizhouhuang/Desktop/cloth-fit/cpp_clothing_deformer/garment.obj", V, F);
+    igl::read_triangle_mesh(POLYFEM_DATA_DIR + std::string("/../tests/garment.obj"), V, F);
 
 	// remove duplicate vertices in the garment
 	// {
