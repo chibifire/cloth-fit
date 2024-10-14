@@ -216,5 +216,28 @@ namespace autogen {
     // dA is (144×1) flattened in column-major order
     void curve_twist_hessian(double t0_x, double t0_y, double t0_z, double t1_x, double t1_y, double t1_z, double t2_x, double t2_y, double t2_z, double t3_x, double t3_y, double t3_z, double dA[144]);
 
+    void def_grad_gradient(
+        double t0_x,
+        double t0_y,
+        double t0_z,
+        double t1_x,
+        double t1_y,
+        double t1_z,
+        double t2_x,
+        double t2_y,
+        double t2_z,
+        double dA[9]);
+    // dA is (81×1) flattened in column-major order
+    void def_grad_hessian(
+        double t0_x,
+        double t0_y,
+        double t0_z,
+        double t1_x,
+        double t1_y,
+        double t1_z,
+        double t2_x,
+        double t2_y,
+        double t2_z,
+        double dA[81]);
 }
 }

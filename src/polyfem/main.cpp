@@ -134,8 +134,8 @@ int main(int argc, char **argv)
 
 	gstate.read_meshes(avatar_mesh_path, source_skeleton_path, target_skeleton_path);
 	gstate.load_garment_mesh(garment_mesh_path, state.args["geometry"][0]["n_refs"]);
-	gstate.project_avatar_to_skeleton();
 	gstate.normalize_meshes();
+	gstate.project_avatar_to_skeleton();
 
 	igl::write_triangle_mesh(out_folder + "/target_avatar.obj", gstate.avatar_v, gstate.avatar_f);
 	igl::write_triangle_mesh(out_folder + "/projected_avatar.obj", gstate.skinny_avatar_v, gstate.avatar_f);
@@ -212,6 +212,10 @@ int main(int argc, char **argv)
 			auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
 			angle_form->set_weight(state.args["angle_penalty_weight"]);
 			forms.push_back(angle_form);
+
+			auto def_form = std::make_shared<DefGradForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
+			def_form->set_weight(state.args["deformation_penalty_weight"]);
+			forms.push_back(def_form);
 
 			auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
 			similarity_form->set_weight(state.args["similarity_penalty_weight"]);

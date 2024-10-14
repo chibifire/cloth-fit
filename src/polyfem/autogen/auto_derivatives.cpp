@@ -5764,4 +5764,245 @@ dA[142] = t1189*(t1096*t529 + t1202);
 dA[143] = t1185*(t1096*t784 - t1184*std::pow(t782, 2) + t64*(std::pow(t487, 2) + t489));
 }
 
+    void def_grad_gradient(
+        double t0_x,
+        double t0_y,
+        double t0_z,
+        double t1_x,
+        double t1_y,
+        double t1_z,
+        double t2_x,
+        double t2_y,
+        double t2_z,
+        double dA[9])
+    {
+        const auto t0 = t0_x - t2_x;
+        const auto t1 = t0_x - t1_x;
+        const auto t2 = t0_y - t1_y;
+        const auto t3 = t0_z - t1_z;
+        const auto t4 = std::pow(t1, 2) + std::pow(t2, 2) + std::pow(t3, 2);
+        const auto t5 = t0_y - t2_y;
+        const auto t6 = t0_z - t2_z;
+        const auto t7 =
+            1.0 / (std::pow(t0, 2) + std::pow(t5, 2) + std::pow(t6, 2));
+        const auto t8 = t4 * t7;
+        const auto t9 = std::sqrt(t8);
+        const auto t10 = t9 / t4;
+        const auto t11 = t7 * t9;
+        dA[0] = t10 * (-t0 * t8 + t0_x - t1_x);
+        dA[1] = t10 * (t0_y - t1_y - t5 * t8);
+        dA[2] = t10 * (t0_z - t1_z - t6 * t8);
+        dA[3] = -t1 * t10;
+        dA[4] = -t10 * t2;
+        dA[5] = -t10 * t3;
+        dA[6] = t0 * t11;
+        dA[7] = t11 * t5;
+        dA[8] = t11 * t6;
+    }
+
+    // dA is (81×1) flattened in column-major order
+    void def_grad_hessian(
+        double t0_x,
+        double t0_y,
+        double t0_z,
+        double t1_x,
+        double t1_y,
+        double t1_z,
+        double t2_x,
+        double t2_y,
+        double t2_z,
+        double dA[81])
+    {
+        const auto t0 = t0_x - t1_x;
+        const auto t1 = std::pow(t0, 2);
+        const auto t2 = t0_y - t1_y;
+        const auto t3 = std::pow(t2, 2);
+        const auto t4 = t0_z - t1_z;
+        const auto t5 = std::pow(t4, 2);
+        const auto t6 = t1 + t3 + t5;
+        const auto t7 = 1.0 / t6;
+        const auto t8 = t0_x - t2_x;
+        const auto t9 = std::pow(t8, 2);
+        const auto t10 = t0_y - t2_y;
+        const auto t11 = std::pow(t10, 2);
+        const auto t12 = t0_z - t2_z;
+        const auto t13 = std::pow(t12, 2);
+        const auto t14 = t11 + t13 + t9;
+        const auto t15 = 1.0 / t14;
+        const auto t16 = t15 * t6;
+        const auto t17 = t16 * t8;
+        const auto t18 = -t0_x + t1_x;
+        const auto t19 = -t17 - t18;
+        const auto t20 = t0 * t8;
+        const auto t21 = 4 * t15;
+        const auto t22 = t19 * t7;
+        const auto t23 = t0 * t22;
+        const auto t24 = t19 * t8;
+        const auto t25 = 2 * t15;
+        const auto t26 = 4 * t9;
+        const auto t27 = std::pow(t14, -2);
+        const auto t28 = t27 * t6;
+        const auto t29 = 1 - t16;
+        const auto t30 = std::sqrt(t16);
+        const auto t31 = t30 * t7;
+        const auto t32 = t10 * t16;
+        const auto t33 = -t0_y + t1_y;
+        const auto t34 = -t32 - t33;
+        const auto t35 = t34 * t7;
+        const auto t36 = 2 * t0;
+        const auto t37 = t0 * t10;
+        const auto t38 = t2 * t8;
+        const auto t39 = 2 * t17;
+        const auto t40 = -t19 * t34 * t7 + t25 * (-t10 * t39 + t37 + t38);
+        const auto t41 = t12 * t16;
+        const auto t42 = -t0_z + t1_z;
+        const auto t43 = -t41 - t42;
+        const auto t44 = t43 * t7;
+        const auto t45 = t0 * t12;
+        const auto t46 = t4 * t8;
+        const auto t47 = -t19 * t43 * t7 + t25 * (-t12 * t39 + t45 + t46);
+        const auto t48 = t30 / std::pow(t6, 2);
+        const auto t49 = t48 * (t0 + t17);
+        const auto t50 = t15 * t30;
+        const auto t51 = t25 * t8;
+        const auto t52 = t50 * (t19 * t7 - t51);
+        const auto t53 = 2 * t2;
+        const auto t54 = t10 * t2;
+        const auto t55 = t2 * t35;
+        const auto t56 = t10 * t34;
+        const auto t57 = 4 * t28;
+        const auto t58 = t12 * t2;
+        const auto t59 = t10 * t4;
+        const auto t60 = t25 * (-2 * t12 * t32 + t58 + t59) - t34 * t43 * t7;
+        const auto t61 = t48 * (t2 + t32);
+        const auto t62 = t10 * t25;
+        const auto t63 = t50 * (t34 * t7 - t62);
+        const auto t64 = 2 * t4;
+        const auto t65 = t12 * t4;
+        const auto t66 = t4 * t44;
+        const auto t67 = t12 * t43;
+        const auto t68 = t48 * (t4 + t41);
+        const auto t69 = t12 * t25;
+        const auto t70 = t50 * (t43 * t7 - t69);
+        const auto t71 = t35 + t62;
+        const auto t72 = t0 * t31;
+        const auto t73 = t44 + t69;
+        const auto t74 = t0 * t48;
+        const auto t75 = -t2 * t74;
+        const auto t76 = -t4 * t74;
+        const auto t77 = t15 * t31;
+        const auto t78 = -t20 * t77;
+        const auto t79 = -t37 * t77;
+        const auto t80 = -t45 * t77;
+        const auto t81 = t22 + t51;
+        const auto t82 = t2 * t31;
+        const auto t83 = -t2 * t4 * t48;
+        const auto t84 = -t38 * t77;
+        const auto t85 = -t54 * t77;
+        const auto t86 = -t58 * t77;
+        const auto t87 = t31 * t4;
+        const auto t88 = -t46 * t77;
+        const auto t89 = -t59 * t77;
+        const auto t90 = -t65 * t77;
+        const auto t91 = -3 * t32 - t33;
+        const auto t92 = t77 * t8;
+        const auto t93 = -3 * t41 - t42;
+        const auto t94 = 3 * t15;
+        const auto t95 = 3 * t27 * t30 * t8;
+        const auto t96 = t10 * t95;
+        const auto t97 = t12 * t95;
+        const auto t98 = -3 * t17 - t18;
+        const auto t99 = t10 * t77;
+        const auto t100 = 4 * t16;
+        const auto t101 = 3 * t10 * t12 * t27 * t30;
+        const auto t102 = t12 * t77;
+        dA[0] = t31
+            * (std::pow(t19, 2) * t7 - t20 * t21 - 2 * t23 + t24 * t25
+               + t26 * t28 + t29);
+        dA[1] = t31 * (2 * t15 * t34 * t8 - t35 * t36 - t40);
+        dA[2] = t31 * (2 * t15 * t43 * t8 - t36 * t44 - t47);
+        dA[3] = t31 * (2 * t1 * t7 - t23 - 1);
+        dA[4] = t2 * t49;
+        dA[5] = t4 * t49;
+        dA[6] = t50 * (t22 * t8 - t25 * t9 + 1);
+        dA[7] = t10 * t52;
+        dA[8] = t12 * t52;
+        dA[9] = t31 * (2 * t10 * t15 * t19 - t22 * t53 - t40);
+        dA[10] = t31
+            * (t11 * t57 - t21 * t54 + t25 * t56 + t29 + std::pow(t34, 2) * t7
+               - 2 * t55);
+        dA[11] = t31 * (2 * t10 * t15 * t43 - t44 * t53 - t60);
+        dA[12] = t0 * t61;
+        dA[13] = t31 * (2 * t3 * t7 - t55 - 1);
+        dA[14] = t4 * t61;
+        dA[15] = t63 * t8;
+        dA[16] = t50 * (t10 * t35 - t11 * t25 + 1);
+        dA[17] = t12 * t63;
+        dA[18] = t31 * (2 * t12 * t15 * t19 - t22 * t64 - t47);
+        dA[19] = t31 * (2 * t12 * t15 * t34 - t35 * t64 - t60);
+        dA[20] = t31
+            * (t13 * t57 - t21 * t65 + t25 * t67 + t29 + std::pow(t43, 2) * t7
+               - 2 * t66);
+        dA[21] = t0 * t68;
+        dA[22] = t2 * t68;
+        dA[23] = t31 * (2 * t5 * t7 - t66 - 1);
+        dA[24] = t70 * t8;
+        dA[25] = t10 * t70;
+        dA[26] = t50 * (t12 * t44 - t13 * t25 + 1);
+        dA[27] = t31 * (t0 * t51 + t23 - 1);
+        dA[28] = t71 * t72;
+        dA[29] = t72 * t73;
+        dA[30] = t31 * (-t1 * t7 + 1);
+        dA[31] = t75;
+        dA[32] = t76;
+        dA[33] = t78;
+        dA[34] = t79;
+        dA[35] = t80;
+        dA[36] = t81 * t82;
+        dA[37] = t31 * (t2 * t62 + t55 - 1);
+        dA[38] = t73 * t82;
+        dA[39] = t75;
+        dA[40] = t31 * (-t3 * t7 + 1);
+        dA[41] = t83;
+        dA[42] = t84;
+        dA[43] = t85;
+        dA[44] = t86;
+        dA[45] = t81 * t87;
+        dA[46] = t71 * t87;
+        dA[47] = t31 * (t4 * t69 + t66 - 1);
+        dA[48] = t76;
+        dA[49] = t83;
+        dA[50] = t31 * (-t5 * t7 + 1);
+        dA[51] = t88;
+        dA[52] = t89;
+        dA[53] = t90;
+        dA[54] = t77 * (-t16 * t26 + 2 * t20 - t24 + t6);
+        dA[55] = t91 * t92;
+        dA[56] = t92 * t93;
+        dA[57] = t78;
+        dA[58] = t84;
+        dA[59] = t88;
+        dA[60] = t50 * (t9 * t94 - 1);
+        dA[61] = t96;
+        dA[62] = t97;
+        dA[63] = t98 * t99;
+        dA[64] = t77 * (t10 * t53 - t100 * t11 - t56 + t6);
+        dA[65] = t93 * t99;
+        dA[66] = t79;
+        dA[67] = t85;
+        dA[68] = t89;
+        dA[69] = t96;
+        dA[70] = t50 * (t11 * t94 - 1);
+        dA[71] = t101;
+        dA[72] = t102 * t98;
+        dA[73] = t102 * t91;
+        dA[74] = t77 * (-t100 * t13 + t12 * t64 + t6 - t67);
+        dA[75] = t80;
+        dA[76] = t86;
+        dA[77] = t90;
+        dA[78] = t97;
+        dA[79] = t101;
+        dA[80] = t50 * (t13 * t94 - 1);
+    }
+
 }

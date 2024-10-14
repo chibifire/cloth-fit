@@ -154,6 +154,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 
 	forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, target));
     forms.push_back(std::make_unique<AreaForm>(V, F, 1));
+	forms.push_back(std::make_unique<DefGradForm>(V, F));
 
 	auto form = std::make_unique<SymmetryForm>(V, curves);
 	if (form->enabled())

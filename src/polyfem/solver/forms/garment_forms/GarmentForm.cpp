@@ -118,6 +118,87 @@ namespace polyfem::solver {
         hessian.setFromTriplets(triplets.begin(), triplets.end());
     }
 
+    double DefGradForm::value_unweighted(const Eigen::VectorXd &x) const
+    {
+        double total = 0;
+        const Eigen::MatrixXd V = utils::unflatten(x, V_.cols()) + V_;
+        for (int e = 0; e < F_.rows(); e++)
+        {
+            double a0 = (V_.row(F_(e, 1)) - V_.row(F_(e, 0))).norm();
+            double b0 = (V_.row(F_(e, 2)) - V_.row(F_(e, 0))).norm();
+            double a1 = (V.row(F_(e, 1)) - V.row(F_(e, 0))).norm();
+            double b1 = (V.row(F_(e, 2)) - V.row(F_(e, 0))).norm();
+
+            total += pow(a1 / b1 - a0 / b0, 2);
+        }
+        return total / 2.;
+    }
+
+    void DefGradForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
+    {
+        gradv.setZero(x.size());
+        const Eigen::MatrixXd V = utils::unflatten(x, V_.cols()) + V_;
+        for (int e = 0; e < F_.rows(); e++)
+        {
+            double a0 = (V_.row(F_(e, 1)) - V_.row(F_(e, 0))).norm();
+            double b0 = (V_.row(F_(e, 2)) - V_.row(F_(e, 0))).norm();
+            double a1 = (V.row(F_(e, 1)) - V.row(F_(e, 0))).norm();
+            double b1 = (V.row(F_(e, 2)) - V.row(F_(e, 0))).norm();
+
+            Eigen::Matrix<double, 9, 1> local_grad;
+            def_grad_gradient(
+                V(F_(e, 0), 0), V(F_(e, 0), 1), V(F_(e, 0), 2),
+                V(F_(e, 1), 0), V(F_(e, 1), 1), V(F_(e, 1), 2),
+                V(F_(e, 2), 0), V(F_(e, 2), 1), V(F_(e, 2), 2),
+                local_grad.data());
+
+            for (int li = 0; li < 3; li++)
+                gradv.segment<3>(F_(e, li) * 3) += (a1 / b1 - a0 / b0) * local_grad.segment<3>(li * 3);
+        }
+    }
+
+    void DefGradForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
+    {
+        POLYFEM_SCOPED_TIMER("def grad hessian");
+        hessian.setZero();
+        hessian.resize(x.size(), x.size());
+        std::vector<Eigen::Triplet<double>> triplets;
+
+        const Eigen::MatrixXd V = utils::unflatten(x, V_.cols()) + V_;
+        for (int e = 0; e < F_.rows(); e++)
+        {
+            double a0 = (V_.row(F_(e, 1)) - V_.row(F_(e, 0))).norm();
+            double b0 = (V_.row(F_(e, 2)) - V_.row(F_(e, 0))).norm();
+            double a1 = (V.row(F_(e, 1)) - V.row(F_(e, 0))).norm();
+            double b1 = (V.row(F_(e, 2)) - V.row(F_(e, 0))).norm();
+
+            Eigen::Vector<double, 9> local_grad;
+            local_grad.setZero();
+            def_grad_gradient(
+                V(F_(e, 0), 0), V(F_(e, 0), 1), V(F_(e, 0), 2),
+                V(F_(e, 1), 0), V(F_(e, 1), 1), V(F_(e, 1), 2),
+                V(F_(e, 2), 0), V(F_(e, 2), 1), V(F_(e, 2), 2),
+                local_grad.data());
+
+            Eigen::Matrix<double, 9, 9> local_hess;
+            local_hess.setZero();
+            def_grad_hessian(
+                V(F_(e, 0), 0), V(F_(e, 0), 1), V(F_(e, 0), 2),
+                V(F_(e, 1), 0), V(F_(e, 1), 1), V(F_(e, 1), 2),
+                V(F_(e, 2), 0), V(F_(e, 2), 1), V(F_(e, 2), 2),
+                local_hess.data());
+            
+            const Eigen::Matrix<double, 9, 9> real_local_hess = local_grad * local_grad.transpose() + local_hess * (a1 / b1 - a0 / b0);
+            for (int i = 0; i < 3; i++)
+                for (int j = 0; j < 3; j++)
+                    for (int di = 0; di < 3; di++)
+                        for (int dj = 0; dj < 3; dj++)
+                            triplets.emplace_back(3 * F_(e, i) + di, 3 * F_(e, j) + dj, real_local_hess(i * 3 + di, j * 3 + dj));
+        }
+
+        hessian.setFromTriplets(triplets.begin(), triplets.end());
+    }
+
     AngleForm::AngleForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : V_(V), F_(F)
     {
         igl::triangle_triangle_adjacency(F_, TT, TTi);
