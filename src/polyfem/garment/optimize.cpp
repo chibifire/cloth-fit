@@ -7,11 +7,13 @@
 
 #include <igl/read_triangle_mesh.h>
 #include <igl/remove_duplicate_vertices.h>
+#include <igl/write_triangle_mesh.h>
 
 #include <paraviewo/ParaviewWriter.hpp>
 #include <paraviewo/VTUWriter.hpp>
 
 #include <ipc/ipc.hpp>
+#include <ipc/distance/point_edge.hpp>
 
 #include <unordered_set>
 
@@ -61,7 +63,55 @@ namespace polyfem {
 
             return {I, t};
         }
+
+        void floydWarshall(const Eigen::MatrixXi &G, Eigen::MatrixXi &dist, Eigen::MatrixXi &parents)
+        {
+            int N = G.rows();
+            dist = G;
+            parents = -Eigen::MatrixXi::Ones(N, N);
+            for (int i = 0; i < N; i++)
+                for (int j = 0; j < N; j++)
+                    if (dist(i, j) > 0 && dist(i, j) <= N)
+                        parents(i, j) = i;
+            
+            for (int k = 0; k < N; k++)
+            {
+                for (int i = 0; i < N; i++)
+                {
+                    for (int j = 0; j < N; j++)
+                    {
+                        if (k == i || k == j || i == j)
+                            continue;
+                        if (dist(i, j) > dist(i, k) + dist(k, j))
+                        {
+                            dist(i, j) = dist(i, k) + dist(k, j);
+                            parents(i, j) = parents(k, j);
+                        }
+                    }
+                }
+            }
+
+            // validate
+            for (int i = 0; i < N; i++)
+            {
+                for (int j = 0; j < N; j++)
+                {
+                    if (i == j)
+                        continue;
+                    const int p = parents(i, j);
+                    if (dist(i, p) + G(p, j) != dist(i, j))
+                        log_and_throw_error("[floydWarshall] Wrong closest distance!");
+                    
+                    int cur = j;
+                    while (parents(i, cur) != i)
+                        cur = parents(i, cur);
+                    if (parents(i, cur) != i)
+                        log_and_throw_error("[floydWarshall] Wrong closest distance!");
+                }
+            }
+        }
     }
+
     void save_vtu(
         const std::string &path,
         GarmentNLProblem &prob,
@@ -154,26 +204,183 @@ namespace polyfem {
 
     void GarmentSolver::project_avatar_to_skeleton()
     {
-        const auto [eid, coord] = project_to_edge_mesh(target_skeleton_v, target_skeleton_b, avatar_v);
+        Eigen::MatrixXi graph, shared_vtx, dist, parent;
+        {
+            graph = Eigen::MatrixXi::Ones(skeleton_b.rows(), skeleton_b.rows()) * (skeleton_b.rows() + 1);
+            shared_vtx = -Eigen::MatrixXi::Ones(skeleton_b.rows(), skeleton_b.rows());
+            for (int i = 0; i < skeleton_b.rows(); i++)
+            {
+                graph(i, i) = 0;
+                for (int j = 0; j < skeleton_b.rows(); j++)
+                {
+                    bool adjacent = (skeleton_b(i, 0) == skeleton_b(j, 0)) ||
+                                    (skeleton_b(i, 0) == skeleton_b(j, 1)) ||
+                                    (skeleton_b(i, 1) == skeleton_b(j, 0)) ||
+                                    (skeleton_b(i, 1) == skeleton_b(j, 1));
+                    if (i != j && adjacent)
+                    {
+                        graph(i, j) = 1;
+                        if ((skeleton_b(i, 0) == skeleton_b(j, 0)) || (skeleton_b(i, 0) == skeleton_b(j, 1)))
+                            shared_vtx(i, j) = skeleton_b(i, 0);
+                        else
+                            shared_vtx(i, j) = skeleton_b(i, 1);
+                    }
+                }
+            }
+            floydWarshall(graph, dist, parent);
+        }
 
-        // Eigen::MatrixXi E;
-        // {
-        //     skinny_avatar_v.setZero(avatar_v.rows(), avatar_v.cols());
-        //     for (int i = 0; i < avatar_v.rows(); i++)
-        //         skinny_avatar_v.row(i) += coord(i) * (target_skeleton_v(skeleton_b(eid(i), 1), Eigen::all) - target_skeleton_v(skeleton_b(eid(i), 0), Eigen::all)) + target_skeleton_v(skeleton_b(eid(i), 0), Eigen::all);
+        // explode avatar mesh
+        Eigen::MatrixXd new_avatar_v(avatar_f.size(), 3);
+        for (int f = 0; f < avatar_f.rows(); f++)
+        {
+            for (int i = 0; i < avatar_f.cols(); i++)
+            {
+                new_avatar_v.row(f * avatar_f.cols() + i) = avatar_v.row(avatar_f(f, i));
+                avatar_f(f, i) = f * avatar_f.cols() + i;
+            }
+        }
+        std::swap(new_avatar_v, avatar_v);
 
-        //     io::OBJWriter::write("debug_project_A.obj", skinny_avatar_v, E, avatar_f);
-        //     io::OBJWriter::write("debug_skeleton_A.obj", target_skeleton_v, target_skeleton_b, E);
-        // }
+        Eigen::VectorXi eid;
+        Eigen::VectorXd coord;
+        // first pass
+        {
+            std::tie(eid, coord) = project_to_edge_mesh(target_skeleton_v, target_skeleton_b, avatar_v);
 
-        skinny_avatar_v.setZero(avatar_v.rows(), avatar_v.cols());
-        for (int i = 0; i < avatar_v.rows(); i++)
-            skinny_avatar_v.row(i) += coord(i) * (skeleton_v(skeleton_b(eid(i), 1), Eigen::all) - skeleton_v(skeleton_b(eid(i), 0), Eigen::all)) + skeleton_v(skeleton_b(eid(i), 0), Eigen::all);
+            skinny_avatar_v.setZero(avatar_v.rows(), avatar_v.cols());
+            for (int i = 0; i < avatar_v.rows(); i++)
+                skinny_avatar_v.row(i) += coord(i) * (skeleton_v(skeleton_b(eid(i), 1), Eigen::all) - skeleton_v(skeleton_b(eid(i), 0), Eigen::all)) + skeleton_v(skeleton_b(eid(i), 0), Eigen::all);
+            skinny_avatar_f = avatar_f;
+        }
 
-        // io::OBJWriter::write("debug_project_B.obj", skinny_avatar_v, E, avatar_f);
-        // io::OBJWriter::write("debug_skeleton_B.obj", skeleton_v, skeleton_b, E);
+        igl::write_triangle_mesh(out_folder + "/projected_avatar_old.obj", skinny_avatar_v, avatar_f);
 
-        skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-4;
+        // iteratively reduce distance
+        for (int iter = 0; iter < 10; iter++) {
+            const int n_faces = skinny_avatar_f.rows();
+            std::vector<Eigen::Matrix<double, 6, 3>> new_faces;
+            for (int f = 0; f < n_faces; f++)
+            {
+                int max_dist = 0;
+                int max_dist_le = -1;
+                for (int le = 0; le < 3; le++)
+                {
+                    const int a = f * 3 + le;
+                    const int b = f * 3 + (le + 1) % 3;
+                    const int c = f * 3 + (le + 2) % 3;
+
+                    bool edge_overlap_with_skeleton = false;
+                    for (int i = 0; i < target_skeleton_b.rows(); i++) 
+                    {
+                        Eigen::Vector3d vb = skinny_avatar_v.row(b);
+                        Eigen::Vector3d va = skinny_avatar_v.row(a);
+                        Eigen::Vector3d b0 = skeleton_v.row(target_skeleton_b(i, 0));
+                        Eigen::Vector3d b1 = skeleton_v.row(target_skeleton_b(i, 1));
+
+                        if (ipc::point_edge_distance(vb, b0, b1) < 1e-4 * (b1 - b0).squaredNorm() &&
+                            ipc::point_edge_distance(va, b0, b1) < 1e-4 * (b1 - b0).squaredNorm())
+                        {
+                            edge_overlap_with_skeleton = true;
+                            break;
+                        }
+                    }
+
+                    int source = eid(b);
+                    int cur = eid(a);
+
+                    if (edge_overlap_with_skeleton || source == cur)
+                        continue;
+                    
+                    if (dist(cur, source) > max_dist)
+                    {
+                        max_dist = dist(cur, source);
+                        max_dist_le = le;
+                    }
+                }
+
+                for (int le = 0; le < 3; le++)
+                {
+                    if (max_dist_le != le)
+                        continue;
+                    
+                    const int a = f * 3 + le;
+                    const int b = f * 3 + (le + 1) % 3;
+                    const int c = f * 3 + (le + 2) % 3;
+
+                    int source = eid(b);
+                    int cur = eid(a);
+
+                    std::vector<std::array<int, 2>> inserted_tmp;
+                    while (cur != source)
+                    {
+                        if (cur < 0 || source < 0 || source >= parent.rows() || cur >= parent.cols() || parent(source, cur) < 0)
+                            std::cout << std::endl;
+                        std::array<int, 2> tmp{shared_vtx(cur, parent(source, cur)), cur};
+                        inserted_tmp.push_back(tmp);
+                        cur = parent(source, cur);
+                    }
+
+                    Eigen::RowVector3d p_prev = skinny_avatar_v.row(a);
+                    for (int k = 0; k < inserted_tmp.size(); k++)
+                    {
+                        Eigen::RowVector3d p = skeleton_v.row(inserted_tmp[k][0]);
+
+                        Eigen::Matrix<double, 6, 3> X;
+                        X << p_prev, p, skinny_avatar_v.row(c),
+                             avatar_v.row(a) + (avatar_v.row(b) - avatar_v.row(a)) * ((double)k / (inserted_tmp.size() + 1)),
+                             avatar_v.row(a) + (avatar_v.row(b) - avatar_v.row(a)) * ((double)(k+1) / (inserted_tmp.size() + 1)),
+                             avatar_v.row(c);
+                        new_faces.push_back(X);
+                        eid.conservativeResize(eid.size() + 3);
+                        eid.tail(3) << (int)((k == 0) ? eid(a) : inserted_tmp[k-1][1]), inserted_tmp[k][1], eid(c);
+
+                        p_prev = p;
+                    }
+
+                    skinny_avatar_v.row(a) = p_prev;
+                    avatar_v.row(a) += (avatar_v.row(b) - avatar_v.row(a)) * ((double)inserted_tmp.size() / (inserted_tmp.size() + 1));
+                    eid(a) = inserted_tmp.back()[1];
+                }
+            }
+
+            if (new_faces.size() == 0)
+                break;
+        
+            {
+                Eigen::MatrixXd tmp(skinny_avatar_v.rows() + new_faces.size() * 3, 3);
+                tmp.topRows(skinny_avatar_v.rows()) = skinny_avatar_v;
+                for (int i = 0; i < new_faces.size(); i++)
+                    tmp.block(skinny_avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].topRows(3);
+                std::swap(skinny_avatar_v, tmp);
+            }
+
+            {
+                Eigen::MatrixXd tmp(avatar_v.rows() + new_faces.size() * 3, 3);
+                tmp.topRows(avatar_v.rows()) = avatar_v;
+                for (int i = 0; i < new_faces.size(); i++)
+                    tmp.block(avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].bottomRows(3);
+                std::swap(avatar_v, tmp);
+            }
+
+            skinny_avatar_f = Eigen::VectorXi::LinSpaced(skinny_avatar_v.rows(), 0, skinny_avatar_v.rows() - 1).reshaped(3, skinny_avatar_v.rows() / 3).transpose();
+            avatar_f = skinny_avatar_f;
+        
+            igl::write_triangle_mesh(out_folder + "/projected_avatar_new_" + std::to_string(iter) + ".obj", skinny_avatar_v, skinny_avatar_f);
+            igl::write_triangle_mesh(out_folder + "/avatar_new_" + std::to_string(iter) + ".obj", avatar_v, avatar_f);
+        }
+
+        Eigen::VectorXi svi, svj;
+        Eigen::MatrixXi sf;
+        Eigen::MatrixXd sv;
+        igl::remove_duplicate_vertices(avatar_v, avatar_f, 1e-6, sv, svi, svj, sf);
+        std::swap(sv, avatar_v);
+        std::swap(sf, avatar_f);
+
+        skinny_avatar_v = skinny_avatar_v(svi, Eigen::all).eval();
+        skinny_avatar_f = avatar_f;
+        
+        skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-3;
     }
 
     void GarmentSolver::normalize_meshes()
@@ -182,11 +389,11 @@ namespace polyfem {
         const double source_scaling = 1e2;
         skeleton_v *= source_scaling;
         garment_v *= source_scaling;
-        skinny_avatar_v *= source_scaling;
+        // skinny_avatar_v *= source_scaling;
 
         // Target side
-        const double target_scaling = bbox_size(skinny_avatar_v).maxCoeff() / bbox_size(target_skeleton_v).maxCoeff();
-        const Eigen::Vector3d center = (skinny_avatar_v.colwise().sum() - target_scaling * avatar_v.colwise().sum()) / avatar_v.rows();
+        const double target_scaling = bbox_size(skeleton_v).maxCoeff() / bbox_size(target_skeleton_v).maxCoeff();
+        const Eigen::Vector3d center = skeleton_v.colwise().sum() / skeleton_v.rows() - target_scaling * avatar_v.colwise().sum() / avatar_v.rows();
         Transformation<3> trans(target_scaling * Eigen::Matrix3d::Identity(), center);
 
         trans.apply(avatar_v);
