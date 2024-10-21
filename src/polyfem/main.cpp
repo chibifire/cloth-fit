@@ -114,7 +114,7 @@ int main(int argc, char **argv)
 			tmp["/solver/max_threads"_json_pointer] = max_threads;
 		if (has_arg(command_line, "output_dir"))
 			tmp["/output/directory"_json_pointer] = std::filesystem::absolute(output_dir);
-		
+
 		assert(tmp.is_object());
 		in_args.merge_patch(tmp);
 	}
@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 			[&](const Eigen::VectorXd &x) {
 				state.solve_data.update_barrier_stiffness(sol);
 			});
-		
+
 		nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
 			const std::string path = out_folder + "/step_" + std::to_string(save_id++) + ".vtu";
 			save_vtu(path, nl_problem, collision_vertices, collision_triangles, gstate.skinny_avatar_v.rows(), sol);
@@ -314,10 +314,10 @@ int main(int argc, char **argv)
 // 				w = 3;
 // 			else                    // face node
 // 				w = 6;
-			
+
 // 			out.row(k) << i, j, N - i - j, w;
 // 		}
-	
+
 // 	out.template leftCols<3>() /= N;
 // 	out.col(3) /= N * N;
 // 	return out;
@@ -336,7 +336,7 @@ int main(int argc, char **argv)
 // 	mat.resize(0, 0);
 
 // 	Eigen::SparseMatrix<double, Eigen::ColMajor> A;
-	
+
 // 	A.resize(2206, 2206);
 // 	A.setIdentity();
 

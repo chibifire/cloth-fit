@@ -370,15 +370,23 @@ namespace polyfem {
             igl::write_triangle_mesh(out_folder + "/avatar_new_" + std::to_string(iter) + ".obj", avatar_v, avatar_f);
         }
 
-        Eigen::VectorXi svi, svj;
-        Eigen::MatrixXi sf;
-        Eigen::MatrixXd sv;
-        igl::remove_duplicate_vertices(avatar_v, avatar_f, 1e-6, sv, svi, svj, sf);
-        std::swap(sv, avatar_v);
-        std::swap(sf, avatar_f);
+        {
+            Eigen::MatrixXi sf;
+            Eigen::MatrixXd sv;
+            Eigen::VectorXi svi, svj;
+            igl::remove_duplicate_vertices(avatar_v, avatar_f, 1e-10, sv, svi, svj, sf);
+            for (int i = 0; i < sf.rows(); i++)
+            {
+                if (sf(i, 0) == sf(i, 1) || sf(i, 2) == sf(i, 1) || sf(i, 0) == sf(i, 2))
+                    log_and_throw_error("Treshold in igl::remove_duplicate_vertices is too large!!");
+            }
 
-        skinny_avatar_v = skinny_avatar_v(svi, Eigen::all).eval();
-        skinny_avatar_f = avatar_f;
+            std::swap(sv, avatar_v);
+            std::swap(sf, avatar_f);
+
+            skinny_avatar_v = skinny_avatar_v(svi, Eigen::all).eval();
+            skinny_avatar_f = avatar_f;
+        }
         
         skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-3;
     }
