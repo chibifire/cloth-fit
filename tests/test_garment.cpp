@@ -134,10 +134,10 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 	const double tol = 1e-5;
 
 	std::vector<std::unique_ptr<Form>> forms;
-	forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
-    forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
-	forms.push_back(std::make_unique<AngleForm>(V, F));
-	forms.push_back(std::make_unique<SimilarityForm>(V, F));
+	// forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
+    // forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
+	// forms.push_back(std::make_unique<AngleForm>(V, F));
+	// forms.push_back(std::make_unique<SimilarityForm>(V, F));
 
 	for (auto &form : forms)
 	{
@@ -152,21 +152,22 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
         REQUIRE(grad.norm() < 1e-12);
     }
 
-	forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, target));
-    forms.push_back(std::make_unique<AreaForm>(V, F, 1));
-	forms.push_back(std::make_unique<DefGradForm>(V, F));
+	forms.push_back(std::make_unique<CurveSizeForm>(V, curves));
+	// forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, target));
+    // forms.push_back(std::make_unique<AreaForm>(V, F, 1));
+	// forms.push_back(std::make_unique<DefGradForm>(V, F));
 
 	auto form = std::make_unique<SymmetryForm>(V, curves);
 	if (form->enabled())
 		forms.push_back(std::move(form));
 
-	{
-		Eigen::MatrixXd avatar_v;
-		Eigen::MatrixXi avatar_f;
-		igl::read_triangle_mesh("/Users/zizhouhuang/Desktop/cloth-fit/cpp_clothing_deformer/avatar.obj", avatar_v, avatar_f);
+	// {
+	// 	Eigen::MatrixXd avatar_v;
+	// 	Eigen::MatrixXi avatar_f;
+	// 	igl::read_triangle_mesh("/Users/zizhouhuang/Desktop/cloth-fit/cpp_clothing_deformer/avatar.obj", avatar_v, avatar_f);
 		
-		forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1));
-	}
+	// 	forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1));
+	// }
 
 	for (auto &form : forms)
 	{

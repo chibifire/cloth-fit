@@ -261,6 +261,76 @@ namespace polyfem::solver
     }
 
 
+    CurveSizeForm::CurveSizeForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves) : V_(V)
+    {
+        for (const auto &c : curves)
+        {
+            assert(c(0) == c(c.size() - 1));
+            curves_.push_back(c);
+        }
+    }
+
+    double CurveSizeForm::value_unweighted(const Eigen::VectorXd &x) const
+    {
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+
+        double val = 0;
+        for (const auto &c : curves_)
+        {
+            for (int i = 1; i < c.size(); i++)
+                val += (V.row(c(i)) - V.row(c(i-1))).norm();
+        }
+        
+        return val;
+    }
+
+    void CurveSizeForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
+    {
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+
+        gradv.setZero(x.size());
+        for (const auto &c : curves_)
+        {
+            for (int i = 1; i < c.size(); i++)
+            {
+                const Eigen::Vector3d vec = (V.row(c(i)) - V.row(c(i-1))).normalized();
+                gradv.template segment<3>(c(i) * 3)   += vec;
+                gradv.template segment<3>(c(i-1) * 3) -= vec;
+            }
+        }
+    }
+
+    void CurveSizeForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
+    {
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+
+        std::vector<Eigen::Triplet<double>> triplets;
+        for (const auto &c : curves_)
+        {
+            for (int i = 1; i < c.size(); i++)
+            {
+                const Eigen::Vector3d vec = V.row(c(i)) - V.row(c(i-1));
+                const double l = vec.norm();
+                const Eigen::Matrix3d H = (Eigen::Matrix3d::Identity() - (vec * vec.transpose()) / (l * l)) / l;
+                for (int j = 0; j < 3; j++)
+                {
+                    for (int k = 0; k < 3; k++)
+                    {
+                        triplets.emplace_back(c(i) * 3 + j, c(i) * 3 + k, H(j, k));
+                        triplets.emplace_back(c(i-1) * 3 + j, c(i) * 3 + k, -H(j, k));
+                        triplets.emplace_back(c(i) * 3 + j, c(i-1) * 3 + k, -H(j, k));
+                        triplets.emplace_back(c(i-1) * 3 + j, c(i-1) * 3 + k, H(j, k));
+                    }
+                }
+            }
+        }
+    
+        hessian.setZero();
+        hessian.resize(x.size(), x.size());
+        hessian.setFromTriplets(triplets.begin(), triplets.end());
+    }
+
+
     CurveTwistForm::CurveTwistForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves) : V_(V)
     {
         for (const auto &c : curves)

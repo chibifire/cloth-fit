@@ -160,6 +160,7 @@ int main(int argc, char **argv)
 	Eigen::MatrixXd cur_garment_v = gstate.garment_v;
 	int save_id = 1;
 	const int total_steps = state.args["incremental_steps"];
+	const int stride = state.args["output"]["paraview"]["skip_frame"];
 	for (int substep = 0; substep < total_steps; ++substep)
 	{
 		const double prev_alpha = substep / (double)total_steps;
@@ -188,10 +189,11 @@ int main(int argc, char **argv)
 		}
 
 		std::shared_ptr<ContactForm> contact_form;
+		std::shared_ptr<CurveSizeForm> curve_size_form;
 		std::shared_ptr<PointPenaltyForm> pen_form;
 		std::shared_ptr<PointLagrangianForm> lagr_form;
 		std::shared_ptr<FitForm<4>> fit_form;
-		std::vector<std::shared_ptr<Form>> forms;
+		std::vector<std::shared_ptr<Form>> forms, full_forms;
 		{
 			const double dhat = state.args["contact"]["dhat"];
 			contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
@@ -225,6 +227,11 @@ int main(int argc, char **argv)
 			curvature_form->set_weight(state.args["curvature_penalty_weight"]);
 			forms.push_back(curvature_form);
 
+			curve_size_form = std::make_shared<CurveSizeForm>(collision_vertices, curves);
+			curve_size_form->disable();
+			curve_size_form->set_weight(state.args["curve_size_weight"]);
+			forms.push_back(curve_size_form);
+
 			// auto twist_form = std::make_shared<CurveTwistForm>(collision_vertices, curves);
 			// twist_form->set_weight(state.args["twist_penalty_weight"]);
 			// forms.push_back(twist_form);
@@ -248,7 +255,7 @@ int main(int argc, char **argv)
 				forms.push_back(form);
 		}
 
-		GarmentNLProblem nl_problem(1 + gstate.garment_v.size(), utils::flatten(next_avatar_v - prev_avatar_v), forms);
+		GarmentNLProblem nl_problem(1 + gstate.garment_v.size(), utils::flatten(next_avatar_v - prev_avatar_v), forms, {});
 
 		Eigen::MatrixXd sol(nl_problem.full_size(), 1);
 		sol.setZero();
@@ -273,14 +280,17 @@ int main(int argc, char **argv)
 			});
 
 		nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
-			const std::string path = out_folder + "/step_" + std::to_string(save_id++) + ".vtu";
-			save_vtu(path, nl_problem, collision_vertices, collision_triangles, gstate.skinny_avatar_v.rows(), sol);
+			const std::string path = out_folder + "/step_" + std::to_string(save_id / stride) + ".vtu";
+			if (save_id % stride == 0)
+				save_vtu(path, nl_problem, collision_vertices, collision_triangles, gstate.skinny_avatar_v.rows(), sol);
+			++save_id;
 		};
 
 		Eigen::MatrixXd prev_sol = sol;
 		al_solver.solve_al(nl_solver, nl_problem, sol);
 
 		fit_form->enable();
+		curve_size_form->enable();
 
 		nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
 		al_solver.solve_reduced(nl_solver, nl_problem, sol);

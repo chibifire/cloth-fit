@@ -308,7 +308,7 @@ int main(int argc, char **argv)
 			forms.push_back(contact_form);
 		}
 
-		GarmentNLProblem nl_problem(1 + garment_v.size() - target_diff.size(), target_diff, forms);
+		GarmentNLProblem nl_problem(1 + garment_v.size() - target_diff.size(), target_diff, forms, {});
 
 		logger().info("Total nodes {}, number of constrained nodes {}", garment_v.size() / 3, target_diff.size() / 3);
 

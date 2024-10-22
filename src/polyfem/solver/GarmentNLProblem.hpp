@@ -17,7 +17,8 @@ namespace polyfem::solver
 	public:
 		GarmentNLProblem(const int full_size,
 					const Eigen::MatrixXd &target,
-				  	const std::vector<std::shared_ptr<Form>> &forms);
+				  	const std::vector<std::shared_ptr<Form>> &forms,
+					const std::vector<std::shared_ptr<Form>> &full_forms);
 		virtual ~GarmentNLProblem() = default;
 
 		double value(const TVector &x) override;
@@ -85,5 +86,8 @@ namespace polyfem::solver
 		{
 			return current_size_ == CurrentSize::FULL_SIZE ? full_size() : reduced_size();
 		}
+
+		// forms that depend on the x_full but not x_complete
+		std::vector<std::shared_ptr<Form>> full_forms_;
 	};
 } // namespace polyfem::solver

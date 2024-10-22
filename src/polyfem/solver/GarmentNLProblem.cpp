@@ -7,11 +7,13 @@ namespace polyfem::solver
 	GarmentNLProblem::GarmentNLProblem(
 		const int full_size,
 		const Eigen::MatrixXd &target,
-		const std::vector<std::shared_ptr<Form>> &forms)
+		const std::vector<std::shared_ptr<Form>> &forms,
+		const std::vector<std::shared_ptr<Form>> &full_forms)
 		: FullNLProblem(forms),
 		  full_size_(full_size),
 		  reduced_size_(full_size_ - 1),
-		  target_(utils::flatten(target))
+		  target_(utils::flatten(target)),
+		  full_forms_(full_forms)
 	{
 		use_reduced_size();
 
@@ -39,8 +41,11 @@ namespace polyfem::solver
 
 	void GarmentNLProblem::update_quantities(const double t, const TVector &x)
 	{
-		const TVector y = full_to_complete(reduced_to_full(x));
+		const TVector y = reduced_to_full(x);
+		const TVector z = full_to_complete(y);
 		for (auto &f : forms_)
+			f->update_quantities(t, z);
+		for (auto &f : full_forms_)
 			f->update_quantities(t, y);
 	}
 
@@ -66,30 +71,63 @@ namespace polyfem::solver
 
 	double GarmentNLProblem::value(const TVector &x)
 	{
-		// TODO: removed fearure const bool only_elastic
-		return FullNLProblem::value(full_to_complete(reduced_to_full(x)));
+		const TVector y = reduced_to_full(x);
+		const TVector z = full_to_complete(y);
+
+		double val = FullNLProblem::value(z);
+		for (auto &f : full_forms_)
+			if (f->enabled())
+				val += f->value(y);
+		return val;
 	}
 
 	void GarmentNLProblem::gradient(const TVector &x, TVector &grad)
 	{
+		const TVector y = reduced_to_full(x);
+		const TVector z = full_to_complete(y);
+
 		TVector g;
-		FullNLProblem::gradient(full_to_complete(reduced_to_full(x)), g);
-		grad = full_to_reduced_grad(complete_to_full_grad(g));
+		FullNLProblem::gradient(z, g);
+		grad = complete_to_full_grad(g);
+		for (auto &f : full_forms_)
+		{
+			if (!f->enabled())
+				continue;
+			TVector tmp;
+			f->first_derivative(y, tmp);
+			logger().trace("[{}] Gradient norm: {}", f->name(), tmp.norm());
+			grad += tmp;
+		}
+		grad = full_to_reduced_grad(grad);
 	}
 
 	void GarmentNLProblem::hessian(const TVector &x, THessian &hessian)
 	{
+		const TVector y = reduced_to_full(x);
+		const TVector z = full_to_complete(y);
+
 		THessian h;
-		FullNLProblem::hessian(full_to_complete(reduced_to_full(x)), h);
+		FullNLProblem::hessian(z, h);
 
 		complete_hessian_to_full_hessian(h, hessian);
+		for (auto &f : full_forms_)
+		{
+			if (!f->enabled())
+				continue;
+			THessian tmp;
+			f->second_derivative(y, tmp);
+			hessian += tmp;
+		}
 		std::swap(h, hessian);
 		full_hessian_to_reduced_hessian(h, hessian);
 	}
 
 	void GarmentNLProblem::solution_changed(const TVector &newX)
 	{
-		FullNLProblem::solution_changed(full_to_complete(reduced_to_full(newX)));
+		const TVector y = reduced_to_full(newX);
+		const TVector z = full_to_complete(y);
+
+		FullNLProblem::solution_changed(z);
 	}
 
 	void GarmentNLProblem::post_step(const polysolve::nonlinear::PostStepData &data)
