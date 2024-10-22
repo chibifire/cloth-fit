@@ -290,12 +290,15 @@ int main(int argc, char **argv)
 		al_solver.solve_al(nl_solver, nl_problem, sol);
 
 		fit_form->enable();
-		curve_size_form->enable();
+		if (substep == total_steps - 1)
+			curve_size_form->enable();
 
 		nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
 		al_solver.solve_reduced(nl_solver, nl_problem, sol);
 
 		cur_garment_v += utils::unflatten(sol.bottomRows(cur_garment_v.size()), 3);
+
+		fit_form->disable();
 	}
 
 	return EXIT_SUCCESS;
