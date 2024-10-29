@@ -129,10 +129,11 @@ int main(int argc, char **argv)
 	const std::string garment_mesh_path = state.args["garment_mesh_path"];
 	const std::string source_skeleton_path = state.args["source_skeleton_path"];
 	const std::string target_skeleton_path = state.args["target_skeleton_path"];
+	const std::string skin_weights_path = state.args["skin_weights_path"];
 
 	gstate.out_folder = out_folder;
 
-	gstate.read_meshes(avatar_mesh_path, source_skeleton_path, target_skeleton_path);
+	gstate.read_meshes(avatar_mesh_path, source_skeleton_path, target_skeleton_path, skin_weights_path);
 	gstate.load_garment_mesh(garment_mesh_path, state.args["geometry"][0]["n_refs"]);
 	gstate.normalize_meshes();
 	gstate.project_avatar_to_skeleton();
@@ -285,6 +286,8 @@ int main(int argc, char **argv)
 				save_vtu(path, nl_problem, collision_vertices, collision_triangles, gstate.skinny_avatar_v.rows(), sol);
 			++save_id;
 		};
+
+		save_vtu(out_folder + "/step_0.vtu", nl_problem, collision_vertices, collision_triangles, gstate.skinny_avatar_v.rows(), sol);
 
 		Eigen::MatrixXd prev_sol = sol;
 		al_solver.solve_al(nl_solver, nl_problem, sol);

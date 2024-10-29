@@ -34,7 +34,8 @@ namespace polyfem {
         void read_meshes(
             const std::string &avatar_mesh_path,
             const std::string &source_skeleton_path,
-            const std::string &target_skeleton_path);
+            const std::string &target_skeleton_path,
+            const std::string &skinning_weights_path);
         
         void project_avatar_to_skeleton();
 
@@ -50,5 +51,7 @@ namespace polyfem {
 
         Eigen::MatrixXd skinny_avatar_v;
         Eigen::MatrixXi skinny_avatar_f;
+
+        Eigen::MatrixXd skinning_weights;
     };
 }

@@ -3,6 +3,7 @@
 #include <polyfem/solver/GarmentNLProblem.hpp>
 #include <polyfem/solver/forms/ContactForm.hpp>
 #include <polyfem/io/OBJWriter.hpp>
+#include <polyfem/io/MatrixIO.hpp>
 #include <polyfem/mesh/MeshUtils.hpp>
 
 #include <igl/read_triangle_mesh.h>
@@ -157,14 +158,7 @@ namespace polyfem {
 		igl::read_triangle_mesh(path, garment_v, garment_f);
 
 		// remove duplicate vertices in the garment
-		{
-			Eigen::VectorXi svi, svj;
-			Eigen::MatrixXi sf;
-			Eigen::MatrixXd sv;
-			igl::remove_duplicate_vertices(garment_v, garment_f, 1e-4, sv, svi, svj, sf);
-			std::swap(sv, garment_v);
-			std::swap(sf, garment_f);
-		}
+        remove_duplicate_vertices(garment_v, garment_f, 1e-6);
 
 		while (n_refs-- > 0)
 			std::tie(garment_v, garment_f) = refine(garment_v, garment_f);
@@ -194,12 +188,19 @@ namespace polyfem {
     void GarmentSolver::read_meshes(
         const std::string &avatar_mesh_path,
         const std::string &source_skeleton_path,
-        const std::string &target_skeleton_path)
+        const std::string &target_skeleton_path,
+        const std::string &skinning_weights_path)
     {
         igl::read_triangle_mesh(avatar_mesh_path, avatar_v, avatar_f);
+
         read_edge_mesh(source_skeleton_path, skeleton_v, skeleton_b);
         read_edge_mesh(target_skeleton_path, target_skeleton_v, target_skeleton_b);
         assert((skeleton_b - target_skeleton_b).squaredNorm() < 1);
+
+        io::read_matrix(skinning_weights_path, skinning_weights);
+        assert(skinning_weights.rows() == skeleton_v.rows());
+        assert(avatar_v.rows() == skinning_weights.cols());
+        assert(skinning_weights.minCoeff() >= 0. && skinning_weights.maxCoeff() <= 1.);
     }
 
     void GarmentSolver::project_avatar_to_skeleton()
@@ -232,11 +233,13 @@ namespace polyfem {
 
         // explode avatar mesh
         Eigen::MatrixXd new_avatar_v(avatar_f.size(), 3);
+        Eigen::MatrixXd new_skinning_weights(skinning_weights.rows(), new_avatar_v.rows());
         for (int f = 0; f < avatar_f.rows(); f++)
         {
             for (int i = 0; i < avatar_f.cols(); i++)
             {
                 new_avatar_v.row(f * avatar_f.cols() + i) = avatar_v.row(avatar_f(f, i));
+                new_skinning_weights.col(f * avatar_f.cols() + i) = skinning_weights.col(avatar_f(f, i));
                 avatar_f(f, i) = f * avatar_f.cols() + i;
             }
         }
@@ -246,7 +249,34 @@ namespace polyfem {
         Eigen::VectorXd coord;
         // first pass
         {
-            std::tie(eid, coord) = project_to_edge_mesh(target_skeleton_v, target_skeleton_b, avatar_v);
+            // std::tie(eid, coord) = project_to_edge_mesh(target_skeleton_v, target_skeleton_b, avatar_v);
+
+            const int N = avatar_v.rows();
+            Eigen::VectorXd dists(N);
+            dists.setConstant(std::numeric_limits<double>::max());
+            coord.setZero(N);
+            eid = -Eigen::VectorXi::Ones(N);
+            for (int i = 0; i < N; i++)
+            {
+                Eigen::Index maxRow, maxCol;
+                const double max_skin_weight = new_skinning_weights.col(i).maxCoeff(&maxRow, &maxCol);
+                
+                assert(maxCol == 0);
+                for (int e = 0; e < target_skeleton_b.rows(); e++)
+                {
+                    if (target_skeleton_b(e, 0) == maxRow || target_skeleton_b(e, 1) == maxRow)
+                    {
+                        const Eigen::Vector2d tmp = project_to_edge(target_skeleton_v.row(target_skeleton_b(e, 0)), target_skeleton_v.row(target_skeleton_b(e, 1)), avatar_v.row(i));
+                        if (tmp(0) < dists(i))
+                        {
+                            dists(i) = tmp(0);
+                            coord(i) = tmp(1);
+                            eid(i) = e;
+                        }
+                    }
+                }
+                assert(eid(i) >= 0);
+            }
 
             skinny_avatar_v.setZero(avatar_v.rows(), avatar_v.cols());
             for (int i = 0; i < avatar_v.rows(); i++)
@@ -285,6 +315,9 @@ namespace polyfem {
                             break;
                         }
                     }
+
+                    if (b >= eid.size() || b < 0)
+                        std::cout << "debug";
 
                     int source = eid(b);
                     int cur = eid(a);
@@ -371,18 +404,7 @@ namespace polyfem {
         }
 
         {
-            Eigen::MatrixXi sf;
-            Eigen::MatrixXd sv;
-            Eigen::VectorXi svi, svj;
-            igl::remove_duplicate_vertices(avatar_v, avatar_f, 1e-10, sv, svi, svj, sf);
-            for (int i = 0; i < sf.rows(); i++)
-            {
-                if (sf(i, 0) == sf(i, 1) || sf(i, 2) == sf(i, 1) || sf(i, 0) == sf(i, 2))
-                    log_and_throw_error("Treshold in igl::remove_duplicate_vertices is too large!!");
-            }
-
-            std::swap(sv, avatar_v);
-            std::swap(sf, avatar_f);
+            const auto [svi, svj] = remove_duplicate_vertices(avatar_v, avatar_f, 1e-10);
 
             skinny_avatar_v = skinny_avatar_v(svi, Eigen::all).eval();
             skinny_avatar_f = avatar_f;

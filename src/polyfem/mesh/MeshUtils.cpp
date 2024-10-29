@@ -14,6 +14,7 @@
 
 #include <igl/PI.h>
 #include <igl/read_triangle_mesh.h>
+#include <igl/remove_duplicate_vertices.h>
 
 #include <geogram/mesh/mesh_io.h>
 #include <geogram/mesh/mesh_geometry.h>
@@ -1363,4 +1364,21 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXi> polyfem::mesh::refine(const Eigen::
 			Vnew(i, d) = *(mesh_ref.vertices.point_ptr(i) + d);
 
 	return {Vnew, Fnew};
+}
+
+std::tuple<Eigen::VectorXi, Eigen::VectorXi> polyfem::mesh::remove_duplicate_vertices(Eigen::MatrixXd &V, Eigen::MatrixXi &F, const double threshold)
+{
+	Eigen::VectorXi svi, svj;
+	Eigen::MatrixXi sf;
+	Eigen::MatrixXd sv;
+	igl::remove_duplicate_vertices(V, F, threshold, sv, svi, svj, sf);
+	for (int i = 0; i < sf.rows(); i++)
+	{
+		if (sf(i, 0) == sf(i, 1) || sf(i, 2) == sf(i, 1) || sf(i, 0) == sf(i, 2))
+			log_and_throw_error("Treshold in igl::remove_duplicate_vertices is too large!!");
+	}
+	std::swap(sv, V);
+	std::swap(sf, F);
+
+	return {svi, svj};
 }
