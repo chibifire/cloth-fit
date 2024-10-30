@@ -69,6 +69,8 @@ namespace polyfem::solver
 
 		std::function<void(const Eigen::VectorXd &sol)> post_step_call_back;
 
+		void set_target_value(double val) { target_value = val; }
+
 	protected:
 		const int full_size_;    ///< Size of the full problem
 		const int reduced_size_; ///< Size of the reduced problem
@@ -89,5 +91,7 @@ namespace polyfem::solver
 
 		// forms that depend on the x_full but not x_complete
 		std::vector<std::shared_ptr<Form>> full_forms_;
+
+		double target_value = 1.;
 	};
 } // namespace polyfem::solver

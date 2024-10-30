@@ -145,6 +145,7 @@ namespace polyfem {
         body_ids.head(n_avatar_vertices).array() = 1;
         writer.add_field("body_ids", body_ids);
 
+        logger().debug("Save VTU to {}", path);
         writer.write_mesh(path, utils::unflatten(complete_disp, V.cols()) + V, F);
     }
 
@@ -404,7 +405,7 @@ namespace polyfem {
         }
 
         {
-            const auto [svi, svj] = remove_duplicate_vertices(avatar_v, avatar_f, 1e-10);
+            const auto [svi, svj] = remove_duplicate_vertices(avatar_v, avatar_f, 1e-12);
 
             skinny_avatar_v = skinny_avatar_v(svi, Eigen::all).eval();
             skinny_avatar_f = avatar_f;

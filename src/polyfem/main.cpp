@@ -154,112 +154,114 @@ int main(int argc, char **argv)
 	Eigen::MatrixXd collision_vertices(gstate.skinny_avatar_v.rows() + gstate.garment_v.rows(), gstate.garment_v.cols());
 	collision_vertices << gstate.skinny_avatar_v, gstate.garment_v;
 
+	ipc::CollisionMesh collision_mesh;
+	{
+		collision_mesh = ipc::CollisionMesh(
+			collision_vertices, collision_edges, collision_triangles);
+
+		const int n_avatar_verts = gstate.skinny_avatar_v.rows();
+		collision_mesh.can_collide = [n_avatar_verts](size_t vi, size_t vj) {
+			return vi >= n_avatar_verts || vj >= n_avatar_verts;
+		};
+
+		gstate.check_intersections(collision_mesh, collision_vertices);
+	}
+
 	const auto curves = boundary_curves(collision_triangles.bottomRows(gstate.garment_f.rows()));
 	const Eigen::MatrixXd source_curve_centers = extract_curve_center_targets(collision_vertices, curves, gstate.skeleton_v, gstate.skeleton_b, gstate.skeleton_v);
 	const Eigen::MatrixXd target_curve_centers = extract_curve_center_targets(collision_vertices, curves, gstate.skeleton_v, gstate.skeleton_b, gstate.target_skeleton_v);
 
 	Eigen::MatrixXd cur_garment_v = gstate.garment_v;
-	int save_id = 1;
+	int save_id = 0;
 	const int total_steps = state.args["incremental_steps"];
 	const int stride = state.args["output"]["paraview"]["skip_frame"];
+
+	std::vector<std::shared_ptr<Form>> persistent_forms;
+	std::shared_ptr<CurveSizeForm> curve_size_form;
+	std::shared_ptr<ContactForm> contact_form;
+	{
+		auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
+		angle_form->set_weight(state.args["angle_penalty_weight"]);
+		persistent_forms.push_back(angle_form);
+
+		auto def_form = std::make_shared<DefGradForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
+		def_form->set_weight(state.args["deformation_penalty_weight"]);
+		persistent_forms.push_back(def_form);
+
+		auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
+		similarity_form->set_weight(state.args["similarity_penalty_weight"]);
+		persistent_forms.push_back(similarity_form);
+
+		auto curvature_form = std::make_shared<CurveCurvatureForm>(collision_vertices, curves);
+		curvature_form->set_weight(state.args["curvature_penalty_weight"]);
+		persistent_forms.push_back(curvature_form);
+
+		auto twist_form = std::make_shared<CurveTwistForm>(collision_vertices, curves);
+		twist_form->set_weight(state.args["twist_penalty_weight"]);
+		persistent_forms.push_back(twist_form);
+
+		auto sym_form = std::make_shared<SymmetryForm>(collision_vertices, curves);
+		sym_form->set_weight(state.args["symmetry_weight"]);
+		if (sym_form->enabled())
+			persistent_forms.push_back(sym_form);
+
+		curve_size_form = std::make_shared<CurveSizeForm>(collision_vertices, curves);
+		curve_size_form->disable();
+		curve_size_form->set_weight(state.args["curve_size_weight"]);
+		persistent_forms.push_back(curve_size_form);
+
+		const double dhat = state.args["contact"]["dhat"];
+		contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
+		contact_form->set_weight(1);
+		contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
+		contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
+		persistent_forms.push_back(contact_form);
+	}
+
+	Eigen::MatrixXd sol = Eigen::MatrixXd::Zero(1 + gstate.garment_v.size(), 1);
 	for (int substep = 0; substep < total_steps; ++substep)
 	{
 		const double prev_alpha = substep / (double)total_steps;
 		const double next_alpha = (substep + 1) / (double)total_steps;
 
+		logger().info("Start substep {} out of {}", substep + 1, total_steps);
+
 		// continuation
-		const Eigen::MatrixXd prev_skeleton_v = (gstate.target_skeleton_v - gstate.skeleton_v) * prev_alpha + gstate.skeleton_v;
-		const Eigen::MatrixXd next_skeleton_v = (gstate.target_skeleton_v - gstate.skeleton_v) * next_alpha + gstate.skeleton_v;
-		const Eigen::MatrixXd prev_avatar_v = (gstate.avatar_v - gstate.skinny_avatar_v) * prev_alpha + gstate.skinny_avatar_v;
+		// const Eigen::MatrixXd prev_skeleton_v = (gstate.target_skeleton_v - gstate.skeleton_v) * prev_alpha + gstate.skeleton_v;
+		// const Eigen::MatrixXd next_skeleton_v = (gstate.target_skeleton_v - gstate.skeleton_v) * next_alpha + gstate.skeleton_v;
+		// const Eigen::MatrixXd prev_avatar_v = (gstate.avatar_v - gstate.skinny_avatar_v) * prev_alpha + gstate.skinny_avatar_v;
 		const Eigen::MatrixXd next_avatar_v = (gstate.avatar_v - gstate.skinny_avatar_v) * next_alpha + gstate.skinny_avatar_v;
 
 		const Eigen::MatrixXd next_curve_centers = (target_curve_centers - source_curve_centers) * next_alpha + source_curve_centers;
 
-		ipc::CollisionMesh collision_mesh;
-		{
-			collision_vertices << prev_avatar_v, cur_garment_v;
-			collision_mesh = ipc::CollisionMesh(
-				collision_vertices, collision_edges, collision_triangles);
-
-			const int n_avatar_verts = gstate.skinny_avatar_v.rows();
-			collision_mesh.can_collide = [n_avatar_verts](size_t vi, size_t vj) {
-				return vi >= n_avatar_verts || vj >= n_avatar_verts;
-			};
-
-			gstate.check_intersections(collision_mesh, collision_vertices);
-		}
-
-		std::shared_ptr<ContactForm> contact_form;
-		std::shared_ptr<CurveSizeForm> curve_size_form;
+		std::vector<std::shared_ptr<Form>> forms = persistent_forms;
 		std::shared_ptr<PointPenaltyForm> pen_form;
 		std::shared_ptr<PointLagrangianForm> lagr_form;
 		std::shared_ptr<FitForm<4>> fit_form;
-		std::vector<std::shared_ptr<Form>> forms, full_forms;
 		{
-			const double dhat = state.args["contact"]["dhat"];
-			contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
-			contact_form->set_weight(1);
-			contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
-			contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
-			forms.push_back(contact_form);
-
 			std::vector<int> indices(gstate.avatar_v.size());
 			for (int i = 0; i < indices.size(); i++)
 				indices[i] = i;
-			pen_form = std::make_shared<PointPenaltyForm>(utils::flatten(next_avatar_v - prev_avatar_v), indices);
+			pen_form = std::make_shared<PointPenaltyForm>(utils::flatten(next_avatar_v - gstate.skinny_avatar_v), indices);
 			forms.push_back(pen_form);
 
-			lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(next_avatar_v - prev_avatar_v), indices);
+			lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(next_avatar_v - gstate.skinny_avatar_v), indices);
 			forms.push_back(lagr_form);
 
-			auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
-			angle_form->set_weight(state.args["angle_penalty_weight"]);
-			forms.push_back(angle_form);
+			auto center_target_form = std::make_shared<CurveCenterTargetForm>(collision_vertices, curves, next_curve_centers);
+			center_target_form->set_weight(state.args["curve_center_target_weight"]);
+			forms.push_back(center_target_form);
 
-			auto def_form = std::make_shared<DefGradForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
-			def_form->set_weight(state.args["deformation_penalty_weight"]);
-			forms.push_back(def_form);
+			fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()), gstate.avatar_v, gstate.avatar_f, 0.1);
+			fit_form->disable();
+			fit_form->set_weight(state.args["fit_weight"]);
+			forms.push_back(fit_form);
 
-			auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()));
-			similarity_form->set_weight(state.args["similarity_penalty_weight"]);
-			forms.push_back(similarity_form);
-
-			auto curvature_form = std::make_shared<CurveCurvatureForm>(collision_vertices, curves);
-			curvature_form->set_weight(state.args["curvature_penalty_weight"]);
-			forms.push_back(curvature_form);
-
-			curve_size_form = std::make_shared<CurveSizeForm>(collision_vertices, curves);
 			curve_size_form->disable();
-			curve_size_form->set_weight(state.args["curve_size_weight"]);
-			forms.push_back(curve_size_form);
-
-			// auto twist_form = std::make_shared<CurveTwistForm>(collision_vertices, curves);
-			// twist_form->set_weight(state.args["twist_penalty_weight"]);
-			// forms.push_back(twist_form);
-
-			{
-				auto center_target_form = std::make_shared<CurveCenterTargetForm>(collision_vertices, curves, next_curve_centers);
-				center_target_form->set_weight(state.args["curve_center_target_weight"]);
-				forms.push_back(center_target_form);
-			}
-
-			{
-				fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.garment_f.rows()), gstate.avatar_v, gstate.avatar_f, 0.1);
-				fit_form->disable();
-				fit_form->set_weight(state.args["fit_weight"]);
-				forms.push_back(fit_form);
-			}
-
-			auto form = std::make_shared<SymmetryForm>(collision_vertices, curves);
-			form->set_weight(state.args["symmetry_weight"]);
-			if (form->enabled())
-				forms.push_back(form);
 		}
 
-		GarmentNLProblem nl_problem(1 + gstate.garment_v.size(), utils::flatten(next_avatar_v - prev_avatar_v), forms, {});
-
-		Eigen::MatrixXd sol(nl_problem.full_size(), 1);
-		sol.setZero();
+		GarmentNLProblem nl_problem(1 + gstate.garment_v.size(), utils::flatten(gstate.avatar_v - gstate.skinny_avatar_v), forms, {});
+		nl_problem.set_target_value(next_alpha);
 
 		nl_problem.line_search_begin(sol, sol);
 		if (!std::isfinite(nl_problem.value(sol))
@@ -269,11 +271,27 @@ int main(int argc, char **argv)
 
 		std::shared_ptr<polysolve::nonlinear::Solver> nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["augmented_lagrangian"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
 
+		double initial_weight = state.args["solver"]["augmented_lagrangian"]["initial_weight"];
+		const double scaling = state.args["solver"]["augmented_lagrangian"]["scaling"];
+		const double max_weight = state.args["solver"]["augmented_lagrangian"]["max_weight"].get<double>();
+		while (true) {
+			pen_form->set_weight(initial_weight);
+			Eigen::VectorXd g;
+			nl_problem.gradient(sol, g);
+			if (g(0) > 0)
+				break;
+			initial_weight *= scaling;
+			if (initial_weight >= max_weight)
+			{
+				initial_weight = max_weight;
+				logger().debug("Increase initial AL weight to {}", initial_weight);
+				break;
+			}
+		}
+
 		ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm> al_solver(
 			lagr_form, pen_form,
-			state.args["solver"]["augmented_lagrangian"]["initial_weight"],
-			state.args["solver"]["augmented_lagrangian"]["scaling"],
-			state.args["solver"]["augmented_lagrangian"]["max_weight"],
+			initial_weight, scaling, max_weight,
 			state.args["solver"]["augmented_lagrangian"]["eta"],
 			state.args["solver"]["augmented_lagrangian"]["error_threshold"],
 			[&](const Eigen::VectorXd &x) {
@@ -287,9 +305,6 @@ int main(int argc, char **argv)
 			++save_id;
 		};
 
-		save_vtu(out_folder + "/step_0.vtu", nl_problem, collision_vertices, collision_triangles, gstate.skinny_avatar_v.rows(), sol);
-
-		Eigen::MatrixXd prev_sol = sol;
 		al_solver.solve_al(nl_solver, nl_problem, sol);
 
 		fit_form->enable();
@@ -299,70 +314,8 @@ int main(int argc, char **argv)
 		nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
 		al_solver.solve_reduced(nl_solver, nl_problem, sol);
 
-		cur_garment_v += utils::unflatten(sol.bottomRows(cur_garment_v.size()), 3);
-
-		fit_form->disable();
+		cur_garment_v = gstate.garment_v + utils::unflatten(sol.bottomRows(cur_garment_v.size()), 3);
 	}
 
 	return EXIT_SUCCESS;
 }
-
-// #include <Eigen/core>
-// #include <array>
-// #include <iostream>
-
-// template <int N>
-// constexpr Eigen::Matrix<double, ((N+1)*(N+2))/2, 4> upsample_standard()
-// {
-// 	constexpr int num = ((N+1)*(N+2))/2;
-
-// 	Eigen::Matrix<double, num, 4> out;
-// 	for (int i = 0, k = 0; i <= N; i++)
-// 		for (int j = 0; i + j <= N; j++, k++)
-// 		{
-// 			std::array<int, 3> arr = {i, j, N - i - j};
-// 			std::sort(arr.begin(), arr.end());
-
-// 			double w = 6;
-// 			if (arr[1] == 0)        // vertex node
-// 				w = 1;
-// 			else if (arr[0] == 0)   // edge node
-// 				w = 3;
-// 			else                    // face node
-// 				w = 6;
-
-// 			out.row(k) << i, j, N - i - j, w;
-// 		}
-
-// 	out.template leftCols<3>() /= N;
-// 	out.col(3) /= N * N;
-// 	return out;
-// }
-
-// int main()
-// {
-// 	std::cout << upsample_standard<3>() << std::endl;
-// }
-
-// #include <iostream>
-// #include <Eigen/SparseCore>
-
-// void assign(Eigen::SparseMatrix<double, Eigen::ColMajor> &mat)
-// {
-// 	mat.resize(0, 0);
-
-// 	Eigen::SparseMatrix<double, Eigen::ColMajor> A;
-
-// 	A.resize(2206, 2206);
-// 	A.setIdentity();
-
-// 	mat = A;
-
-// 	std::cout << "mat:\n" << mat.rows() << std::endl;
-// 	std::cout << "A:\n" << A.rows() << std::endl;
-// }
-
-// int main() {
-// 	Eigen::SparseMatrix<double, Eigen::ColMajor> B;
-// 	assign(B);
-// }

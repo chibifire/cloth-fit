@@ -538,7 +538,7 @@ namespace polyfem::solver
                 }
                 if (!found)
                 {
-                    logger().error("Asymmetric vertex (ID {}, pos {}) on the curve with error {} (ID {}, pos {}) found! Set weight to zero!", 
+                    logger().warn("Asymmetric vertex (ID {}, pos {}) on the curve with error {} (ID {}, pos {}) found! Set weight to zero!", 
                         curve_(i), x.transpose(), min_err / bbox_size, curve_(min_id), coordinates[min_id].transpose());
 
                     has_correspondence = false;

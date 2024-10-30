@@ -175,7 +175,7 @@ namespace polyfem::solver
 			return reduced;
 
 		TVector full(reduced.size() + 1);
-		full(0) = 1;
+		full(0) = target_value;
 		full.tail(reduced.size()) = reduced;
 		return full;
 	}
