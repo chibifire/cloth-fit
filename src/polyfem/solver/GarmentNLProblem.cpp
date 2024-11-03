@@ -31,11 +31,13 @@ namespace polyfem::solver
 
 	void GarmentNLProblem::init_lagging(const TVector &x)
 	{
+		// WARNING: This does not call for full_forms_
 		FullNLProblem::init_lagging(full_to_complete(reduced_to_full(x)));
 	}
 
 	void GarmentNLProblem::update_lagging(const TVector &x, const int iter_num)
 	{
+		// WARNING: This does not call for full_forms_
 		FullNLProblem::update_lagging(full_to_complete(reduced_to_full(x)), iter_num);
 	}
 
@@ -51,21 +53,25 @@ namespace polyfem::solver
 
 	void GarmentNLProblem::line_search_begin(const TVector &x0, const TVector &x1)
 	{
+		// WARNING: This does not call for full_forms_
 		FullNLProblem::line_search_begin(full_to_complete(reduced_to_full(x0)), full_to_complete(reduced_to_full(x1)));
 	}
 
 	double GarmentNLProblem::max_step_size(const TVector &x0, const TVector &x1)
 	{
+		// WARNING: This does not call for full_forms_
 		return FullNLProblem::max_step_size(full_to_complete(reduced_to_full(x0)), full_to_complete(reduced_to_full(x1)));
 	}
 
 	bool GarmentNLProblem::is_step_valid(const TVector &x0, const TVector &x1)
 	{
+		// WARNING: This does not call for full_forms_
 		return FullNLProblem::is_step_valid(full_to_complete(reduced_to_full(x0)), full_to_complete(reduced_to_full(x1)));
 	}
 
 	bool GarmentNLProblem::is_step_collision_free(const TVector &x0, const TVector &x1)
 	{
+		// WARNING: This does not call for full_forms_
 		return FullNLProblem::is_step_collision_free(full_to_complete(reduced_to_full(x0)), full_to_complete(reduced_to_full(x1)));
 	}
 
@@ -128,6 +134,9 @@ namespace polyfem::solver
 		const TVector z = full_to_complete(y);
 
 		FullNLProblem::solution_changed(z);
+
+		for (auto &f : full_forms_)
+			f->solution_changed(y);
 	}
 
 	void GarmentNLProblem::post_step(const polysolve::nonlinear::PostStepData &data)
@@ -135,7 +144,15 @@ namespace polyfem::solver
 		if (post_step_call_back)
 			post_step_call_back(data.x);
 
-		FullNLProblem::post_step(polysolve::nonlinear::PostStepData(data.iter_num, data.solver_info, full_to_complete(reduced_to_full(data.x)), full_to_complete(reduced_to_full(data.grad))));
+		const TVector y = reduced_to_full(data.x);
+		const TVector z = full_to_complete(y);
+		const TVector gy = reduced_to_full(data.grad);
+		const TVector gz = full_to_complete(y);
+		FullNLProblem::post_step(polysolve::nonlinear::PostStepData(data.iter_num, data.solver_info, z, gz));
+
+		polysolve::nonlinear::PostStepData tmp_data(data.iter_num, data.solver_info, y, gy);
+		for (auto &f : full_forms_)
+			f->post_step(tmp_data);
 
 		// TODO: add me back
 		// if (state_.args["output"]["advanced"]["save_nl_solve_sequence"])

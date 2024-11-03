@@ -6,9 +6,11 @@
 #include <polyfem/io/MatrixIO.hpp>
 #include <polyfem/mesh/MeshUtils.hpp>
 
+#include <igl/edges.h>
 #include <igl/read_triangle_mesh.h>
 #include <igl/remove_duplicate_vertices.h>
 #include <igl/write_triangle_mesh.h>
+
 
 #include <paraviewo/ParaviewWriter.hpp>
 #include <paraviewo/VTUWriter.hpp>
@@ -35,34 +37,6 @@ namespace polyfem {
             double d = (p - (a + t * s)).squaredNorm();
 
             return Eigen::Vector2d(d, t);
-        }
-
-        std::tuple<Eigen::VectorXi, Eigen::VectorXd> 
-        project_to_edge_mesh(
-            const Eigen::MatrixXd &V,
-            const Eigen::MatrixXi &E,
-            const Eigen::MatrixXd &P)
-        {
-            const int N = P.rows();
-            Eigen::VectorXd d(N), t(N);
-            d.setConstant(std::numeric_limits<double>::max());
-            t.setZero();
-            Eigen::VectorXi I = -Eigen::VectorXi::Ones(N);
-            for (int e = 0; e < E.rows(); e++)
-            {
-                for (int i = 0; i < N; i++)
-                {
-                    Eigen::Vector2d tmp = project_to_edge(V.row(E(e, 0)), V.row(E(e, 1)), P.row(i));
-                    if (tmp(0) < d(i))
-                    {
-                        t(i) = tmp(1);
-                        d(i) = tmp(0);
-                        I(i) = e;
-                    }
-                }
-            }
-
-            return {I, t};
         }
 
         void floydWarshall(const Eigen::MatrixXi &G, Eigen::MatrixXi &dist, Eigen::MatrixXi &parents)
@@ -124,7 +98,8 @@ namespace polyfem {
         std::shared_ptr<paraviewo::ParaviewWriter> tmpw = std::make_shared<paraviewo::VTUWriter>();
         paraviewo::ParaviewWriter &writer = *tmpw;
 
-        const Eigen::VectorXd complete_disp = prob.full_to_complete(prob.reduced_to_full(sol));
+        const Eigen::VectorXd full_disp = prob.reduced_to_full(sol);
+        const Eigen::VectorXd complete_disp = prob.full_to_complete(full_disp);
 
         Eigen::VectorXd total_grad = Eigen::VectorXd::Zero(complete_disp.size());
         std::unordered_set<std::string> existing_names;
@@ -136,9 +111,24 @@ namespace polyfem {
             while (existing_names.count(name) != 0)
                 name += "_";
             existing_names.insert(name);
+            grad.head(n_avatar_vertices * 3).setZero();
             writer.add_field(name, utils::unflatten(grad, 3));
             total_grad += grad;
         }
+        for (const auto &form : prob.full_forms())
+        {
+            Eigen::VectorXd grad_full, grad;
+            form->first_derivative(full_disp, grad_full);
+            std::string name = "grad_" + form->name();
+            while (existing_names.count(name) != 0)
+                name += "_";
+            existing_names.insert(name);
+            grad.setZero(total_grad.size());
+            grad.tail(grad_full.size() - 1) = grad_full.tail(grad_full.size() - 1);
+            writer.add_field(name, utils::unflatten(grad, 3));
+            total_grad += grad;
+        }
+        total_grad.head(n_avatar_vertices * 3).setZero();
         writer.add_field("grad", utils::unflatten(total_grad, 3));
 
         Eigen::VectorXd body_ids = Eigen::VectorXd::Zero(V.rows());
@@ -250,8 +240,6 @@ namespace polyfem {
         Eigen::VectorXd coord;
         // first pass
         {
-            // std::tie(eid, coord) = project_to_edge_mesh(target_skeleton_v, target_skeleton_b, avatar_v);
-
             const int N = avatar_v.rows();
             Eigen::VectorXd dists(N);
             dists.setConstant(std::numeric_limits<double>::max());
@@ -405,9 +393,12 @@ namespace polyfem {
         }
 
         {
-            const auto [svi, svj] = remove_duplicate_vertices(avatar_v, avatar_f, 1e-12);
+            Eigen::MatrixXd tmp_v(avatar_v.rows(), avatar_v.cols() + skinny_avatar_v.cols());
+            tmp_v << avatar_v, skinny_avatar_v;
+            const auto [svi, svj] = remove_duplicate_vertices(tmp_v, avatar_f, 1e-10);
 
-            skinny_avatar_v = skinny_avatar_v(svi, Eigen::all).eval();
+            avatar_v = tmp_v.template leftCols<3>();
+            skinny_avatar_v = tmp_v.template rightCols<3>();
             skinny_avatar_f = avatar_f;
         }
         
@@ -429,5 +420,11 @@ namespace polyfem {
 
         trans.apply(avatar_v);
         trans.apply(target_skeleton_v);
+
+        Eigen::MatrixXi E;
+        igl::edges(garment_f, E);
+
+        Eigen::VectorXd len = (garment_v(E.col(0), Eigen::all) - garment_v(E.col(1), Eigen::all)).rowwise().norm();
+        logger().debug("Min edge length: {}", len.minCoeff());
     }
 }

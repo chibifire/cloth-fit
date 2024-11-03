@@ -131,6 +131,21 @@ int main(int argc, char **argv)
 	const std::string target_skeleton_path = state.args["target_skeleton_path"];
 	const std::string skin_weights_path = state.args["skin_weights_path"];
 
+	if (!std::filesystem::exists(avatar_mesh_path))
+		log_and_throw_error("Invalid avatar mesh path: {}", avatar_mesh_path);
+
+	if (!std::filesystem::exists(garment_mesh_path))
+		log_and_throw_error("Invalid garment mesh path: {}", garment_mesh_path);
+
+	if (!std::filesystem::exists(source_skeleton_path))
+		log_and_throw_error("Invalid source skeleton mesh path: {}", source_skeleton_path);
+
+	if (!std::filesystem::exists(target_skeleton_path))
+		log_and_throw_error("Invalid target skeleton mesh path: {}", target_skeleton_path);
+
+	if (!std::filesystem::exists(skin_weights_path))
+		log_and_throw_error("Invalid skin weights path: {}", skin_weights_path);
+
 	gstate.out_folder = out_folder;
 
 	gstate.read_meshes(avatar_mesh_path, source_skeleton_path, target_skeleton_path, skin_weights_path);
@@ -177,6 +192,7 @@ int main(int argc, char **argv)
 	const int stride = state.args["output"]["paraview"]["skip_frame"];
 
 	std::vector<std::shared_ptr<Form>> persistent_forms;
+	std::vector<std::shared_ptr<Form>> persistent_full_forms;
 	std::shared_ptr<CurveSizeForm> curve_size_form;
 	std::shared_ptr<ContactForm> contact_form;
 	{
@@ -216,6 +232,11 @@ int main(int argc, char **argv)
 		contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
 		contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
 		persistent_forms.push_back(contact_form);
+
+		const auto tmp_curves = boundary_curves(gstate.garment_f);
+		auto center_target_form = std::make_shared<CurveCenterTargetForm>(gstate.garment_v, tmp_curves, gstate.skeleton_v, gstate.target_skeleton_v, gstate.skeleton_b);
+		center_target_form->set_weight(state.args["new_curve_center_target_weight"]);
+		persistent_full_forms.push_back(center_target_form);
 	}
 
 	Eigen::MatrixXd sol = Eigen::MatrixXd::Zero(1 + gstate.garment_v.size(), 1);
@@ -248,7 +269,7 @@ int main(int argc, char **argv)
 			lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(next_avatar_v - gstate.skinny_avatar_v), indices);
 			forms.push_back(lagr_form);
 
-			auto center_target_form = std::make_shared<CurveCenterTargetForm>(collision_vertices, curves, next_curve_centers);
+			auto center_target_form = std::make_shared<OldCurveCenterTargetForm>(collision_vertices, curves, next_curve_centers);
 			center_target_form->set_weight(state.args["curve_center_target_weight"]);
 			forms.push_back(center_target_form);
 
@@ -260,7 +281,7 @@ int main(int argc, char **argv)
 			curve_size_form->disable();
 		}
 
-		GarmentNLProblem nl_problem(1 + gstate.garment_v.size(), utils::flatten(gstate.avatar_v - gstate.skinny_avatar_v), forms, {});
+		GarmentNLProblem nl_problem(1 + gstate.garment_v.size(), utils::flatten(gstate.avatar_v - gstate.skinny_avatar_v), forms, persistent_full_forms);
 		nl_problem.set_target_value(next_alpha);
 
 		nl_problem.line_search_begin(sol, sol);
@@ -274,20 +295,20 @@ int main(int argc, char **argv)
 		double initial_weight = state.args["solver"]["augmented_lagrangian"]["initial_weight"];
 		const double scaling = state.args["solver"]["augmented_lagrangian"]["scaling"];
 		const double max_weight = state.args["solver"]["augmented_lagrangian"]["max_weight"].get<double>();
-		while (true) {
-			pen_form->set_weight(initial_weight);
-			Eigen::VectorXd g;
-			nl_problem.gradient(sol, g);
-			if (g(0) > 0)
-				break;
-			initial_weight *= scaling;
-			if (initial_weight >= max_weight)
-			{
-				initial_weight = max_weight;
-				logger().debug("Increase initial AL weight to {}", initial_weight);
-				break;
-			}
-		}
+		// while (true) {
+		// 	pen_form->set_weight(initial_weight);
+		// 	Eigen::VectorXd g;
+		// 	nl_problem.gradient(sol, g);
+		// 	if (g(0) > 0)
+		// 		break;
+		// 	initial_weight *= scaling;
+		// 	if (initial_weight >= max_weight)
+		// 	{
+		// 		initial_weight = max_weight;
+		// 		break;
+		// 	}
+		// }
+		logger().debug("Set initial AL weight to {}", initial_weight);
 
 		ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm> al_solver(
 			lagr_form, pen_form,

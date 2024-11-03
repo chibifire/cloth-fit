@@ -93,8 +93,8 @@ endif()
 set(POLYFEM_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src/polyfem")
 set(POLYFEM_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/src")
 
-set(CPM_polysolve_SOURCE "/Users/zizhouhuang/Desktop/polysolve")
-set(CPM_ipc-toolkit_SOURCE "/Users/zizhouhuang/Desktop/ipc-toolkit")
+# set(CPM_polysolve_SOURCE "/Users/zizhouhuang/Desktop/polysolve")
+# set(CPM_ipc-toolkit_SOURCE "/Users/zizhouhuang/Desktop/ipc-toolkit")
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/polyfem/")
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/recipes/")
@@ -328,11 +328,6 @@ if(POLYFEM_TOPLEVEL_PROJECT)
     if(NOT (${CMAKE_VERSION} VERSION_LESS "3.6.0"))
         set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME}_bin)
     endif()
-
-    add_executable(mytest src/polyfem/mytest.cpp)
-    target_compile_features(mytest PUBLIC cxx_std_14)
-    target_link_libraries(mytest PUBLIC polyfem::polyfem polyfem::warnings)
-    target_link_libraries(mytest PUBLIC CLI11::CLI11)
 
     if(POLYFEM_BUILD_DOCS)
         # check if Doxygen is installed

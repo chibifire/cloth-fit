@@ -71,6 +71,8 @@ namespace polyfem::solver
 
 		void set_target_value(double val) { target_value = val; }
 
+		const std::vector<std::shared_ptr<Form>> &full_forms() const { return full_forms_; }
+
 	protected:
 		const int full_size_;    ///< Size of the full problem
 		const int reduced_size_; ///< Size of the reduced problem
