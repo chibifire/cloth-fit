@@ -144,9 +144,11 @@ namespace polyfem::solver
 	private:
 		const Eigen::MatrixXd V_;
         std::vector<Eigen::VectorXi> curves_;
-		const double tol = 5e-2;
+		const double tol = 1e-1;
 		const int dim = 0;
 
 		std::vector<Eigen::VectorXi> correspondences_;
+
+		mutable StiffnessMatrix hessian_cached;
 	};
 }

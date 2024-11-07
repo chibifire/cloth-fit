@@ -2,6 +2,7 @@
 
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/autogen/auto_derivatives.hpp>
+#include <polyfem/utils/AutodiffTypes.hpp>
 
 #include <igl/boundary_facets.h>
 #include <igl/adjacency_matrix.h>
@@ -24,6 +25,17 @@ namespace polyfem::solver
             t = std::min(1., std::max(0., t));
             const double dist = (d - t * e).squaredNorm();
             return Eigen::Vector2d(dist, t);
+        }
+
+        template <class T>
+        T symmetry_penalty(const Eigen::Matrix<T, -1, -1> &V, const Eigen::VectorXi &correspondence, const int dim)
+        {
+            const Eigen::Vector<T, 3> center = V.colwise().sum() / (T)V.rows();
+
+            Eigen::Matrix<T, -1, -1> tmp = V(correspondence, Eigen::all) - V;
+            tmp.col(dim) = (V(correspondence, dim) + V.col(dim)).array() - 2 * center(dim);
+
+            return tmp.squaredNorm() / 2.;
         }
     }
 	std::vector<Eigen::VectorXi> boundary_curves(const Eigen::MatrixXi &F)
@@ -487,6 +499,7 @@ namespace polyfem::solver
 
     SymmetryForm::SymmetryForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves): V_(V)
     {
+        hessian_cached.resize(0, 0);
         for (const auto &curve : curves)
         {
             assert(curve(0) == curve(curve.size() - 1));
@@ -567,12 +580,7 @@ namespace polyfem::solver
             const auto &curve = curves_[i];
             const auto &correspondence = correspondences_[i];
 
-            const Eigen::Vector3d center = V(curve, Eigen::all).colwise().sum() / curve.size();
-
-            Eigen::MatrixXd tmp = V(curve(correspondence), Eigen::all) - V(curve, Eigen::all);
-            tmp.col(dim) = (V(curve(correspondence), dim) + V(curve, dim)).array() - 2 * center(dim);
-
-            out += tmp.squaredNorm() / 2.;
+            out += symmetry_penalty<double>(V(curve, Eigen::all), correspondence, dim);
         }
         return out;
     }
@@ -580,6 +588,8 @@ namespace polyfem::solver
     void SymmetryForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
     {
         const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+
+        // typedef DScalar1<double, Eigen::Matrix<double, Eigen::Dynamic, 1>> ADGrad;
 
         Eigen::MatrixXd g = Eigen::MatrixXd::Zero(V.rows(), V.cols());
         for (int i = 0; i < curves_.size(); i++)
@@ -606,6 +616,19 @@ namespace polyfem::solver
 
             const double deriv_wrt_c = -2 * tmp.col(dim).sum();
             g(curve, dim).array() += deriv_wrt_c / curve.size();
+
+            // Eigen::VectorXd tmp_v = utils::flatten(V(curve, Eigen::all));
+            // DiffScalarBase::setVariableCount(tmp_v.size());
+            // Eigen::Matrix<ADGrad, -1, -1> diff_v(curve.size(), 3);
+            // for (int j = 0; j < diff_v.rows(); j++)
+            //     for (int d = 0; d < diff_v.cols(); d++)
+            //         diff_v(j, d) = ADGrad(j * diff_v.cols() + d, tmp_v(j * diff_v.cols() + d));
+
+            // ADGrad diff_val = symmetry_penalty<ADGrad>(diff_v, correspondence, dim);
+            // Eigen::VectorXd tmp_g = diff_val.getGradient();
+            // for (int j = 0; j < curve.size(); j++)
+            //     for (int d = 0; d < 3; d++)
+            //         g(curve(j), d) += tmp_g(j * 3 + d);
         }
 
         gradv = utils::flatten(g);
@@ -613,8 +636,18 @@ namespace polyfem::solver
 
     void SymmetryForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
     {
-        hessian.setZero();
-        hessian.resize(x.size(), x.size());
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+
+        if (hessian_cached.rows() == V.size())
+        {
+            hessian = hessian_cached;
+            return;
+        }
+
+        hessian_cached.setZero();
+        hessian_cached.resize(x.size(), x.size());
+
+        typedef DScalar2<double, Eigen::Matrix<double, Eigen::Dynamic, 1>, Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>> ADHess;
 
         std::vector<Eigen::Triplet<double>> T;
         for (int i = 0; i < curves_.size(); i++)
@@ -623,25 +656,40 @@ namespace polyfem::solver
             const auto &correspondence = correspondences_[i];
             
             const int N = curve.size();
-            Eigen::MatrixXd H(N, N);
-            for (int d = 0; d < 3; d++)
-            {
-                H.setZero();
-                H.diagonal().array() += 2;
+            // Eigen::MatrixXd H(N, N);
+            // for (int d = 0; d < 3; d++)
+            // {
+            //     H.setZero();
+            //     H.diagonal().array() += 2;
                 
-                for (int i = 0; i < N; i++)
-                    H(i, correspondence(i)) += 2 * (d == dim ? 1 : -1);
+            //     for (int k = 0; k < N; k++)
+            //         H(k, correspondence(k)) += 2 * (d == dim ? 1 : -1);
                 
-                if (d == dim)
-                    H.array() += (-4. / N);
+            //     if (d == dim)
+            //         H.array() += (-4. / N);
 
-                for (int i = 0; i < N; i++)
-                    for (int j = 0; j < N; j++)
-                        if (H(i, j) != 0)
-                            T.emplace_back(curve(i) * 3 + d, curve(j) * 3 + d, H(i, j));
-            }
+            //     for (int k = 0; k < N; k++)
+            //         for (int j = 0; j < N; j++)
+            //             if (H(k, j) != 0)
+            //                 T.emplace_back(curve(k) * 3 + d, curve(j) * 3 + d, H(k, j));
+            // }
+
+            Eigen::VectorXd tmp_v = utils::flatten(V(curve, Eigen::all));
+            DiffScalarBase::setVariableCount(tmp_v.size());
+            Eigen::Matrix<ADHess, -1, -1> diff_v(curve.size(), 3);
+            for (int j = 0; j < diff_v.rows(); j++)
+                for (int d = 0; d < diff_v.cols(); d++)
+                    diff_v(j, d) = ADHess(j * diff_v.cols() + d, tmp_v(j * diff_v.cols() + d));
+
+            ADHess diff_val = symmetry_penalty<ADHess>(diff_v, correspondence, dim);
+            Eigen::MatrixXd tmp_h = diff_val.getHessian();
+            for (int j0 = 0; j0 < N; j0++)
+                for (int j1 = 0; j1 < N; j1++)
+                    for (int d = 0; d < 3; d++)
+                        T.emplace_back(curve(j0) * 3 + d, curve(j1) * 3 + d, tmp_h(j0 * 3 + d, j1 * 3 + d));
         }
 
-        hessian.setFromTriplets(T.begin(), T.end());
+        hessian_cached.setFromTriplets(T.begin(), T.end());
+        hessian = hessian_cached;
     }
 }

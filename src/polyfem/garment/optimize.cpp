@@ -8,9 +8,10 @@
 
 #include <igl/edges.h>
 #include <igl/read_triangle_mesh.h>
+#include <igl/readOBJ.h>
 #include <igl/remove_duplicate_vertices.h>
 #include <igl/write_triangle_mesh.h>
-
+#include <igl/writeOBJ.h>
 
 #include <paraviewo/ParaviewWriter.hpp>
 #include <paraviewo/VTUWriter.hpp>
@@ -87,16 +88,27 @@ namespace polyfem {
         }
     }
 
-    void save_vtu(
+    void OBJMesh::read(const std::string &path)
+    {
+        igl::readOBJ(path, v, tc, cn, f, ftc, fn);
+    }
+
+    void OBJMesh::write(const std::string &path)
+    {
+        igl::writeOBJ(path, v, f, cn, fn, tc, ftc);
+    }
+
+    void GarmentSolver::save_result(
         const std::string &path,
         GarmentNLProblem &prob,
         const Eigen::MatrixXd &V,
         const Eigen::MatrixXi &F,
-        const int n_avatar_vertices,
         const Eigen::VectorXd &sol)
     {
         std::shared_ptr<paraviewo::ParaviewWriter> tmpw = std::make_shared<paraviewo::VTUWriter>();
         paraviewo::ParaviewWriter &writer = *tmpw;
+
+        const int n_avatar_vertices = avatar_v.rows();
 
         const Eigen::VectorXd full_disp = prob.reduced_to_full(sol);
         const Eigen::VectorXd complete_disp = prob.full_to_complete(full_disp);
@@ -135,8 +147,12 @@ namespace polyfem {
         body_ids.head(n_avatar_vertices).array() = 1;
         writer.add_field("body_ids", body_ids);
 
-        logger().debug("Save VTU to {}", path);
-        writer.write_mesh(path, utils::unflatten(complete_disp, V.cols()) + V, F);
+        logger().debug("Save VTU to {}", path + ".vtu");
+        const Eigen::MatrixXd current_vertices = utils::unflatten(complete_disp, V.cols()) + V;
+        writer.write_mesh(path + ".vtu", current_vertices, F);
+
+        garment.v = current_vertices.bottomRows(garment.v.rows());
+        garment.write(path + "_garment.obj");
     }
 
     Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V)
@@ -144,15 +160,24 @@ namespace polyfem {
         return V.colwise().maxCoeff() - V.colwise().minCoeff();
     }
 
-    void GarmentSolver::load_garment_mesh(const std::string &path, int n_refs)
+    void GarmentSolver::load_garment_mesh(
+        const std::string &path,
+        const std::string &garment_skinning_weights_path, 
+        int n_refs)
 	{
-		igl::read_triangle_mesh(path, garment_v, garment_f);
+        garment.read(path);
+
+        io::read_matrix(garment_skinning_weights_path, garment_skinning_weights);
+        assert(garment_skinning_weights.rows() == skeleton_v.rows());
+        assert(garment.v.rows() == garment_skinning_weights.cols());
+        assert(garment_skinning_weights.minCoeff() >= 0. && garment_skinning_weights.maxCoeff() <= 1.);
 
 		// remove duplicate vertices in the garment
-        remove_duplicate_vertices(garment_v, garment_f, 1e-6);
+        // remove_duplicate_vertices(garment.v, garment.f, 1e-6);
 
-		while (n_refs-- > 0)
-			std::tie(garment_v, garment_f) = refine(garment_v, garment_f);
+		// while (n_refs-- > 0)
+		// 	std::tie(garment.v, garment.f) = refine(garment.v, garment.f);
+        assert(n_refs == 0);
 	}
 
     void GarmentSolver::check_intersections(
@@ -180,7 +205,7 @@ namespace polyfem {
         const std::string &avatar_mesh_path,
         const std::string &source_skeleton_path,
         const std::string &target_skeleton_path,
-        const std::string &skinning_weights_path)
+        const std::string &target_avatar_skinning_weights_path)
     {
         igl::read_triangle_mesh(avatar_mesh_path, avatar_v, avatar_f);
 
@@ -188,10 +213,10 @@ namespace polyfem {
         read_edge_mesh(target_skeleton_path, target_skeleton_v, target_skeleton_b);
         assert((skeleton_b - target_skeleton_b).squaredNorm() < 1);
 
-        io::read_matrix(skinning_weights_path, skinning_weights);
-        assert(skinning_weights.rows() == skeleton_v.rows());
-        assert(avatar_v.rows() == skinning_weights.cols());
-        assert(skinning_weights.minCoeff() >= 0. && skinning_weights.maxCoeff() <= 1.);
+        io::read_matrix(target_avatar_skinning_weights_path, target_avatar_skinning_weights);
+        assert(target_avatar_skinning_weights.rows() == skeleton_v.rows());
+        assert(avatar_v.rows() == target_avatar_skinning_weights.cols());
+        assert(target_avatar_skinning_weights.minCoeff() >= 0. && target_avatar_skinning_weights.maxCoeff() <= 1.);
     }
 
     void GarmentSolver::project_avatar_to_skeleton()
@@ -224,13 +249,13 @@ namespace polyfem {
 
         // explode avatar mesh
         Eigen::MatrixXd new_avatar_v(avatar_f.size(), 3);
-        Eigen::MatrixXd new_skinning_weights(skinning_weights.rows(), new_avatar_v.rows());
+        Eigen::MatrixXd new_skinning_weights(target_avatar_skinning_weights.rows(), new_avatar_v.rows());
         for (int f = 0; f < avatar_f.rows(); f++)
         {
             for (int i = 0; i < avatar_f.cols(); i++)
             {
                 new_avatar_v.row(f * avatar_f.cols() + i) = avatar_v.row(avatar_f(f, i));
-                new_skinning_weights.col(f * avatar_f.cols() + i) = skinning_weights.col(avatar_f(f, i));
+                new_skinning_weights.col(f * avatar_f.cols() + i) = target_avatar_skinning_weights.col(avatar_f(f, i));
                 avatar_f(f, i) = f * avatar_f.cols() + i;
             }
         }
@@ -402,7 +427,7 @@ namespace polyfem {
             skinny_avatar_f = avatar_f;
         }
         
-        skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-3;
+        skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-5;
     }
 
     void GarmentSolver::normalize_meshes()
@@ -410,7 +435,7 @@ namespace polyfem {
         // Source side
         const double source_scaling = 1e2;
         skeleton_v *= source_scaling;
-        garment_v *= source_scaling;
+        garment.v *= source_scaling;
         // skinny_avatar_v *= source_scaling;
 
         // Target side
@@ -422,9 +447,9 @@ namespace polyfem {
         trans.apply(target_skeleton_v);
 
         Eigen::MatrixXi E;
-        igl::edges(garment_f, E);
+        igl::edges(garment.f, E);
 
-        Eigen::VectorXd len = (garment_v(E.col(0), Eigen::all) - garment_v(E.col(1), Eigen::all)).rowwise().norm();
+        Eigen::VectorXd len = (garment.v(E.col(0), Eigen::all) - garment.v(E.col(1), Eigen::all)).rowwise().norm();
         logger().debug("Min edge length: {}", len.minCoeff());
     }
 }

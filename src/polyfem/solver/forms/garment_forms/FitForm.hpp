@@ -53,5 +53,7 @@ namespace polyfem::solver
         openvdb::DoubleGrid::Ptr grid;
 
 		mutable std::unique_ptr<utils::MatrixCache> mat_cache_;
+
+		const int power = 2;
 	};
 } // namespace polyfem::solver

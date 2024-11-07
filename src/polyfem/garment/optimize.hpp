@@ -10,13 +10,20 @@ namespace polyfem {
         class GarmentNLProblem;
     }
 
-    void save_vtu(
-        const std::string &path,
-        solver::GarmentNLProblem &prob,
-        const Eigen::MatrixXd &V,
-        const Eigen::MatrixXi &F,
-        const int n_avatar_vertices,
-        const Eigen::VectorXd &sol);
+    struct OBJMesh {
+        // vertices, triangle faces
+        Eigen::MatrixXd v;
+        Eigen::MatrixXi f;
+        // normals
+        Eigen::MatrixXi fn;
+        Eigen::MatrixXd cn;
+        // textures
+        Eigen::MatrixXi ftc;
+        Eigen::MatrixXd tc;
+
+        void read(const std::string &path);
+        void write(const std::string &path);
+    };
     
     Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V);
 
@@ -29,22 +36,36 @@ namespace polyfem {
 
         void load_garment_mesh(
             const std::string &path,
+            const std::string &garment_skinning_weights_path,
             int n_refs = 0);
 
         void read_meshes(
             const std::string &avatar_mesh_path,
             const std::string &source_skeleton_path,
             const std::string &target_skeleton_path,
-            const std::string &skinning_weights_path);
+            const std::string &target_avatar_skinning_weights_path);
         
         void project_avatar_to_skeleton();
 
         void normalize_meshes();
     
+        void save_result(
+            const std::string &path,
+            solver::GarmentNLProblem &prob,
+            const Eigen::MatrixXd &V,
+            const Eigen::MatrixXi &F,
+            const Eigen::VectorXd &sol);
+        
+        int n_garment_vertices() const { return garment.v.rows(); }
+        int n_garment_faces() const { return garment.f.rows(); }
+        int n_avatar_vertices() const { return avatar_v.rows(); }
+
         std::string out_folder;
     
-        Eigen::MatrixXd avatar_v, garment_v;
-        Eigen::MatrixXi avatar_f, garment_f;
+        Eigen::MatrixXd avatar_v;
+        Eigen::MatrixXi avatar_f;
+
+        OBJMesh garment;
 
         Eigen::MatrixXd skeleton_v, target_skeleton_v;
         Eigen::MatrixXi skeleton_b, target_skeleton_b;
@@ -52,6 +73,7 @@ namespace polyfem {
         Eigen::MatrixXd skinny_avatar_v;
         Eigen::MatrixXi skinny_avatar_f;
 
-        Eigen::MatrixXd skinning_weights;
+        Eigen::MatrixXd target_avatar_skinning_weights;
+        Eigen::MatrixXd garment_skinning_weights;
     };
 }

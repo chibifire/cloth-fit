@@ -171,7 +171,7 @@ namespace polyfem::solver
                     log_and_throw_error("Invalid sdf values!");
                 
                 if (tmp > 0)
-                    val += area * weights(i) * tmp*tmp / 2.;
+                    val += area * weights(i) * pow(tmp, power);
             }
         }
 
@@ -197,7 +197,7 @@ namespace polyfem::solver
                     
                     if (tmp.x > 0)
                         for (int d = 0; d < 3; d++)
-                            local_storage.mat(F_.row(f), d) += (tmp.x * area * weights(i) * tmp.g(d)) * P.row(i);
+                            local_storage.mat(F_.row(f), d) += (pow(tmp.x, power-1) * power * area * weights(i) * tmp.g(d)) * P.row(i);
                 }
             }
         });
@@ -266,8 +266,8 @@ namespace polyfem::solver
                     h << tmp.h(0, 0), tmp.h(0, 1), tmp.h(0, 2), 
                         tmp.h(1, 0), tmp.h(1, 1), tmp.h(1, 2),
                         tmp.h(2, 0), tmp.h(2, 1), tmp.h(2, 2);
-                    h *= tmp.x;
-                    h += g * g.transpose();
+                    h *= pow(tmp.x, power-1) * power;
+                    h += g * g.transpose() * (pow(tmp.x, power-2) * power * (power-1));
                     h *= area * weights(i);
 
                     for (int d = 0; d < 3; d++)
