@@ -331,7 +331,7 @@ int main(int argc, char **argv)
 		nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
 			const std::string path = out_folder + "/step_" + std::to_string(save_id / stride);
 			if (save_id % stride == 0)
-				gstate.save_result(path, nl_problem, collision_vertices, collision_triangles, sol);
+				gstate.save_result(out_folder, save_id / stride, nl_problem, collision_vertices, collision_triangles, sol);
 			++save_id;
 		};
 

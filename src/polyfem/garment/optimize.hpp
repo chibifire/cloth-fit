@@ -51,6 +51,7 @@ namespace polyfem {
     
         void save_result(
             const std::string &path,
+            const int index,
             solver::GarmentNLProblem &prob,
             const Eigen::MatrixXd &V,
             const Eigen::MatrixXi &F,

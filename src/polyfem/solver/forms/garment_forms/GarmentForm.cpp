@@ -118,7 +118,9 @@ namespace polyfem::solver {
                 const double barrier_grad = -(x - 1) * (2 * x * std::log(x) + x - 1) / area;
                 const double barrier_hess = -(2 * std::log(x) + 3 - 2 / x - 1 / x / x) / threshold_;
                 
-                const Eigen::Matrix<double, 9, 9> real_local_hess = local_grad * (local_grad.transpose() * barrier_hess) + local_hess * barrier_grad;
+                Eigen::Matrix<double, 9, 9> real_local_hess = local_grad * (local_grad.transpose() * barrier_hess) + local_hess * barrier_grad;
+                if (is_project_to_psd())
+                    real_local_hess = ipc::project_to_psd(real_local_hess);
                 for (int i = 0; i < 3; i++)
                     for (int j = 0; j < 3; j++)
                         for (int di = 0; di < 3; di++)
@@ -445,6 +447,9 @@ namespace polyfem::solver {
                     local_hess += fac * (tmp_hess * errB + local_grad * local_grad.transpose());
                 }
 
+                if (is_project_to_psd())
+                    local_hess = ipc::project_to_psd(local_hess);
+
                 for (int lj = 0; lj < indices.size(); lj++)
                     for (int dj = 0; dj < 3; dj++)
                         for (int li = 0; li < indices.size(); li++)
@@ -656,6 +661,9 @@ namespace polyfem::solver {
                 h({0,1,2,3,4,5,6,7,8}, {0,1,2,3,4,5,6,7,8})     += (fac * err / orig_dists(i, 2 * j + 0)) * local_hess[0];
                 h({0,1,2,3,4,5,9,10,11}, {0,1,2,3,4,5,9,10,11}) -= (fac * err / orig_dists(i, 2 * j + 1)) * local_hess[1];
 
+                if (is_project_to_psd())
+                    h = ipc::project_to_psd(h);
+
                 Eigen::Vector<int, 4> indices4;
                 indices4 << F_(i, le(j, 0)), F_(i, le(j, 1)), F_(i, lv(j)), F_(TT(i, j), lv(TTi(i, j)));
                 for (int li = 0; li < indices4.size(); li++)
@@ -801,6 +809,9 @@ namespace polyfem::solver {
                 target_skeleton_v_(skeleton_edges_(bid, 1), 0), target_skeleton_v_(skeleton_edges_(bid, 1), 1), target_skeleton_v_(skeleton_edges_(bid, 1), 2));
 
             h = h.eval() * (tmp(1) - param0) + g * g.transpose();
+
+            if (is_project_to_psd())
+                h = ipc::project_to_psd(h);
 
             std::array<int, 4> index_map{0, 1 + vid * 3, 2 + vid * 3, 3 + vid * 3};
             for (int d0 = 0; d0 < 4; d0++)

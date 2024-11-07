@@ -100,6 +100,7 @@ namespace polyfem {
 
     void GarmentSolver::save_result(
         const std::string &path,
+        const int index,
         GarmentNLProblem &prob,
         const Eigen::MatrixXd &V,
         const Eigen::MatrixXi &F,
@@ -108,51 +109,51 @@ namespace polyfem {
         std::shared_ptr<paraviewo::ParaviewWriter> tmpw = std::make_shared<paraviewo::VTUWriter>();
         paraviewo::ParaviewWriter &writer = *tmpw;
 
-        const int n_avatar_vertices = avatar_v.rows();
-
         const Eigen::VectorXd full_disp = prob.reduced_to_full(sol);
         const Eigen::VectorXd complete_disp = prob.full_to_complete(full_disp);
 
-        Eigen::VectorXd total_grad = Eigen::VectorXd::Zero(complete_disp.size());
-        std::unordered_set<std::string> existing_names;
-        for (const auto &form : prob.forms())
-        {
-            Eigen::VectorXd grad;
-            form->first_derivative(complete_disp, grad);
-            std::string name = "grad_" + form->name();
-            while (existing_names.count(name) != 0)
-                name += "_";
-            existing_names.insert(name);
-            grad.head(n_avatar_vertices * 3).setZero();
-            writer.add_field(name, utils::unflatten(grad, 3));
-            total_grad += grad;
-        }
-        for (const auto &form : prob.full_forms())
-        {
-            Eigen::VectorXd grad_full, grad;
-            form->first_derivative(full_disp, grad_full);
-            std::string name = "grad_" + form->name();
-            while (existing_names.count(name) != 0)
-                name += "_";
-            existing_names.insert(name);
-            grad.setZero(total_grad.size());
-            grad.tail(grad_full.size() - 1) = grad_full.tail(grad_full.size() - 1);
-            writer.add_field(name, utils::unflatten(grad, 3));
-            total_grad += grad;
-        }
-        total_grad.head(n_avatar_vertices * 3).setZero();
-        writer.add_field("grad", utils::unflatten(total_grad, 3));
+        // Eigen::VectorXd total_grad = Eigen::VectorXd::Zero(complete_disp.size());
+        // std::unordered_set<std::string> existing_names;
+        // for (const auto &form : prob.forms())
+        // {
+        //     Eigen::VectorXd grad;
+        //     form->first_derivative(complete_disp, grad);
+        //     std::string name = "grad_" + form->name();
+        //     while (existing_names.count(name) != 0)
+        //         name += "_";
+        //     existing_names.insert(name);
+        //     grad.head(n_avatar_vertices() * 3).setZero();
+        //     writer.add_field(name, utils::unflatten(grad, 3));
+        //     total_grad += grad;
+        // }
+        // for (const auto &form : prob.full_forms())
+        // {
+        //     Eigen::VectorXd grad_full, grad;
+        //     form->first_derivative(full_disp, grad_full);
+        //     std::string name = "grad_" + form->name();
+        //     while (existing_names.count(name) != 0)
+        //         name += "_";
+        //     existing_names.insert(name);
+        //     grad.setZero(total_grad.size());
+        //     grad.tail(grad_full.size() - 1) = grad_full.tail(grad_full.size() - 1);
+        //     writer.add_field(name, utils::unflatten(grad, 3));
+        //     total_grad += grad;
+        // }
+        // total_grad.head(n_avatar_vertices() * 3).setZero();
+        // writer.add_field("grad", utils::unflatten(total_grad, 3));
 
-        Eigen::VectorXd body_ids = Eigen::VectorXd::Zero(V.rows());
-        body_ids.head(n_avatar_vertices).array() = 1;
-        writer.add_field("body_ids", body_ids);
+        // Eigen::VectorXd body_ids = Eigen::VectorXd::Zero(V.rows());
+        // body_ids.head(n_avatar_vertices()).array() = 1;
+        // writer.add_field("body_ids", body_ids);
 
-        logger().debug("Save VTU to {}", path + ".vtu");
         const Eigen::MatrixXd current_vertices = utils::unflatten(complete_disp, V.cols()) + V;
-        writer.write_mesh(path + ".vtu", current_vertices, F);
+        // logger().debug("Save VTU to {}", path + "/step_" + std::to_string(index) + ".vtu");
+        // writer.write_mesh(path + "/step_" + std::to_string(index) + ".vtu", current_vertices, F);
 
         garment.v = current_vertices.bottomRows(garment.v.rows());
-        garment.write(path + "_garment.obj");
+        garment.write(path + "/step_garment_" + std::to_string(index) + ".obj");
+
+        igl::write_triangle_mesh(path + "/step_avatar_" + std::to_string(index) + ".obj", current_vertices.topRows(n_avatar_vertices()), avatar_f);
     }
 
     Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V)

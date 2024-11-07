@@ -259,6 +259,9 @@ namespace polyfem::solver
                 
                 local_hess += h * errB + g * g.transpose();
 
+                if (is_project_to_psd())
+                    local_hess = ipc::project_to_psd(local_hess);
+
                 for (int lj = 0; lj < 3; lj++)
                     for (int dj = 0; dj < 3; dj++)
                         for (int li = 0; li < 3; li++)
