@@ -274,7 +274,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 			if (form->name() != "garment-fit")
 				step = 1e-8;
 			else
-				step = 1e-6;
+				step = 1e-7;
 
 			form->init(x);
 			form->init_lagging(x);

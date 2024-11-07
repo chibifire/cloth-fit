@@ -134,6 +134,19 @@ namespace polyfem::solver
             weights = tmp.col(3);
         }
 
+        {
+            initial_distance.setZero(F_.rows() * n_loc_samples);
+            typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
+            for (int f = 0; f < F_.rows(); f++) {
+                const Eigen::Matrix3d M = V_({F_(f, 0),F_(f, 1),F_(f, 2)}, Eigen::all);
+                Eigen::Matrix<double, n_loc_samples, 3> samples = P * M;
+                for (int i = 0; i < P.rows(); i++) {
+                    math::Vec3<double> p(samples(i, 0), samples(i, 1), samples(i, 2));
+                    initial_distance(f * n_loc_samples + i) = tools::SplineSampler::sample(acc, grid->transformPtr()->worldToIndex(p));
+                }
+            }
+        }
+
         // export SDF as a triangle mesh
         // {
         //     tools::volumeToMesh(*grid, points, quads, 0.);
@@ -170,8 +183,8 @@ namespace polyfem::solver
                 if (std::isnan(tmp))
                     log_and_throw_error("Invalid sdf values!");
                 
-                if (tmp > 0)
-                    val += area * weights(i) * pow(tmp, power);
+                if (tmp > initial_distance(f * n_loc_samples + i))
+                    val += area * weights(i) * pow(tmp - initial_distance(f * n_loc_samples + i), power);
             }
         }
 
@@ -195,9 +208,9 @@ namespace polyfem::solver
                 for (int i = 0; i < P.rows(); i++) {
                     const auto &tmp = totalP[f * n_loc_samples + i];
                     
-                    if (tmp.x > 0)
+                    if (tmp.x > initial_distance(f * n_loc_samples + i))
                         for (int d = 0; d < 3; d++)
-                            local_storage.mat(F_.row(f), d) += (pow(tmp.x, power-1) * power * area * weights(i) * tmp.g(d)) * P.row(i);
+                            local_storage.mat(F_.row(f), d) += (pow(tmp.x - initial_distance(f * n_loc_samples + i), power-1) * power * area * weights(i) * tmp.g(d)) * P.row(i);
                 }
             }
         });
@@ -257,7 +270,7 @@ namespace polyfem::solver
                 for (int i = 0; i < P.rows(); i++) {
                     const auto &tmp = totalP[f * n_loc_samples + i];
 
-                    if (tmp.x <= 0)
+                    if (tmp.x <= initial_distance(f * n_loc_samples + i))
                         continue;
                     
                     Eigen::Vector3d g;
@@ -266,8 +279,8 @@ namespace polyfem::solver
                     h << tmp.h(0, 0), tmp.h(0, 1), tmp.h(0, 2), 
                         tmp.h(1, 0), tmp.h(1, 1), tmp.h(1, 2),
                         tmp.h(2, 0), tmp.h(2, 1), tmp.h(2, 2);
-                    h *= pow(tmp.x, power-1) * power;
-                    h += g * g.transpose() * (pow(tmp.x, power-2) * power * (power-1));
+                    h *= pow(tmp.x - initial_distance(f * n_loc_samples + i), power-1) * power;
+                    h += g * g.transpose() * (pow(tmp.x - initial_distance(f * n_loc_samples + i), power-2) * power * (power-1));
                     h *= area * weights(i);
 
                     for (int d = 0; d < 3; d++)

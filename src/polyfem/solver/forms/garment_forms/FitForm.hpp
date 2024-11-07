@@ -55,5 +55,7 @@ namespace polyfem::solver
 		mutable std::unique_ptr<utils::MatrixCache> mat_cache_;
 
 		const int power = 2;
+
+		Eigen::VectorXd initial_distance;
 	};
 } // namespace polyfem::solver
