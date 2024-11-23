@@ -243,9 +243,9 @@ int main(int argc, char **argv)
 		center_target_form->set_weight(state.args["new_curve_center_target_weight"]);
 		persistent_full_forms.push_back(center_target_form);
 
-		auto global_positional_form = std::make_shared<GlobalPositionalForm>(initial_garment_v, gstate.garment.f, gstate.skeleton_v, gstate.target_skeleton_v, gstate.skeleton_b, gstate.garment_skinning_weights);
-		global_positional_form->set_weight(state.args["global_positional_target_weight"]);
-		persistent_full_forms.push_back(global_positional_form);
+		// auto global_positional_form = std::make_shared<GlobalPositionalForm>(initial_garment_v, gstate.garment.f, gstate.skeleton_v, gstate.target_skeleton_v, gstate.skeleton_b, gstate.garment_skinning_weights);
+		// global_positional_form->set_weight(state.args["global_positional_target_weight"]);
+		// persistent_full_forms.push_back(global_positional_form);
 	}
 
 	Eigen::MatrixXd sol = Eigen::MatrixXd::Zero(1 + initial_garment_v.size(), 1);

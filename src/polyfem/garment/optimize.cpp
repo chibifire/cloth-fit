@@ -20,6 +20,7 @@
 #include <ipc/distance/point_edge.hpp>
 
 #include <unordered_set>
+#include <filesystem>
 
 using namespace polyfem::solver;
 using namespace polyfem::mesh;
@@ -168,10 +169,13 @@ namespace polyfem {
 	{
         garment.read(path);
 
-        io::read_matrix(garment_skinning_weights_path, garment_skinning_weights);
-        assert(garment_skinning_weights.rows() == skeleton_v.rows());
-        assert(garment.v.rows() == garment_skinning_weights.cols());
-        assert(garment_skinning_weights.minCoeff() >= 0. && garment_skinning_weights.maxCoeff() <= 1.);
+        if (std::filesystem::exists(garment_skinning_weights_path))
+        {
+            io::read_matrix(garment_skinning_weights_path, garment_skinning_weights);
+            assert(garment_skinning_weights.rows() == skeleton_v.rows());
+            assert(garment.v.rows() == garment_skinning_weights.cols());
+            assert(garment_skinning_weights.minCoeff() >= 0. && garment_skinning_weights.maxCoeff() <= 1.);
+        }
 
 		// remove duplicate vertices in the garment
         // remove_duplicate_vertices(garment.v, garment.f, 1e-6);
