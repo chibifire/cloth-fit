@@ -87,7 +87,7 @@ namespace {
         for (int i = 0, k = 0; i <= N; i++)
             for (int j = 0; i + j <= N; j++, k++)
             {
-                std::array<int, 3> arr = {i, j, N - i - j};
+                std::array<int, 3> arr = {{i, j, N - i - j}};
                 std::sort(arr.begin(), arr.end());
 
                 double w = 6;
