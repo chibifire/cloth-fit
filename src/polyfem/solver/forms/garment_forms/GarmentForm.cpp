@@ -680,145 +680,145 @@ namespace polyfem::solver {
         hessian.setFromTriplets(triplets.begin(), triplets.end());
     }
 
-    GlobalPositionalForm::GlobalPositionalForm(
-        const Eigen::MatrixXd &V, 
-        const Eigen::MatrixXi &F,
-        const Eigen::MatrixXd &source_skeleton_v,
-        const Eigen::MatrixXd &target_skeleton_v,
-        const Eigen::MatrixXi &skeleton_edges,
-        const Eigen::MatrixXd &skin_weights):
-        V_(V), source_skeleton_v_(source_skeleton_v),
-        target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges),
-        skin_weights_(skin_weights)
-    {
-        Eigen::MatrixXd weights_per_bone = Eigen::MatrixXd::Zero(skeleton_edges.rows(), V.rows());
-        for (int i = 0; i < skeleton_edges.rows(); i++)
-            weights_per_bone.row(i) = skin_weights.row(skeleton_edges(i, 0)) + skin_weights.row(skeleton_edges(i, 1));
+    // GlobalPositionalForm::GlobalPositionalForm(
+    //     const Eigen::MatrixXd &V, 
+    //     const Eigen::MatrixXi &F,
+    //     const Eigen::MatrixXd &source_skeleton_v,
+    //     const Eigen::MatrixXd &target_skeleton_v,
+    //     const Eigen::MatrixXi &skeleton_edges,
+    //     const Eigen::MatrixXd &skin_weights):
+    //     V_(V), source_skeleton_v_(source_skeleton_v),
+    //     target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges),
+    //     skin_weights_(skin_weights)
+    // {
+    //     Eigen::MatrixXd weights_per_bone = Eigen::MatrixXd::Zero(skeleton_edges.rows(), V.rows());
+    //     for (int i = 0; i < skeleton_edges.rows(); i++)
+    //         weights_per_bone.row(i) = skin_weights.row(skeleton_edges(i, 0)) + skin_weights.row(skeleton_edges(i, 1));
 
-        bones = -Eigen::VectorXi::Ones(V.rows());
-        relative_positions = Eigen::VectorXd::Zero(V.rows());
-        for (int vid = 0; vid < V.rows(); vid++)
-        {
-            const Eigen::Vector3d point = V.row(vid);
+    //     bones = -Eigen::VectorXi::Ones(V.rows());
+    //     relative_positions = Eigen::VectorXd::Zero(V.rows());
+    //     for (int vid = 0; vid < V.rows(); vid++)
+    //     {
+    //         const Eigen::Vector3d point = V.row(vid);
 
-            Eigen::MatrixXd::Index bid;
-            if (weights_per_bone.col(vid).maxCoeff(&bid) < 0.8)
-                continue;
+    //         Eigen::MatrixXd::Index bid;
+    //         if (weights_per_bone.col(vid).maxCoeff(&bid) < 0.8)
+    //             continue;
             
-            Eigen::Vector2d tmp = point_line_closest_distance(point, source_skeleton_v.row(skeleton_edges(bid, 0)), source_skeleton_v.row(skeleton_edges(bid, 1)));
+    //         Eigen::Vector2d tmp = point_line_closest_distance(point, source_skeleton_v.row(skeleton_edges(bid, 0)), source_skeleton_v.row(skeleton_edges(bid, 1)));
 
-            bones(vid) = bid;
-            relative_positions(vid) = tmp(1);
-        }
-    }
+    //         bones(vid) = bid;
+    //         relative_positions(vid) = tmp(1);
+    //     }
+    // }
 
-    double GlobalPositionalForm::value_unweighted(const Eigen::VectorXd &x) const
-    {
-        const double t = x(0);
-        const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
-        const Eigen::MatrixXd skeleton_v = source_skeleton_v_ + t * (target_skeleton_v_ - source_skeleton_v_);
+    // double GlobalPositionalForm::value_unweighted(const Eigen::VectorXd &x) const
+    // {
+    //     const double t = x(0);
+    //     const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
+    //     const Eigen::MatrixXd skeleton_v = source_skeleton_v_ + t * (target_skeleton_v_ - source_skeleton_v_);
 
-        double val = 0.;
-        for (int vid = 0; vid < V.rows(); vid++)
-        {
-            const Eigen::Vector3d point = V.row(vid);
+    //     double val = 0.;
+    //     for (int vid = 0; vid < V.rows(); vid++)
+    //     {
+    //         const Eigen::Vector3d point = V.row(vid);
 
-            if (bones(vid) < 0)
-                continue;
+    //         if (bones(vid) < 0)
+    //             continue;
 
-            const int bid = bones(vid);
-            const double param0 = relative_positions(vid);
+    //         const int bid = bones(vid);
+    //         const double param0 = relative_positions(vid);
 
-            const Eigen::Vector2d tmp = point_line_closest_distance(point, skeleton_v.row(skeleton_edges_(bid, 0)), skeleton_v.row(skeleton_edges_(bid, 1)));
-            val += pow(param0 - tmp(1), 2);
-        }
+    //         const Eigen::Vector2d tmp = point_line_closest_distance(point, skeleton_v.row(skeleton_edges_(bid, 0)), skeleton_v.row(skeleton_edges_(bid, 1)));
+    //         val += pow(param0 - tmp(1), 2);
+    //     }
 
-        return val / 2.;
-    }
+    //     return val / 2.;
+    // }
 
-    void GlobalPositionalForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
-    {
-        const double t = x(0);
-        const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
-        const Eigen::MatrixXd skeleton_v = source_skeleton_v_ + t * (target_skeleton_v_ - source_skeleton_v_);
+    // void GlobalPositionalForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
+    // {
+    //     const double t = x(0);
+    //     const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
+    //     const Eigen::MatrixXd skeleton_v = source_skeleton_v_ + t * (target_skeleton_v_ - source_skeleton_v_);
 
-        gradv.setZero(x.size());
-        for (int vid = 0; vid < V.rows(); vid++)
-        {
-            const Eigen::Vector3d point = V.row(vid);
+    //     gradv.setZero(x.size());
+    //     for (int vid = 0; vid < V.rows(); vid++)
+    //     {
+    //         const Eigen::Vector3d point = V.row(vid);
 
-            if (bones(vid) < 0)
-                continue;
+    //         if (bones(vid) < 0)
+    //             continue;
 
-            const int bid = bones(vid);
-            const double param0 = relative_positions(vid);
+    //         const int bid = bones(vid);
+    //         const double param0 = relative_positions(vid);
 
-            const Eigen::Vector2d tmp = point_line_closest_distance(point, skeleton_v.row(skeleton_edges_(bid, 0)), skeleton_v.row(skeleton_edges_(bid, 1)));
+    //         const Eigen::Vector2d tmp = point_line_closest_distance(point, skeleton_v.row(skeleton_edges_(bid, 0)), skeleton_v.row(skeleton_edges_(bid, 1)));
 
-            Eigen::Vector4d g;
-            autogen::line_projection_uv_gradient(
-                t, point(0), point(1), point(2), g.data(), 
-                source_skeleton_v_(skeleton_edges_(bid, 0), 0), source_skeleton_v_(skeleton_edges_(bid, 0), 1), source_skeleton_v_(skeleton_edges_(bid, 0), 2),
-                target_skeleton_v_(skeleton_edges_(bid, 0), 0), target_skeleton_v_(skeleton_edges_(bid, 0), 1), target_skeleton_v_(skeleton_edges_(bid, 0), 2),
-                source_skeleton_v_(skeleton_edges_(bid, 1), 0), source_skeleton_v_(skeleton_edges_(bid, 1), 1), source_skeleton_v_(skeleton_edges_(bid, 1), 2),
-                target_skeleton_v_(skeleton_edges_(bid, 1), 0), target_skeleton_v_(skeleton_edges_(bid, 1), 1), target_skeleton_v_(skeleton_edges_(bid, 1), 2));
+    //         Eigen::Vector4d g;
+    //         autogen::line_projection_uv_gradient(
+    //             t, point(0), point(1), point(2), g.data(), 
+    //             source_skeleton_v_(skeleton_edges_(bid, 0), 0), source_skeleton_v_(skeleton_edges_(bid, 0), 1), source_skeleton_v_(skeleton_edges_(bid, 0), 2),
+    //             target_skeleton_v_(skeleton_edges_(bid, 0), 0), target_skeleton_v_(skeleton_edges_(bid, 0), 1), target_skeleton_v_(skeleton_edges_(bid, 0), 2),
+    //             source_skeleton_v_(skeleton_edges_(bid, 1), 0), source_skeleton_v_(skeleton_edges_(bid, 1), 1), source_skeleton_v_(skeleton_edges_(bid, 1), 2),
+    //             target_skeleton_v_(skeleton_edges_(bid, 1), 0), target_skeleton_v_(skeleton_edges_(bid, 1), 1), target_skeleton_v_(skeleton_edges_(bid, 1), 2));
             
-            g *= tmp(1) - param0;
+    //         g *= tmp(1) - param0;
 
-            gradv(0) += g(0);
-            gradv.template segment<3>(1 + vid * 3) += g.tail<3>();
-        }
-    }
+    //         gradv(0) += g(0);
+    //         gradv.template segment<3>(1 + vid * 3) += g.tail<3>();
+    //     }
+    // }
 
-    void GlobalPositionalForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
-    {
-        hessian.resize(x.size(), x.size());
-        hessian.setZero();
+    // void GlobalPositionalForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
+    // {
+    //     hessian.resize(x.size(), x.size());
+    //     hessian.setZero();
 
-        const double t = x(0);
-        const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
-        const Eigen::MatrixXd skeleton_v = source_skeleton_v_ + t * (target_skeleton_v_ - source_skeleton_v_);
+    //     const double t = x(0);
+    //     const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
+    //     const Eigen::MatrixXd skeleton_v = source_skeleton_v_ + t * (target_skeleton_v_ - source_skeleton_v_);
 
-        std::vector<Eigen::Triplet<double>> T;
-        for (int vid = 0; vid < V.rows(); vid++)
-        {
-            const Eigen::Vector3d point = V.row(vid);
+    //     std::vector<Eigen::Triplet<double>> T;
+    //     for (int vid = 0; vid < V.rows(); vid++)
+    //     {
+    //         const Eigen::Vector3d point = V.row(vid);
 
-            if (bones(vid) < 0)
-                continue;
+    //         if (bones(vid) < 0)
+    //             continue;
 
-            const int bid = bones(vid);
-            const double param0 = relative_positions(vid);
+    //         const int bid = bones(vid);
+    //         const double param0 = relative_positions(vid);
 
-            const Eigen::Vector2d tmp = point_line_closest_distance(point, skeleton_v.row(skeleton_edges_(bid, 0)), skeleton_v.row(skeleton_edges_(bid, 1)));
+    //         const Eigen::Vector2d tmp = point_line_closest_distance(point, skeleton_v.row(skeleton_edges_(bid, 0)), skeleton_v.row(skeleton_edges_(bid, 1)));
 
-            Eigen::Vector4d g;
-            autogen::line_projection_uv_gradient(
-                t, point(0), point(1), point(2), g.data(), 
-                source_skeleton_v_(skeleton_edges_(bid, 0), 0), source_skeleton_v_(skeleton_edges_(bid, 0), 1), source_skeleton_v_(skeleton_edges_(bid, 0), 2),
-                target_skeleton_v_(skeleton_edges_(bid, 0), 0), target_skeleton_v_(skeleton_edges_(bid, 0), 1), target_skeleton_v_(skeleton_edges_(bid, 0), 2),
-                source_skeleton_v_(skeleton_edges_(bid, 1), 0), source_skeleton_v_(skeleton_edges_(bid, 1), 1), source_skeleton_v_(skeleton_edges_(bid, 1), 2),
-                target_skeleton_v_(skeleton_edges_(bid, 1), 0), target_skeleton_v_(skeleton_edges_(bid, 1), 1), target_skeleton_v_(skeleton_edges_(bid, 1), 2));
+    //         Eigen::Vector4d g;
+    //         autogen::line_projection_uv_gradient(
+    //             t, point(0), point(1), point(2), g.data(), 
+    //             source_skeleton_v_(skeleton_edges_(bid, 0), 0), source_skeleton_v_(skeleton_edges_(bid, 0), 1), source_skeleton_v_(skeleton_edges_(bid, 0), 2),
+    //             target_skeleton_v_(skeleton_edges_(bid, 0), 0), target_skeleton_v_(skeleton_edges_(bid, 0), 1), target_skeleton_v_(skeleton_edges_(bid, 0), 2),
+    //             source_skeleton_v_(skeleton_edges_(bid, 1), 0), source_skeleton_v_(skeleton_edges_(bid, 1), 1), source_skeleton_v_(skeleton_edges_(bid, 1), 2),
+    //             target_skeleton_v_(skeleton_edges_(bid, 1), 0), target_skeleton_v_(skeleton_edges_(bid, 1), 1), target_skeleton_v_(skeleton_edges_(bid, 1), 2));
             
-            Eigen::Matrix4d h;
-            autogen::line_projection_uv_hessian(
-                t, point(0), point(1), point(2), h.data(), 
-                source_skeleton_v_(skeleton_edges_(bid, 0), 0), source_skeleton_v_(skeleton_edges_(bid, 0), 1), source_skeleton_v_(skeleton_edges_(bid, 0), 2),
-                target_skeleton_v_(skeleton_edges_(bid, 0), 0), target_skeleton_v_(skeleton_edges_(bid, 0), 1), target_skeleton_v_(skeleton_edges_(bid, 0), 2),
-                source_skeleton_v_(skeleton_edges_(bid, 1), 0), source_skeleton_v_(skeleton_edges_(bid, 1), 1), source_skeleton_v_(skeleton_edges_(bid, 1), 2),
-                target_skeleton_v_(skeleton_edges_(bid, 1), 0), target_skeleton_v_(skeleton_edges_(bid, 1), 1), target_skeleton_v_(skeleton_edges_(bid, 1), 2));
+    //         Eigen::Matrix4d h;
+    //         autogen::line_projection_uv_hessian(
+    //             t, point(0), point(1), point(2), h.data(), 
+    //             source_skeleton_v_(skeleton_edges_(bid, 0), 0), source_skeleton_v_(skeleton_edges_(bid, 0), 1), source_skeleton_v_(skeleton_edges_(bid, 0), 2),
+    //             target_skeleton_v_(skeleton_edges_(bid, 0), 0), target_skeleton_v_(skeleton_edges_(bid, 0), 1), target_skeleton_v_(skeleton_edges_(bid, 0), 2),
+    //             source_skeleton_v_(skeleton_edges_(bid, 1), 0), source_skeleton_v_(skeleton_edges_(bid, 1), 1), source_skeleton_v_(skeleton_edges_(bid, 1), 2),
+    //             target_skeleton_v_(skeleton_edges_(bid, 1), 0), target_skeleton_v_(skeleton_edges_(bid, 1), 1), target_skeleton_v_(skeleton_edges_(bid, 1), 2));
 
-            h = h.eval() * (tmp(1) - param0) + g * g.transpose();
+    //         h = h.eval() * (tmp(1) - param0) + g * g.transpose();
 
-            if (is_project_to_psd())
-                h = ipc::project_to_psd(h);
+    //         if (is_project_to_psd())
+    //             h = ipc::project_to_psd(h);
 
-            std::array<int, 4> index_map{0, 1 + vid * 3, 2 + vid * 3, 3 + vid * 3};
-            for (int d0 = 0; d0 < 4; d0++)
-                for (int d1 = 0; d1 < 4; d1++)
-                    T.emplace_back(index_map[d0], index_map[d1], h(d0, d1));
-        }
+    //         std::array<int, 4> index_map{0, 1 + vid * 3, 2 + vid * 3, 3 + vid * 3};
+    //         for (int d0 = 0; d0 < 4; d0++)
+    //             for (int d1 = 0; d1 < 4; d1++)
+    //                 T.emplace_back(index_map[d0], index_map[d1], h(d0, d1));
+    //     }
 
-        hessian.setFromTriplets(T.begin(), T.end());
-    }
+    //     hessian.setFromTriplets(T.begin(), T.end());
+    // }
 }

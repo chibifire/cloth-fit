@@ -132,15 +132,15 @@ TEST_CASE("Garment full forms derivatives", "[form][form_derivatives][garment]")
 	forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
 	forms.push_back(std::make_unique<CurveCenterProjectedTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
 
-	{
-		Eigen::MatrixXd skin_weights;
-        io::read_matrix(POLYFEM_DATA_DIR + std::string("/../tests/skin.txt"), skin_weights);
-        assert(skin_weights.rows() == source_skeleton_v.rows());
-        assert(V.rows() == skin_weights.cols());
-        assert(skin_weights.minCoeff() >= 0. && skin_weights.maxCoeff() <= 1.);
+	// {
+	// 	Eigen::MatrixXd skin_weights;
+    //     io::read_matrix(POLYFEM_DATA_DIR + std::string("/../tests/skin.txt"), skin_weights);
+    //     assert(skin_weights.rows() == source_skeleton_v.rows());
+    //     assert(V.rows() == skin_weights.cols());
+    //     assert(skin_weights.minCoeff() >= 0. && skin_weights.maxCoeff() <= 1.);
 
-		forms.push_back(std::make_unique<GlobalPositionalForm>(V, F, source_skeleton_v, target_skeleton_v, skeleton_edges, skin_weights));
-	}
+	// 	forms.push_back(std::make_unique<GlobalPositionalForm>(V, F, source_skeleton_v, target_skeleton_v, skeleton_edges, skin_weights));
+	// }
 
 	for (auto &form : forms)
 	{

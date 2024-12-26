@@ -216,7 +216,14 @@ namespace polyfem {
 
         read_edge_mesh(source_skeleton_path, skeleton_v, skeleton_b);
         read_edge_mesh(target_skeleton_path, target_skeleton_v, target_skeleton_b);
-        assert((skeleton_b - target_skeleton_b).squaredNorm() < 1);
+        // assert((skeleton_b - target_skeleton_b).squaredNorm() < 1);
+        for (int i = 0; i < skeleton_b.rows(); i++)
+        {
+            if ((std::min(skeleton_b(i, 0), skeleton_b(i, 1)) != std::min(target_skeleton_b(i, 0), target_skeleton_b(i, 1)))
+            || (std::max(skeleton_b(i, 0), skeleton_b(i, 1)) != std::max(target_skeleton_b(i, 0), target_skeleton_b(i, 1))))
+                log_and_throw_error("Inconsistent skeletons!");
+        }
+        target_skeleton_b = skeleton_b;
 
         io::read_matrix(target_avatar_skinning_weights_path, target_avatar_skinning_weights);
         assert(target_avatar_skinning_weights.rows() == skeleton_v.rows());
@@ -279,7 +286,7 @@ namespace polyfem {
             {
                 Eigen::Index maxRow, maxCol;
                 const double max_skin_weight = new_skinning_weights.col(i).maxCoeff(&maxRow, &maxCol);
-                
+
                 assert(maxCol == 0);
                 for (int e = 0; e < target_skeleton_b.rows(); e++)
                 {
@@ -294,7 +301,8 @@ namespace polyfem {
                         }
                     }
                 }
-                assert(eid(i) >= 0);
+                if (eid(i) < 0)
+                    log_and_throw_error("Failed to project vertex to the bone!");
             }
 
             skinny_avatar_v.setZero(avatar_v.rows(), avatar_v.cols());
@@ -303,6 +311,7 @@ namespace polyfem {
             skinny_avatar_f = avatar_f;
         }
 
+        // igl::write_triangle_mesh(out_folder + "/avatar_old.obj", avatar_v, avatar_f);
         igl::write_triangle_mesh(out_folder + "/projected_avatar_old.obj", skinny_avatar_v, avatar_f);
 
         // iteratively reduce distance

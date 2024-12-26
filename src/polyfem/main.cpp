@@ -147,8 +147,8 @@ int main(int argc, char **argv)
 	if (!std::filesystem::exists(avatar_skin_weights_path))
 		log_and_throw_error("Invalid skin weights path: {}", avatar_skin_weights_path);
 
-	if (!std::filesystem::exists(garment_skin_weights_path))
-		log_and_throw_error("Invalid skin weights path: {}", garment_skin_weights_path);
+	// if (!std::filesystem::exists(garment_skin_weights_path))
+	// 	log_and_throw_error("Invalid skin weights path: {}", garment_skin_weights_path);
 
 	gstate.out_folder = out_folder;
 
@@ -346,6 +346,8 @@ int main(int argc, char **argv)
 
 		cur_garment_v = initial_garment_v + utils::unflatten(sol.bottomRows(cur_garment_v.size()), 3);
 	}
+
+	logger().info("Garment retargeting succeeded!");
 
 	return EXIT_SUCCESS;
 }
