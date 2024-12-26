@@ -813,11 +813,11 @@ namespace polyfem::solver {
     //         if (is_project_to_psd())
     //             h = ipc::project_to_psd(h);
 
-    //         std::array<int, 4> index_map{0, 1 + vid * 3, 2 + vid * 3, 3 + vid * 3};
-    //         for (int d0 = 0; d0 < 4; d0++)
-    //             for (int d1 = 0; d1 < 4; d1++)
-    //                 T.emplace_back(index_map[d0], index_map[d1], h(d0, d1));
-    //     }
+        //     std::array<int, 4> index_map{{0, 1 + vid * 3, 2 + vid * 3, 3 + vid * 3}};
+        //     for (int d0 = 0; d0 < 4; d0++)
+        //         for (int d1 = 0; d1 < 4; d1++)
+        //             T.emplace_back(index_map[d0], index_map[d1], h(d0, d1));
+        // }
 
     //     hessian.setFromTriplets(T.begin(), T.end());
     // }

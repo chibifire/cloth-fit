@@ -377,7 +377,7 @@ namespace polyfem {
                     {
                         if (cur < 0 || source < 0 || source >= parent.rows() || cur >= parent.cols() || parent(source, cur) < 0)
                             std::cout << std::endl;
-                        std::array<int, 2> tmp{shared_vtx(cur, parent(source, cur)), cur};
+                        std::array<int, 2> tmp{{shared_vtx(cur, parent(source, cur)), cur}};
                         inserted_tmp.push_back(tmp);
                         cur = parent(source, cur);
                     }
