@@ -163,54 +163,29 @@ namespace autogen {
         double dA[81]);
 
 
-    void curve_cross_product_norm_gradient(
-        double t0_x,
-        double t0_y,
-        double t0_z,
-        double t1_x,
-        double t1_y,
-        double t1_z,
-        double t2_x,
-        double t2_y,
-        double t2_z,
-        double dA[9]);
-    // dA is (81×1) flattened in column-major order
-    void curve_cross_product_norm_hessian(
-        double t0_x,
-        double t0_y,
-        double t0_z,
-        double t1_x,
-        double t1_y,
-        double t1_z,
-        double t2_x,
-        double t2_y,
-        double t2_z,
-        double dA[81]);
-
-
     void curve_dot_product_norm_gradient(
-        double t0_x,
-        double t0_y,
-        double t0_z,
-        double t1_x,
-        double t1_y,
-        double t1_z,
-        double t2_x,
-        double t2_y,
-        double t2_z,
-        double dA[9]);
-    // dA is (81×1) flattened in column-major order
+        double p1x,
+        double p1y,
+        double p1z,
+        double p2x,
+        double p2y,
+        double p2z,
+        double p3x,
+        double p3y,
+        double p3z,
+        double grad[9]);
+    // hess is (81×1) flattened in column-major order
     void curve_dot_product_norm_hessian(
-        double t0_x,
-        double t0_y,
-        double t0_z,
-        double t1_x,
-        double t1_y,
-        double t1_z,
-        double t2_x,
-        double t2_y,
-        double t2_z,
-        double dA[81]);
+        double p1x,
+        double p1y,
+        double p1z,
+        double p2x,
+        double p2y,
+        double p2z,
+        double p3x,
+        double p3y,
+        double p3z,
+        double hess[81]);
 
     void curve_twist_gradient(double t0_x, double t0_y, double t0_z, double t1_x, double t1_y, double t1_z, double t2_x, double t2_y, double t2_z, double t3_x, double t3_y, double t3_z, double dA[12]);
     // dA is (144×1) flattened in column-major order

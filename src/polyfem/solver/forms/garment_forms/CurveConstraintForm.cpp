@@ -143,7 +143,7 @@ namespace polyfem::solver
         std::vector<Eigen::MatrixXd> out;
         for (const auto &curve : curves_)
         {
-            Eigen::MatrixXd result(curve.size() - 2, 2);
+            Eigen::MatrixXd result(curve.size() - 2, 1);
             for (int i = 0; i < curve.size() - 2; i++)
             {
                 const Eigen::Ref<const Eigen::Vector3d> a = V.row(curve(i));
@@ -151,10 +151,8 @@ namespace polyfem::solver
                 const Eigen::Ref<const Eigen::Vector3d> c = V.row(curve(i+2));
                 const Eigen::Vector3d v1 = c - b;
                 const Eigen::Vector3d v2 = a - b;
-                const double len = v1.squaredNorm() * v2.squaredNorm();
 
-                result(i, 0) = pow(v1.dot(v2), 2) / len;
-                result(i, 1) = v1.cross(v2).squaredNorm() / len;
+                result(i, 0) = v1.dot(v2) / (v1.norm() * v2.norm());
             }
             out.push_back(std::move(result));
         }
@@ -189,9 +187,8 @@ namespace polyfem::solver
                 const Eigen::Ref<const Eigen::Vector3d> p3 = V.row(curve(i+2));
                 const Eigen::Vector3d v1 = p3 - p2;
                 const Eigen::Vector3d v2 = p1 - p2;
-                const double len = v1.squaredNorm() * v2.squaredNorm();
-                const double errA = pow(v1.dot(v2), 2) / len - orig_angles[c](i, 0);
-                const double errB = v1.cross(v2).squaredNorm() / len - orig_angles[c](i, 1);
+                const double len = v1.norm() * v2.norm();
+                const double errA = v1.dot(v2) / len - orig_angles[c](i, 0);
 
                 Eigen::Vector<double, 9> g;
                 curve_dot_product_norm_gradient(
@@ -201,14 +198,6 @@ namespace polyfem::solver
                 
                 for (int k = 0; k < 3; k++)
                     gradv.segment(curve(i + k) * 3, 3) += g.segment<3>(k * 3) * errA;
-
-                curve_cross_product_norm_gradient(
-                    p1(0), p1(1), p1(2),
-                    p2(0), p2(1), p2(2),
-                    p3(0), p3(1), p3(2), g.data());
-
-                for (int k = 0; k < 3; k++)
-                    gradv.segment(curve(i + k) * 3, 3) += g.segment<3>(k * 3) * errB;
             }
         }
     }
@@ -228,9 +217,8 @@ namespace polyfem::solver
                 const Eigen::Ref<const Eigen::Vector3d> p3 = V.row(curve(i+2));
                 const Eigen::Vector3d v1 = p3 - p2;
                 const Eigen::Vector3d v2 = p1 - p2;
-                const double len = v1.squaredNorm() * v2.squaredNorm();
-                const double errA = pow(v1.dot(v2), 2) / len - orig_angles[c](i, 0);
-                const double errB = v1.cross(v2).squaredNorm() / len - orig_angles[c](i, 1);
+                const double len = v1.norm() * v2.norm();
+                const double errA = v1.dot(v2) / len - orig_angles[c](i, 0);
 
                 Eigen::Vector<double, 9> g;
                 Eigen::Matrix<double, 9, 9> h, local_hess;
@@ -246,18 +234,6 @@ namespace polyfem::solver
                     p3(0), p3(1), p3(2), h.data());
                 
                 local_hess = h * errA + g * g.transpose();
-
-                curve_cross_product_norm_gradient(
-                    p1(0), p1(1), p1(2),
-                    p2(0), p2(1), p2(2),
-                    p3(0), p3(1), p3(2), g.data());
-
-                curve_cross_product_norm_hessian(
-                    p1(0), p1(1), p1(2),
-                    p2(0), p2(1), p2(2),
-                    p3(0), p3(1), p3(2), h.data());
-                
-                local_hess += h * errB + g * g.transpose();
 
                 if (is_project_to_psd())
                     local_hess = ipc::project_to_psd(local_hess);
