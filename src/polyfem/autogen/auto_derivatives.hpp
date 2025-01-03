@@ -228,5 +228,66 @@ namespace autogen {
         double a1x, double a1y, double a1z,
         double b0x, double b0y, double b0z,
         double b1x, double b1y, double b1z);
+
+
+    void curve_torsion_sin_gradient(
+        double p0x,
+        double p0y,
+        double p0z,
+        double p1x,
+        double p1y,
+        double p1z,
+        double p2x,
+        double p2y,
+        double p2z,
+        double p3x,
+        double p3y,
+        double p3z,
+        double grad[12]);
+    // hess is (144×1) flattened in column-major order
+    void curve_torsion_sin_hessian(
+        double p0x,
+        double p0y,
+        double p0z,
+        double p1x,
+        double p1y,
+        double p1z,
+        double p2x,
+        double p2y,
+        double p2z,
+        double p3x,
+        double p3y,
+        double p3z,
+        double hess[144]);
+
+    void curve_torsion_cos_gradient(
+        double p0x,
+        double p0y,
+        double p0z,
+        double p1x,
+        double p1y,
+        double p1z,
+        double p2x,
+        double p2y,
+        double p2z,
+        double p3x,
+        double p3y,
+        double p3z,
+        double grad[12]);
+    // hess is (144×1) flattened in column-major order
+    void curve_torsion_cos_hessian(
+        double p0x,
+        double p0y,
+        double p0z,
+        double p1x,
+        double p1y,
+        double p1z,
+        double p2x,
+        double p2y,
+        double p2z,
+        double p3x,
+        double p3y,
+        double p3z,
+        double hess[144]);
 }
 }

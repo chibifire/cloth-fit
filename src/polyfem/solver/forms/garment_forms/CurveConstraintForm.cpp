@@ -476,6 +476,201 @@ namespace polyfem::solver
         hessian.setFromTriplets(triplets.begin(), triplets.end());
     }
 
+    CurveTorsionForm::CurveTorsionForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves) : V_(V)
+    {
+        for (const auto &c : curves)
+        {
+            const int N = c.size() - 1;
+            assert(c(0) == c(N));
+
+            Eigen::VectorXi c_(N + 3);
+            c_.head(N + 1) = c;
+            c_(N + 1) = c(1);
+            c_(N + 2) = c(2);
+
+            assert(c_(0) == c_(c_.size() - 3));
+            assert(c_(1) == c_(c_.size() - 2));
+            assert(c_(2) == c_(c_.size() - 1));
+
+            curves_.push_back(c_);
+        }
+        orig_angles = compute_angles(V);
+    }
+
+    CurveTorsionForm::CurveTorsionForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : CurveTorsionForm(V, boundary_curves(F))
+    {
+    }
+
+    std::vector<Eigen::MatrixXd> CurveTorsionForm::compute_angles(const Eigen::MatrixXd &V) const
+    {
+        std::vector<Eigen::MatrixXd> out;
+        for (const auto &curve : curves_)
+        {
+            Eigen::MatrixXd result(curve.size() - 3, 2);
+            for (int i = 0; i < curve.size() - 3; i++)
+            {
+                const Eigen::Ref<const Eigen::Vector3d> a = V.row(curve(i));
+                const Eigen::Ref<const Eigen::Vector3d> b = V.row(curve(i+1));
+                const Eigen::Ref<const Eigen::Vector3d> c = V.row(curve(i+2));
+                const Eigen::Ref<const Eigen::Vector3d> d = V.row(curve(i+3));
+                const Eigen::Vector3d mid = (c - b).normalized();
+                const Eigen::Vector3d v1 = b - a;
+                const Eigen::Vector3d v2 = d - c;
+
+                const Eigen::Vector3d w1 = (v1 - v1.dot(mid) * mid).normalized();
+                const Eigen::Vector3d w2 = (v2 - v2.dot(mid) * mid).normalized();
+
+                result(i, 0) = w1.dot(w2);
+                result(i, 1) = mid.dot(w1.cross(w2));
+            }
+            out.push_back(std::move(result));
+        }
+
+        return out;
+    }
+
+    double CurveTorsionForm::value_unweighted(const Eigen::VectorXd &x) const
+    {
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+        auto angles = compute_angles(V);
+
+        double val = 0;
+        for (int i = 0; i < angles.size(); i++)
+            val += (angles[i] - orig_angles[i]).squaredNorm() / 2.;
+        
+        return val;
+    }
+
+    void CurveTorsionForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
+    {
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+
+        gradv.setZero(x.size());
+        for (int c = 0; c < curves_.size(); c++)
+        {
+            const auto &curve = curves_[c];
+            for (int i = 0; i < curve.size() - 3; i++)
+            {
+                const Eigen::Ref<const Eigen::Vector3d> p0 = V.row(curve(i));
+                const Eigen::Ref<const Eigen::Vector3d> p1 = V.row(curve(i+1));
+                const Eigen::Ref<const Eigen::Vector3d> p2 = V.row(curve(i+2));
+                const Eigen::Ref<const Eigen::Vector3d> p3 = V.row(curve(i+3));
+                const Eigen::Vector3d mid = (p2 - p1).normalized();
+                const Eigen::Vector3d v1 = p1 - p0;
+                const Eigen::Vector3d v2 = p3 - p2;
+                const Eigen::Vector3d w1 = (v1 - v1.dot(mid) * mid).normalized();
+                const Eigen::Vector3d w2 = (v2 - v2.dot(mid) * mid).normalized();
+
+                double err = w1.dot(w2) - orig_angles[c](i, 0);
+
+                Eigen::Vector<double, 12> g;
+                curve_torsion_cos_gradient(
+                    p0(0), p0(1), p0(2),
+                    p1(0), p1(1), p1(2),
+                    p2(0), p2(1), p2(2), 
+                    p3(0), p3(1), p3(2), g.data());
+                
+                if (!std::isfinite(g.squaredNorm()))
+                    log_and_throw_error("NAN curve twist");
+
+                for (int k = 0; k < 4; k++)
+                    gradv.segment(curve(i + k) * 3, 3) += g.segment<3>(k * 3) * err;
+
+                err = mid.dot(w1.cross(w2)) - orig_angles[c](i, 1);
+
+                g.setZero();
+                curve_torsion_sin_gradient(
+                    p0(0), p0(1), p0(2),
+                    p1(0), p1(1), p1(2),
+                    p2(0), p2(1), p2(2), 
+                    p3(0), p3(1), p3(2), g.data());
+                
+                if (!std::isfinite(g.squaredNorm()))
+                    log_and_throw_error("NAN curve twist");
+
+                for (int k = 0; k < 4; k++)
+                    gradv.segment(curve(i + k) * 3, 3) += g.segment<3>(k * 3) * err;
+            }
+        }
+    }
+
+    void CurveTorsionForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
+    {
+        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
+
+        std::vector<Eigen::Triplet<double>> triplets;
+        for (int c = 0; c < curves_.size(); c++)
+        {
+            const auto &curve = curves_[c];
+            for (int i = 0; i < curve.size() - 3; i++)
+            {
+                const Eigen::Ref<const Eigen::Vector3d> p0 = V.row(curve(i));
+                const Eigen::Ref<const Eigen::Vector3d> p1 = V.row(curve(i+1));
+                const Eigen::Ref<const Eigen::Vector3d> p2 = V.row(curve(i+2));
+                const Eigen::Ref<const Eigen::Vector3d> p3 = V.row(curve(i+3));
+                const Eigen::Vector3d mid = (p2 - p1).normalized();
+                const Eigen::Vector3d v1 = p1 - p0;
+                const Eigen::Vector3d v2 = p3 - p2;
+                const Eigen::Vector3d w1 = (v1 - v1.dot(mid) * mid).normalized();
+                const Eigen::Vector3d w2 = (v2 - v2.dot(mid) * mid).normalized();
+
+                double err = w1.dot(w2) - orig_angles[c](i, 0);
+
+                Eigen::Vector<double, 12> g;
+                Eigen::Matrix<double, 12, 12> h;
+
+                curve_torsion_cos_gradient(
+                    p0(0), p0(1), p0(2),
+                    p1(0), p1(1), p1(2),
+                    p2(0), p2(1), p2(2), 
+                    p3(0), p3(1), p3(2), g.data());
+
+                curve_torsion_cos_hessian(
+                    p0(0), p0(1), p0(2),
+                    p1(0), p1(1), p1(2),
+                    p2(0), p2(1), p2(2), 
+                    p3(0), p3(1), p3(2), h.data());
+                
+                h = (h * err + g * g.transpose()).eval();
+
+                for (int lj = 0; lj < 4; lj++)
+                    for (int dj = 0; dj < 3; dj++)
+                        for (int li = 0; li < 4; li++)
+                            for (int di = 0; di < 3; di++)
+                                triplets.emplace_back(curve(i + li) * 3 + di, curve(i + lj) * 3 + dj, h(li * 3 + di, lj * 3 + dj));
+
+
+                err = mid.dot(w1.cross(w2)) - orig_angles[c](i, 1);
+
+                g.setZero();
+                curve_torsion_sin_gradient(
+                    p0(0), p0(1), p0(2),
+                    p1(0), p1(1), p1(2),
+                    p2(0), p2(1), p2(2), 
+                    p3(0), p3(1), p3(2), g.data());
+
+                h.setZero();
+                curve_torsion_sin_hessian(
+                    p0(0), p0(1), p0(2),
+                    p1(0), p1(1), p1(2),
+                    p2(0), p2(1), p2(2), 
+                    p3(0), p3(1), p3(2), h.data());
+                
+                h = (h * err + g * g.transpose()).eval();
+
+                for (int lj = 0; lj < 4; lj++)
+                    for (int dj = 0; dj < 3; dj++)
+                        for (int li = 0; li < 4; li++)
+                            for (int di = 0; di < 3; di++)
+                                triplets.emplace_back(curve(i + li) * 3 + di, curve(i + lj) * 3 + dj, h(li * 3 + di, lj * 3 + dj));
+            }
+        }
+    
+        hessian.setZero();
+        hessian.resize(x.size(), x.size());
+        hessian.setFromTriplets(triplets.begin(), triplets.end());
+    }
+
     SymmetryForm::SymmetryForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves): V_(V)
     {
         hessian_cached.resize(0, 0);

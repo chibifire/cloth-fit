@@ -23,7 +23,9 @@ set(AUTOGEN
 	auto_eigs.hpp
 	auto_mooney_rivlin_gradient_hessian.cpp
 	auto_mooney_rivlin_gradient_hessian.hpp
-	auto_derivatives.cpp
+	auto_derivatives1.cpp
+	auto_derivatives2.cpp
+	auto_derivatives3.cpp
 	auto_derivatives.hpp
 )
 
