@@ -4,6 +4,7 @@
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/autogen/auto_derivatives.hpp>
 #include <polyfem/utils/AutodiffTypes.hpp>
+#include <polyfem/utils/Timer.hpp>
 
 #include <polyfem/mesh/MeshUtils.hpp>
 #include <igl/write_triangle_mesh.h>
@@ -547,6 +548,7 @@ namespace polyfem::solver
 
     void CurveTargetForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
     {
+        POLYFEM_SCOPED_TIMER("curve target hessian");
         hessian.resize(x.size(), x.size());
         hessian.setZero();
 

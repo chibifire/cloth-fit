@@ -839,14 +839,14 @@ namespace polyfem::solver
 		std::vector<Eigen::Triplet<double>> triplets;
 		for (int i = 0, k = 0; i < TT.rows(); i++)
 		{
+			Eigen::Matrix<double, 1, 18> tmp;
+			Eigen::Matrix<double, 12, 12> h;
 			for (int j = 0; j < TT.cols(); j++, k++)
 			{
 				if (TT(i, j) < 0)
 					continue;
 
-				Eigen::Matrix<double, 1, 18> tmp;
 				tmp << V.row(F_(i, le(j, 0))), V.row(F_(i, le(j, 1))), V.row(F_(i, lv(j))), V.row(F_(TT(i, j), lv(TTi(i, j)))), orig_coeffs.row(k);
-                Eigen::Matrix<double, 12, 12> h;
 				similarity_hessian(tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5), tmp(6), tmp(7), tmp(8), tmp(9), tmp(10), tmp(11), tmp(12), tmp(13), tmp(14), tmp(15), tmp(16), tmp(17), h.data());
 
                 h *= 0.5 * (orig_areas(i) + orig_areas(TT(i, j)));

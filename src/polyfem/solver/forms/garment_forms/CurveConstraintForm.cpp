@@ -3,6 +3,7 @@
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/autogen/auto_derivatives.hpp>
 #include <polyfem/utils/AutodiffTypes.hpp>
+#include <polyfem/utils/Timer.hpp>
 
 #include <igl/boundary_facets.h>
 #include <igl/adjacency_matrix.h>
@@ -454,6 +455,7 @@ namespace polyfem::solver
 
 	void CurveTwistForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
 	{
+		POLYFEM_SCOPED_TIMER("curve twist hessian");
 		const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
 		std::vector<Eigen::Triplet<double>> triplets;
@@ -598,6 +600,7 @@ namespace polyfem::solver
 
 	void CurveTorsionForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
 	{
+		POLYFEM_SCOPED_TIMER("curve torsion hessian");
 		const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
         typedef DScalar2<double, Eigen::Matrix<double, 12, 1>, Eigen::Matrix<double, 12, 12>> ADHess;
@@ -771,6 +774,7 @@ namespace polyfem::solver
 
 	void SymmetryForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
 	{
+		POLYFEM_SCOPED_TIMER("symmetry hessian");
 		const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
 		if (hessian_cached.rows() == V.size())

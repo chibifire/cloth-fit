@@ -218,13 +218,13 @@ int main(int argc, char **argv)
 	std::shared_ptr<CurveSizeForm> curve_size_form;
 	std::shared_ptr<ContactForm> contact_form;
 	{
-		auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
-		angle_form->set_weight(state.args["angle_penalty_weight"]);
-		persistent_forms.push_back(angle_form);
+		// auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
+		// angle_form->set_weight(state.args["angle_penalty_weight"]);
+		// persistent_forms.push_back(angle_form);
 
-		auto def_form = std::make_shared<DefGradForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
-		def_form->set_weight(state.args["deformation_penalty_weight"]);
-		persistent_forms.push_back(def_form);
+		// auto def_form = std::make_shared<DefGradForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
+		// def_form->set_weight(state.args["deformation_penalty_weight"]);
+		// persistent_forms.push_back(def_form);
 
 		auto similarity_form = std::make_shared<NewSimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
 		similarity_form->set_weight(state.args["similarity_penalty_weight"]);
@@ -298,9 +298,9 @@ int main(int argc, char **argv)
 			lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(next_avatar_v - gstate.skinny_avatar_v), indices);
 			forms.push_back(lagr_form);
 
-			auto center_target_form = std::make_shared<OldCurveCenterTargetForm>(collision_vertices, curves, next_curve_centers);
-			center_target_form->set_weight(state.args["curve_center_target_weight"]);
-			forms.push_back(center_target_form);
+			// auto center_target_form = std::make_shared<OldCurveCenterTargetForm>(collision_vertices, curves, next_curve_centers);
+			// center_target_form->set_weight(state.args["curve_center_target_weight"]);
+			// forms.push_back(center_target_form);
 
 			fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()), gstate.avatar_v, gstate.avatar_f, state.args["voxel_size"]);
 			fit_form->disable();
