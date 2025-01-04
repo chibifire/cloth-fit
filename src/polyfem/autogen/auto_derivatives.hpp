@@ -229,7 +229,17 @@ namespace autogen {
         double b0x, double b0y, double b0z,
         double b1x, double b1y, double b1z);
 
-
+    // p0 = np.array(symbols('p0x p0y p0z'))
+    // p1 = np.array(symbols('p1x p1y p1z'))
+    // p2 = np.array(symbols('p2x p2y p2z'))
+    // p3 = np.array(symbols('p3x p3y p3z'))
+    // x = np.array([p0.T, p1.T, p2.T, p3.T]).reshape(-1)
+    // mid = p2 - p1
+    // v1 = p1 - p0
+    // v2 = p3 - p2
+    // w1 = project(v1, mid)
+    // w2 = project(v2, mid)
+    // T = np.cross(w1, w2).dot(mid)  / (mynorm(w1) * mynorm(w2) * mynorm(mid))
     void curve_torsion_sin_gradient(
         double p0x,
         double p0y,
@@ -260,6 +270,17 @@ namespace autogen {
         double p3z,
         double hess[144]);
 
+    // p0 = np.array(symbols('p0x p0y p0z'))
+    // p1 = np.array(symbols('p1x p1y p1z'))
+    // p2 = np.array(symbols('p2x p2y p2z'))
+    // p3 = np.array(symbols('p3x p3y p3z'))
+    // x = np.array([p0.T, p1.T, p2.T, p3.T]).reshape(-1)
+    // mid = p2 - p1
+    // v1 = p1 - p0
+    // v2 = p3 - p2
+    // w1 = project(v1, mid)
+    // w2 = project(v2, mid)
+    // T = w1.dot(w2) / (mynorm(w1) * mynorm(w2))
     void curve_torsion_cos_gradient(
         double p0x,
         double p0y,
@@ -288,6 +309,61 @@ namespace autogen {
         double p3x,
         double p3y,
         double p3z,
+        double hess[144]);
+
+    // c0 = np.array(symbols('c0x c0y c0z'))
+    // c1 = np.array(symbols('c1x c1y c1z'))
+    // p0 = np.array(symbols('p0x p0y p0z'))
+    // p1 = np.array(symbols('p1x p1y p1z'))
+    // p2 = np.array(symbols('p2x p2y p2z'))
+    // p3 = np.array(symbols('p3x p3y p3z'))
+    // x = np.array([p0.T, p1.T, p2.T, p3.T]).reshape(-1)
+    // e = p1 - p0
+    // n0 = np.cross(e, p2 - p0)
+    // n1 = np.cross(p3 - p0, e)
+    // vec0 = c0[0] * e + c0[1] * (p2 - p0) + c0[2] * n0
+    // vec1 = c1[0] * (p3 - p0) + c1[1] * e + c1[2] * n1
+    // T = (vec0 - vec1).dot(vec0 - vec1)
+    void similarity_gradient(
+        double p0x,
+        double p0y,
+        double p0z,
+        double p1x,
+        double p1y,
+        double p1z,
+        double p2x,
+        double p2y,
+        double p2z,
+        double p3x,
+        double p3y,
+        double p3z,
+        double c0x,
+        double c0y,
+        double c0z,
+        double c1x,
+        double c1y,
+        double c1z,
+        double grad[12]);
+    // hess is (144×1) flattened in column-major order
+    void similarity_hessian(
+        double p0x,
+        double p0y,
+        double p0z,
+        double p1x,
+        double p1y,
+        double p1z,
+        double p2x,
+        double p2y,
+        double p2z,
+        double p3x,
+        double p3y,
+        double p3z,
+        double c0x,
+        double c0y,
+        double c0z,
+        double c1x,
+        double c1y,
+        double c1z,
         double hess[144]);
 }
 }

@@ -186,6 +186,23 @@ int main(int argc, char **argv)
 		gstate.check_intersections(collision_mesh, collision_vertices);
 	}
 
+	{
+		const double dhat = state.args["contact"]["dhat"];
+
+		Eigen::MatrixXi collision_edges_tmp;
+		igl::edges(gstate.garment.f, collision_edges_tmp);
+
+		ipc::CollisionMesh collision_mesh_tmp;
+		collision_mesh_tmp = ipc::CollisionMesh(
+			gstate.garment.v, collision_edges_tmp, gstate.garment.f);
+
+		ipc::Collisions collision_set;
+		Eigen::MatrixXd displaced_surface = collision_mesh_tmp.displace_vertices(Eigen::MatrixXd::Zero(collision_mesh_tmp.full_num_vertices(), 3));
+		collision_set.build(collision_mesh_tmp, displaced_surface, dhat, 0, state.args["solver"]["contact"]["CCD"]["broad_phase"]);
+		double dist = collision_set.compute_minimum_distance(collision_mesh_tmp, displaced_surface);
+		logger().info("Initial distance {}, dhat {}", sqrt(dist), dhat);
+	}
+
 	const auto curves = boundary_curves(collision_triangles.bottomRows(gstate.n_garment_faces()));
 	const Eigen::MatrixXd source_curve_centers = extract_curve_center_targets(collision_vertices, curves, gstate.skeleton_v, gstate.skeleton_b, gstate.skeleton_v);
 	const Eigen::MatrixXd target_curve_centers = extract_curve_center_targets(collision_vertices, curves, gstate.skeleton_v, gstate.skeleton_b, gstate.target_skeleton_v);
@@ -209,7 +226,7 @@ int main(int argc, char **argv)
 		def_form->set_weight(state.args["deformation_penalty_weight"]);
 		persistent_forms.push_back(def_form);
 
-		auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
+		auto similarity_form = std::make_shared<NewSimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
 		similarity_form->set_weight(state.args["similarity_penalty_weight"]);
 		persistent_forms.push_back(similarity_form);
 
@@ -231,12 +248,15 @@ int main(int argc, char **argv)
 		curve_size_form->set_weight(state.args["curve_size_weight"]);
 		persistent_forms.push_back(curve_size_form);
 
-		const double dhat = state.args["contact"]["dhat"];
-		contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
-		contact_form->set_weight(1);
-		contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
-		contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
-		persistent_forms.push_back(contact_form);
+		{
+			const double dhat = state.args["contact"]["dhat"];
+
+			contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
+			contact_form->set_weight(1);
+			contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
+			contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
+			persistent_forms.push_back(contact_form);
+		}
 
 		const auto tmp_curves = boundary_curves(gstate.garment.f);
 		auto center_target_form = std::make_shared<CurveTargetForm>(initial_garment_v, tmp_curves, gstate.skeleton_v, gstate.target_skeleton_v, gstate.skeleton_b);

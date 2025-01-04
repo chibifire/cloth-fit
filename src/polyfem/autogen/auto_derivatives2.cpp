@@ -3241,4 +3241,464 @@ namespace polyfem::autogen {
                + 2 * t594 * t602);
     }
 
+
+    void similarity_gradient(
+        double p0x,
+        double p0y,
+        double p0z,
+        double p1x,
+        double p1y,
+        double p1z,
+        double p2x,
+        double p2y,
+        double p2z,
+        double p3x,
+        double p3y,
+        double p3z,
+        double c0x,
+        double c0y,
+        double c0z,
+        double c1x,
+        double c1y,
+        double c1z,
+        double grad[12])
+    {
+        const auto t0 = c0x - c1y;
+        const auto t1 = c0y - c1x + t0;
+        const auto t2 = p0y - p1y;
+        const auto t3 = -p3z;
+        const auto t4 = p0z + t3;
+        const auto t5 = -p3y;
+        const auto t6 = p0y + t5;
+        const auto t7 = p0z - p1z;
+        const auto t8 = -p2z;
+        const auto t9 = p0z + t8;
+        const auto t10 = -p2y;
+        const auto t11 = p0y + t10;
+        const auto t12 = -p3x;
+        const auto t13 = p0x + t12;
+        const auto t14 = p0x - p1x;
+        const auto t15 = -p2x;
+        const auto t16 = p0x + t15;
+        const auto t17 = -c0x * t14 - c0y * t16 + c0z * (-t11 * t7 + t2 * t9)
+            + c1x * t13 + c1y * t14;
+        const auto t18 = c1z * (t2 * t4 - t6 * t7) + t17;
+        const auto t19 = c0z * (p1y + t10) + c1z * (p1y + t5);
+        const auto t20 = -c0x * t7 - c0y * t9 + c0z * (t11 * t14 - t16 * t2)
+            + c1x * t4 + c1y * t7;
+        const auto t21 = c1z * (-t13 * t2 + t14 * t6) + t20;
+        const auto t22 = c0z * (p1z + t8) + c1z * (p1z + t3);
+        const auto t23 = -t14;
+        const auto t24 = -t7;
+        const auto t25 = c0x * t2 + c0y * t11 + c0z * (t16 * t24 - t23 * t9)
+            - c1x * t6 - c1y * t2 + c1z * (-t13 * t7 + t14 * t4);
+        const auto t26 = c0z * (p1x + t15) + c1z * (p1x + t12);
+        const auto t27 = c0z * t11 + c1z * t6;
+        const auto t28 = c0z * t9 + c1z * t4;
+        const auto t29 = c0z * t16 + c1z * t13;
+        const auto t30 = c0z * t21;
+        const auto t31 = -t2;
+        const auto t32 = -t6;
+        const auto t33 = c1z * (-t24 * t32 - t31 * t4) + t17;
+        const auto t34 = c1z * (t13 * t31 + t23 * t32) + t20;
+        const auto t35 = -t25;
+        grad[0] = -2 * t1 * t18 + 2 * t19 * t21 + 2 * t22 * t25;
+        grad[1] = 2 * t1 * t25 + 2 * t18 * t22 - 2 * t21 * t26;
+        grad[2] = -2 * t1 * t21 - 2 * t18 * t19 - 2 * t25 * t26;
+        grad[3] = 2 * t0 * t18 - 2 * t21 * t27 - 2 * t25 * t28;
+        grad[4] = -2 * t0 * t25 - 2 * t18 * t28 + 2 * t21 * t29;
+        grad[5] = 2 * t0 * t21 + 2 * t18 * t27 + 2 * t25 * t29;
+        grad[6] = 2 * c0y * t18 + 2 * c0z * t25 * t7 + 2 * t2 * t30;
+        grad[7] = -2 * c0y * t25 + 2 * c0z * t18 * t7 - 2 * t14 * t30;
+        grad[8] = 2 * c0y * t21 - 2 * c0z * t14 * t25 - 2 * c0z * t18 * t2;
+        grad[9] = -2 * c1x * t33 + 2 * c1z * t2 * t34 - 2 * c1z * t35 * t7;
+        grad[10] = -2 * c1x * t35 - 2 * c1z * t14 * t34 + 2 * c1z * t33 * t7;
+        grad[11] = -2 * c1x * t34 + 2 * c1z * t14 * t35 - 2 * c1z * t2 * t33;
+    }
+
+    // hess is (144×1) flattened in column-major order
+    void similarity_hessian(
+        double p0x,
+        double p0y,
+        double p0z,
+        double p1x,
+        double p1y,
+        double p1z,
+        double p2x,
+        double p2y,
+        double p2z,
+        double p3x,
+        double p3y,
+        double p3z,
+        double c0x,
+        double c0y,
+        double c0z,
+        double c1x,
+        double c1y,
+        double c1z,
+        double hess[144])
+    {
+        const auto t0 = -p2y;
+        const auto t1 = -p3y;
+        const auto t2 = c0z * (p1y + t0) + c1z * (p1y + t1);
+        const auto t3 = std::pow(t2, 2);
+        const auto t4 = -p2z;
+        const auto t5 = -p3z;
+        const auto t6 = c0z * (p1z + t4) + c1z * (p1z + t5);
+        const auto t7 = c0x - c1y;
+        const auto t8 = c0y - c1x + t7;
+        const auto t9 = std::pow(t8, 2);
+        const auto t10 = std::pow(t6, 2) + t9;
+        const auto t11 = -p2x;
+        const auto t12 = -p3x;
+        const auto t13 = c0z * (p1x + t11) + c1z * (p1x + t12);
+        const auto t14 = 2 * t13;
+        const auto t15 = -t14 * t2;
+        const auto t16 = -t14 * t6;
+        const auto t17 = p0y + t0;
+        const auto t18 = p0y + t1;
+        const auto t19 = c0z * t17 + c1z * t18;
+        const auto t20 = t19 * t2;
+        const auto t21 = t7 * t8;
+        const auto t22 = p0z + t4;
+        const auto t23 = p0z + t5;
+        const auto t24 = c0z * t22 + c1z * t23;
+        const auto t25 = t21 + t24 * t6;
+        const auto t26 = -2 * t20 - 2 * t25;
+        const auto t27 = t6 * t7;
+        const auto t28 = t24 * t8;
+        const auto t29 = p0x + t11;
+        const auto t30 = p0x + t12;
+        const auto t31 = c0z * t29 + c1z * t30;
+        const auto t32 = c0z + c1z;
+        const auto t33 = p0x - p1x;
+        const auto t34 = p0y - p1y;
+        const auto t35 = p0z - p1z;
+        const auto t36 = -c0x * t35 - c0y * t22 + c0z * (t17 * t33 - t29 * t34)
+            + c1x * t23 + c1y * t35;
+        const auto t37 = c1z * (t18 * t33 - t30 * t34) + t36;
+        const auto t38 = t32 * t37;
+        const auto t39 = 2 * t2 * t31 - 2 * t27 + 2 * t28 + 2 * t38;
+        const auto t40 = -t33;
+        const auto t41 = -t35;
+        const auto t42 = c0x * t34 + c0y * t17 + c0z * (-t22 * t40 + t29 * t41)
+            - c1x * t18 - c1y * t34 + c1z * (t23 * t33 - t30 * t35);
+        const auto t43 = -t19 * t8 + t2 * t7 + t32 * t42;
+        const auto t44 = 2 * t31 * t6 + 2 * t43;
+        const auto t45 = c0z * t2;
+        const auto t46 = t34 * t45;
+        const auto t47 = -c0y * t8;
+        const auto t48 = c0z * t35;
+        const auto t49 = t47 + t48 * t6;
+        const auto t50 = 2 * t46 + 2 * t49;
+        const auto t51 = -t18;
+        const auto t52 = -t34;
+        const auto t53 = c1z * (t30 * t52 + t40 * t51) + t36;
+        const auto t54 = c0y * t6 + t48 * t8;
+        const auto t55 = -2 * c0z * t53 - 2 * t33 * t45 - 2 * t54;
+        const auto t56 = -c0z * t42;
+        const auto t57 = t33 * t6;
+        const auto t58 = t34 * t8;
+        const auto t59 = c0y * t2 + c0z * t58;
+        const auto t60 = -2 * c0z * t57 + 2 * t56 + 2 * t59;
+        const auto t61 = c1z * t2;
+        const auto t62 = t34 * t61;
+        const auto t63 = c1x * t8;
+        const auto t64 = c1z * t35;
+        const auto t65 = t6 * t64 + t63;
+        const auto t66 = 2 * t62 + 2 * t65;
+        const auto t67 = t64 * t8;
+        const auto t68 = c1x * t6;
+        const auto t69 = c1z * t53;
+        const auto t70 = -2 * t33 * t61 - 2 * t67 + 2 * t68 - 2 * t69;
+        const auto t71 = c1x * t2;
+        const auto t72 = c1z * t58;
+        const auto t73 = -t42;
+        const auto t74 = c1z * t73;
+        const auto t75 = -t74;
+        const auto t76 = -2 * c1z * t57 - 2 * t71 + 2 * t72 - 2 * t75;
+        const auto t77 = std::pow(t13, 2);
+        const auto t78 = -2 * t2 * t6;
+        const auto t79 = 2 * t13 * t19 + 2 * t27 - 2 * t28 - 2 * t38;
+        const auto t80 = t13 * t31;
+        const auto t81 = -2 * t25 - 2 * t80;
+        const auto t82 = t13 * t7;
+        const auto t83 = t31 * t8;
+        const auto t84 = -c0x * t33 - c0y * t29 + c0z * (-t17 * t35 + t22 * t34)
+            + c1x * t30 + c1y * t33;
+        const auto t85 = c1z * (-t18 * t35 + t23 * t34) + t84;
+        const auto t86 = t32 * t85;
+        const auto t87 = 2 * t19 * t6 - 2 * t82 + 2 * t83 + 2 * t86;
+        const auto t88 = c0z * t37;
+        const auto t89 = c0z * t13;
+        const auto t90 = -2 * t34 * t89 + 2 * t54 + 2 * t88;
+        const auto t91 = t33 * t89;
+        const auto t92 = 2 * t49 + 2 * t91;
+        const auto t93 = c1z * (-t23 * t52 - t41 * t51) + t84;
+        const auto t94 = t34 * t6;
+        const auto t95 = t33 * t8;
+        const auto t96 = c0y * t13 + c0z * t95;
+        const auto t97 = -2 * c0z * t93 - 2 * c0z * t94 - 2 * t96;
+        const auto t98 = c1z * t13;
+        const auto t99 = -t69;
+        const auto t100 = -2 * t34 * t98 + 2 * t67 - 2 * t68 - 2 * t99;
+        const auto t101 = t33 * t98;
+        const auto t102 = 2 * t101 + 2 * t65;
+        const auto t103 = c1z * t95;
+        const auto t104 = c1x * t13;
+        const auto t105 = c1z * t93;
+        const auto t106 = -2 * c1z * t94 - 2 * t103 + 2 * t104 - 2 * t105;
+        const auto t107 = 2 * t13 * t24 - 2 * t43;
+        const auto t108 = 2 * t2 * t24 + 2 * t82 - 2 * t83 - 2 * t86;
+        const auto t109 = -2 * t20 - 2 * t21 - 2 * t80;
+        const auto t110 = -2 * c0z * t73 - 2 * t13 * t48 - 2 * t59;
+        const auto t111 = c0z * t85;
+        const auto t112 = 2 * t111 - 2 * t35 * t45 + 2 * t96;
+        const auto t113 = 2 * t46 + 2 * t47 + 2 * t91;
+        const auto t114 = -2 * t13 * t64 + 2 * t71 - 2 * t72 - 2 * t74;
+        const auto t115 = -t105;
+        const auto t116 = 2 * t103 - 2 * t104 - 2 * t115 - 2 * t35 * t61;
+        const auto t117 = 2 * t101 + 2 * t62 + 2 * t63;
+        const auto t118 = std::pow(t19, 2);
+        const auto t119 = std::pow(t7, 2);
+        const auto t120 = t119 + std::pow(t24, 2);
+        const auto t121 = 2 * t31;
+        const auto t122 = -t121 * t19;
+        const auto t123 = -t121 * t24;
+        const auto t124 = c0z * t19;
+        const auto t125 = t124 * t34;
+        const auto t126 = -c0y * t7;
+        const auto t127 = t126 + t24 * t48;
+        const auto t128 = -2 * t125 - 2 * t127;
+        const auto t129 = c0y * t24 + t48 * t7 + t88;
+        const auto t130 = 2 * t124 * t33 + 2 * t129;
+        const auto t131 = t34 * t7;
+        const auto t132 = c0y * t19 + c0z * t131 + t56;
+        const auto t133 = 2 * c0z * t24 * t33 - 2 * t132;
+        const auto t134 = c1z * t19;
+        const auto t135 = t134 * t34;
+        const auto t136 = c1x * t7;
+        const auto t137 = t136 + t24 * t64;
+        const auto t138 = -2 * t135 - 2 * t137;
+        const auto t139 = t64 * t7;
+        const auto t140 = c1x * t24;
+        const auto t141 = 2 * t134 * t33 + 2 * t139 - 2 * t140 + 2 * t69;
+        const auto t142 = c1z * t131;
+        const auto t143 = c1x * t19;
+        const auto t144 = 2 * c1z * t24 * t33 - 2 * t142 + 2 * t143 + 2 * t75;
+        const auto t145 = std::pow(t31, 2);
+        const auto t146 = -2 * t19 * t24;
+        const auto t147 = 2 * c0z * t31 * t34 - 2 * t129;
+        const auto t148 = c0z * t31 * t33;
+        const auto t149 = -2 * t127 - 2 * t148;
+        const auto t150 = t24 * t34;
+        const auto t151 = t33 * t7;
+        const auto t152 = c0y * t31 + c0z * t151 + t111;
+        const auto t153 = 2 * c0z * t150 + 2 * t152;
+        const auto t154 = c1z * t31;
+        const auto t155 = -2 * t139 + 2 * t140 + 2 * t154 * t34 + 2 * t99;
+        const auto t156 = t154 * t33;
+        const auto t157 = -2 * t137 - 2 * t156;
+        const auto t158 = c1z * t151;
+        const auto t159 = c1x * t31;
+        const auto t160 = 2 * c1z * t150 + 2 * t105 + 2 * t158 - 2 * t159;
+        const auto t161 = 2 * t132 + 2 * t31 * t48;
+        const auto t162 = 2 * c0z * t19 * t35 - 2 * t152;
+        const auto t163 = -2 * t125 - 2 * t126 - 2 * t148;
+        const auto t164 = 2 * t142 - 2 * t143 + 2 * t31 * t64 + 2 * t74;
+        const auto t165 = 2 * t115 - 2 * t158 + 2 * t159 + 2 * t19 * t64;
+        const auto t166 = -2 * t135 - 2 * t136 - 2 * t156;
+        const auto t167 = std::pow(c0z, 2);
+        const auto t168 = std::pow(t34, 2);
+        const auto t169 = t167 * t168;
+        const auto t170 = std::pow(c0y, 2);
+        const auto t171 = std::pow(t35, 2);
+        const auto t172 = t167 * t171 + t170;
+        const auto t173 = t33 * t34;
+        const auto t174 = 2 * t167;
+        const auto t175 = -t173 * t174;
+        const auto t176 = t174 * t35;
+        const auto t177 = -t176 * t33;
+        const auto t178 = c0z * c1z;
+        const auto t179 = t168 * t178;
+        const auto t180 = -c0y * c1x;
+        const auto t181 = t171 * t178 + t180;
+        const auto t182 = 2 * t179 + 2 * t181;
+        const auto t183 = t173 * t178;
+        const auto t184 = c0y * t64 + c1x * t48;
+        const auto t185 = -2 * t183 + 2 * t184;
+        const auto t186 = c1z * t48;
+        const auto t187 = t186 * t33;
+        const auto t188 = c0y * c1z;
+        const auto t189 = c0z * c1x;
+        const auto t190 = t188 * t34 + t189 * t34;
+        const auto t191 = -2 * t187 - 2 * t190;
+        const auto t192 = std::pow(t33, 2);
+        const auto t193 = t167 * t192;
+        const auto t194 = -t176 * t34;
+        const auto t195 = -2 * t183 - 2 * t184;
+        const auto t196 = t178 * t192;
+        const auto t197 = 2 * t181 + 2 * t196;
+        const auto t198 = t186 * t34;
+        const auto t199 = t188 * t33 + t189 * t33;
+        const auto t200 = -2 * t198 + 2 * t199;
+        const auto t201 = -2 * t187 + 2 * t190;
+        const auto t202 = -2 * t198 - 2 * t199;
+        const auto t203 = 2 * t179 + 2 * t180 + 2 * t196;
+        const auto t204 = std::pow(c1z, 2);
+        const auto t205 = t168 * t204;
+        const auto t206 = std::pow(c1x, 2);
+        const auto t207 = t171 * t204 + t206;
+        const auto t208 = 2 * t204;
+        const auto t209 = -t173 * t208;
+        const auto t210 = t208 * t35;
+        const auto t211 = -t210 * t33;
+        const auto t212 = t192 * t204;
+        const auto t213 = -t210 * t34;
+        hess[0] = 2 * t10 + 2 * t3;
+        hess[1] = t15;
+        hess[2] = t16;
+        hess[3] = t26;
+        hess[4] = t39;
+        hess[5] = t44;
+        hess[6] = t50;
+        hess[7] = t55;
+        hess[8] = t60;
+        hess[9] = t66;
+        hess[10] = t70;
+        hess[11] = t76;
+        hess[12] = t15;
+        hess[13] = 2 * t10 + 2 * t77;
+        hess[14] = t78;
+        hess[15] = t79;
+        hess[16] = t81;
+        hess[17] = t87;
+        hess[18] = t90;
+        hess[19] = t92;
+        hess[20] = t97;
+        hess[21] = t100;
+        hess[22] = t102;
+        hess[23] = t106;
+        hess[24] = t16;
+        hess[25] = t78;
+        hess[26] = 2 * t3 + 2 * t77 + 2 * t9;
+        hess[27] = t107;
+        hess[28] = t108;
+        hess[29] = t109;
+        hess[30] = t110;
+        hess[31] = t112;
+        hess[32] = t113;
+        hess[33] = t114;
+        hess[34] = t116;
+        hess[35] = t117;
+        hess[36] = t26;
+        hess[37] = t79;
+        hess[38] = t107;
+        hess[39] = 2 * t118 + 2 * t120;
+        hess[40] = t122;
+        hess[41] = t123;
+        hess[42] = t128;
+        hess[43] = t130;
+        hess[44] = t133;
+        hess[45] = t138;
+        hess[46] = t141;
+        hess[47] = t144;
+        hess[48] = t39;
+        hess[49] = t81;
+        hess[50] = t108;
+        hess[51] = t122;
+        hess[52] = 2 * t120 + 2 * t145;
+        hess[53] = t146;
+        hess[54] = t147;
+        hess[55] = t149;
+        hess[56] = t153;
+        hess[57] = t155;
+        hess[58] = t157;
+        hess[59] = t160;
+        hess[60] = t44;
+        hess[61] = t87;
+        hess[62] = t109;
+        hess[63] = t123;
+        hess[64] = t146;
+        hess[65] = 2 * t118 + 2 * t119 + 2 * t145;
+        hess[66] = t161;
+        hess[67] = t162;
+        hess[68] = t163;
+        hess[69] = t164;
+        hess[70] = t165;
+        hess[71] = t166;
+        hess[72] = t50;
+        hess[73] = t90;
+        hess[74] = t110;
+        hess[75] = t128;
+        hess[76] = t147;
+        hess[77] = t161;
+        hess[78] = 2 * t169 + 2 * t172;
+        hess[79] = t175;
+        hess[80] = t177;
+        hess[81] = t182;
+        hess[82] = t185;
+        hess[83] = t191;
+        hess[84] = t55;
+        hess[85] = t92;
+        hess[86] = t112;
+        hess[87] = t130;
+        hess[88] = t149;
+        hess[89] = t162;
+        hess[90] = t175;
+        hess[91] = 2 * t172 + 2 * t193;
+        hess[92] = t194;
+        hess[93] = t195;
+        hess[94] = t197;
+        hess[95] = t200;
+        hess[96] = t60;
+        hess[97] = t97;
+        hess[98] = t113;
+        hess[99] = t133;
+        hess[100] = t153;
+        hess[101] = t163;
+        hess[102] = t177;
+        hess[103] = t194;
+        hess[104] = 2 * t169 + 2 * t170 + 2 * t193;
+        hess[105] = t201;
+        hess[106] = t202;
+        hess[107] = t203;
+        hess[108] = t66;
+        hess[109] = t100;
+        hess[110] = t114;
+        hess[111] = t138;
+        hess[112] = t155;
+        hess[113] = t164;
+        hess[114] = t182;
+        hess[115] = t195;
+        hess[116] = t201;
+        hess[117] = 2 * t205 + 2 * t207;
+        hess[118] = t209;
+        hess[119] = t211;
+        hess[120] = t70;
+        hess[121] = t102;
+        hess[122] = t116;
+        hess[123] = t141;
+        hess[124] = t157;
+        hess[125] = t165;
+        hess[126] = t185;
+        hess[127] = t197;
+        hess[128] = t202;
+        hess[129] = t209;
+        hess[130] = 2 * t207 + 2 * t212;
+        hess[131] = t213;
+        hess[132] = t76;
+        hess[133] = t106;
+        hess[134] = t117;
+        hess[135] = t144;
+        hess[136] = t160;
+        hess[137] = t166;
+        hess[138] = t191;
+        hess[139] = t200;
+        hess[140] = t203;
+        hess[141] = t211;
+        hess[142] = t213;
+        hess[143] = 2 * t205 + 2 * t206 + 2 * t212;
+    }
+
 }

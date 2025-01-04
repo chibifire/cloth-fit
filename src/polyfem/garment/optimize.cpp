@@ -459,11 +459,5 @@ namespace polyfem {
 
         trans.apply(avatar_v);
         trans.apply(target_skeleton_v);
-
-        Eigen::MatrixXi E;
-        igl::edges(garment.f, E);
-
-        Eigen::VectorXd len = (garment.v(E.col(0), Eigen::all) - garment.v(E.col(1), Eigen::all)).rowwise().norm();
-        logger().debug("Min edge length: {}", len.minCoeff());
     }
 }
