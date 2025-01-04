@@ -3,6 +3,8 @@
 #include <iostream>
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/autogen/auto_derivatives.hpp>
+#include <polyfem/utils/AutodiffTypes.hpp>
+
 #include <polyfem/mesh/MeshUtils.hpp>
 #include <igl/write_triangle_mesh.h>
 #include <finitediff.hpp>
@@ -22,16 +24,17 @@ namespace polyfem::solver
             const double dist = (d - t * e).squaredNorm();
             return Eigen::Vector2d(dist, t);
         }
-        Eigen::Vector2d point_line_closest_distance(
-            const Eigen::Vector3d &p,
-            const Eigen::Vector3d &a,
-            const Eigen::Vector3d &b)
+        template <class T>
+        Eigen::Vector<T, 2> point_line_closest_distance(
+            const Eigen::Vector<T, 3> &p,
+            const Eigen::Vector<T, 3> &a,
+            const Eigen::Vector<T, 3> &b)
         {
-            const Eigen::Vector3d e = b - a;
-            const Eigen::Vector3d d = p - a;
-            double t = e.dot(d) / e.squaredNorm();
-            const double dist = (d - t * e).squaredNorm();
-            return Eigen::Vector2d(dist, t);
+            const Eigen::Vector<T, 3> e = b - a;
+            const Eigen::Vector<T, 3> d = p - a;
+            T t = e.dot(d) / e.squaredNorm();
+            const T dist = (d - t * e).squaredNorm();
+            return Eigen::Vector<T, 2>(dist, t);
         }
     }
 
@@ -110,7 +113,7 @@ namespace polyfem::solver
             double closest_dist = std::numeric_limits<double>::max(), closest_uv = 0;
             for (int i = 0; i < skeleton_edges.rows(); i++)
             {
-                Eigen::Vector2d tmp = point_line_closest_distance(center, source_skeleton_v.row(skeleton_edges(i, 0)), source_skeleton_v.row(skeleton_edges(i, 1)));
+                Eigen::Vector2d tmp = point_line_closest_distance<double>(center, source_skeleton_v.row(skeleton_edges(i, 0)), source_skeleton_v.row(skeleton_edges(i, 1)));
                 if (tmp(0) < closest_dist)
                 {
                     closest_dist = tmp(0);
@@ -138,7 +141,7 @@ namespace polyfem::solver
             const int id = bones(j);
             const double param0 = relative_positions(j);
 
-            const Eigen::Vector2d tmp = point_line_closest_distance(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
+            const Eigen::Vector2d tmp = point_line_closest_distance<double>(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
 
             val += pow(param0 - tmp(1), 2);
         }
@@ -160,7 +163,7 @@ namespace polyfem::solver
             const int id = bones(j);
             const double param0 = relative_positions(j);
 
-            const Eigen::Vector2d tmp = point_line_closest_distance(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
+            const Eigen::Vector2d tmp = point_line_closest_distance<double>(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
 
             Eigen::Vector4d g;
             autogen::line_projection_uv_gradient(
@@ -200,7 +203,7 @@ namespace polyfem::solver
         //         const int id = bones(j);
         //         const double param0 = relative_positions(j);
 
-        //         const Eigen::Vector2d tmp = point_line_closest_distance(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
+        //         const Eigen::Vector2d tmp = point_line_closest_distance<double>(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
         //         V1.row(j) = tmp(1) * (skeleton_v.row(skeleton_edges_(id, 1)) - skeleton_v.row(skeleton_edges_(id, 0))) + skeleton_v.row(skeleton_edges_(id, 0));
         //         V2.row(j) = param0 * (skeleton_v.row(skeleton_edges_(id, 1)) - skeleton_v.row(skeleton_edges_(id, 0))) + skeleton_v.row(skeleton_edges_(id, 0));
         //     }
@@ -220,7 +223,7 @@ namespace polyfem::solver
             const int id = bones(j);
             const double param0 = relative_positions(j);
 
-            const Eigen::Vector2d tmp = point_line_closest_distance(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
+            const Eigen::Vector2d tmp = point_line_closest_distance<double>(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
 
             Eigen::Vector4d g;
             autogen::line_projection_uv_gradient(
@@ -355,7 +358,7 @@ namespace polyfem::solver
             
             const Eigen::Vector3d tmp = center - target;
             for (int i = 0; i < curve.size(); i++)
-                gradv.segment<3>(1 + curve(i) * 3, 3) += tmp / curve.size();
+                gradv.segment<3>(1 + curve(i) * 3) += tmp / curve.size();
             gradv(0) -= tmp.dot(targetT - targetS);
         }
     }
@@ -433,6 +436,156 @@ namespace polyfem::solver
                 {
                     T.emplace_back(1 + curve(i0) * 3 + d0, 1 + curve(i1) * 3 + d1, local_hess(i0 * 3 + d0 + 1, i1 * 3 + d1 + 1));
                 }
+            }
+        }
+
+        hessian.setFromTriplets(T.begin(), T.end());
+    }
+
+
+    CurveTargetForm::CurveTargetForm(
+        const Eigen::MatrixXd &V, 
+        const std::vector<Eigen::VectorXi> &curves,
+        const Eigen::MatrixXd &source_skeleton_v,
+        const Eigen::MatrixXd &target_skeleton_v,
+        const Eigen::MatrixXi &skeleton_edges): 
+        V_(V), source_skeleton_v_(source_skeleton_v),
+        target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges)
+    {
+        for (auto curve : curves)
+        {
+            curves_.push_back(curve.head(curve.size()-1));
+        }
+        bones.resize(curves_.size());
+        relative_positions.resize(curves_.size());
+        for (int j = 0; j < curves_.size(); j++)
+        {
+            const Eigen::Vector3d center = V(curves_[j], Eigen::all).colwise().sum() / curves_[j].size();
+
+            // Project centers to original skeleton bones
+            double closest_dist = std::numeric_limits<double>::max();
+            for (int i = 0; i < skeleton_edges.rows(); i++)
+            {
+                Eigen::Vector2d tmp = point_edge_closest_distance(center, source_skeleton_v.row(skeleton_edges(i, 0)), source_skeleton_v.row(skeleton_edges(i, 1)));
+                if (tmp(0) < closest_dist)
+                {
+                    closest_dist = tmp(0);
+                    bones(j) = i;
+                }
+            }
+            
+            relative_positions[j].resize(curves_[j].size());
+            for (int i = 0; i < curves_[j].size(); i++)
+            {
+                Eigen::Vector2d tmp = point_line_closest_distance<double>(V.row(curves_[j](i)), source_skeleton_v.row(skeleton_edges(bones(j), 0)), source_skeleton_v.row(skeleton_edges(bones(j), 1)));
+                relative_positions[j](i) = tmp(1);
+            }
+        }
+    }
+
+    double CurveTargetForm::value_unweighted(const Eigen::VectorXd &x) const
+    {
+        const double t = x(0);
+        const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
+
+        double val = 0.;
+        for (int j = 0; j < curves_.size(); j++)
+        {
+            const int id = bones(j);
+            for (int i = 0; i < curves_[j].size(); i++)
+            {
+                const Eigen::Vector3d bone0 = t * (target_skeleton_v_.row(skeleton_edges_(id, 0)) - source_skeleton_v_.row(skeleton_edges_(id, 0))) + source_skeleton_v_.row(skeleton_edges_(id, 0));
+                const Eigen::Vector3d bone1 = t * (target_skeleton_v_.row(skeleton_edges_(id, 1)) - source_skeleton_v_.row(skeleton_edges_(id, 1))) + source_skeleton_v_.row(skeleton_edges_(id, 1));
+                Eigen::Vector2d tmp = point_line_closest_distance<double>(V.row(curves_[j](i)), bone0, bone1);
+
+                val += pow(relative_positions[j](i) - tmp(1), 2);
+            }
+        }
+
+        return val / 2.;
+    }
+
+    void CurveTargetForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
+    {
+        const double t = x(0);
+        const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
+
+		typedef DScalar1<double, Eigen::Matrix<double, 4, 1>> ADGrad;
+        DiffScalarBase::setVariableCount(4);
+
+        gradv.setZero(x.size());
+        for (int j = 0; j < curves_.size(); j++)
+        {
+            const auto &curve = curves_[j];
+
+            const int id = bones(j);
+            for (int i = 0; i < curve.size(); i++)
+            {
+                Eigen::Vector<ADGrad, 4> diff_v;
+                for (int d = 0; d < 3; d++)
+                    diff_v(d) = ADGrad(d, V(curve(i), d));
+                diff_v(3) = ADGrad(3, t);
+
+                const Eigen::Vector3d a0 = source_skeleton_v_.row(skeleton_edges_(id, 0));
+                const Eigen::Vector3d b0 = target_skeleton_v_.row(skeleton_edges_(id, 0));
+                const Eigen::Vector3d a1 = source_skeleton_v_.row(skeleton_edges_(id, 1));
+                const Eigen::Vector3d b1 = target_skeleton_v_.row(skeleton_edges_(id, 1));
+
+                Eigen::Vector<ADGrad, 3> bone0;
+                bone0 << diff_v(3) * (b0(0) - a0(0)) + a0(0), diff_v(3) * (b0(1) - a0(1)) + a0(1), diff_v(3) * (b0(2) - a0(2)) + a0(2);
+                Eigen::Vector<ADGrad, 3> bone1;
+                bone1 << diff_v(3) * (b1(0) - a1(0)) + a1(0), diff_v(3) * (b1(1) - a1(1)) + a1(1), diff_v(3) * (b1(2) - a1(2)) + a1(2);
+                Eigen::Vector<ADGrad, 2> tmp = point_line_closest_distance<ADGrad>(diff_v.head<3>(), bone0, bone1);
+
+                ADGrad err = pow(relative_positions[j](i) - tmp(1), 2) / 2.;
+
+                gradv.segment<3>(1 + curve(i) * 3) += err.getGradient().head<3>().transpose();
+                gradv(0) += err.getGradient()(3);
+            }
+        }
+    }
+
+    void CurveTargetForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
+    {
+        hessian.resize(x.size(), x.size());
+        hessian.setZero();
+
+        typedef DScalar2<double, Eigen::Matrix<double, 4, 1>, Eigen::Matrix<double, 4, 4>> ADHess;
+        DiffScalarBase::setVariableCount(4);
+
+        const double t = x(0);
+        const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
+
+        std::vector<Eigen::Triplet<double>> T;
+        for (int j = 0; j < curves_.size(); j++)
+        {
+            const auto &curve = curves_[j];
+
+            const int id = bones(j);
+            for (int i = 0; i < curve.size(); i++)
+            {
+                Eigen::Vector<ADHess, 4> diff_v;
+                for (int d = 0; d < 3; d++)
+                    diff_v(d) = ADHess(d, V(curve(i), d));
+                diff_v(3) = ADHess(3, t);
+
+                const Eigen::Vector3d a0 = source_skeleton_v_.row(skeleton_edges_(id, 0));
+                const Eigen::Vector3d b0 = target_skeleton_v_.row(skeleton_edges_(id, 0));
+                const Eigen::Vector3d a1 = source_skeleton_v_.row(skeleton_edges_(id, 1));
+                const Eigen::Vector3d b1 = target_skeleton_v_.row(skeleton_edges_(id, 1));
+
+                Eigen::Vector<ADHess, 3> bone0;
+                bone0 << diff_v(3) * (b0(0) - a0(0)) + a0(0), diff_v(3) * (b0(1) - a0(1)) + a0(1), diff_v(3) * (b0(2) - a0(2)) + a0(2);
+                Eigen::Vector<ADHess, 3> bone1;
+                bone1 << diff_v(3) * (b1(0) - a1(0)) + a1(0), diff_v(3) * (b1(1) - a1(1)) + a1(1), diff_v(3) * (b1(2) - a1(2)) + a1(2);
+                Eigen::Vector<ADHess, 2> tmp = point_line_closest_distance<ADHess>(diff_v.head<3>(), bone0, bone1);
+
+                ADHess err = pow(relative_positions[j](i) - tmp(1), 2) / 2.;
+
+                std::array<int, 4> indices{{curve(i) * 3 + 1, curve(i) * 3 + 2, curve(i) * 3 + 3, 0}};
+                for (int k = 0; k < 4; k++)
+                    for (int l = 0; l < 4; l++)
+                        T.emplace_back(indices[k], indices[l], err.getHessian()(k, l));
             }
         }
 

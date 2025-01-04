@@ -239,7 +239,7 @@ int main(int argc, char **argv)
 		persistent_forms.push_back(contact_form);
 
 		const auto tmp_curves = boundary_curves(gstate.garment.f);
-		auto center_target_form = std::make_shared<CurveCenterTargetForm>(initial_garment_v, tmp_curves, gstate.skeleton_v, gstate.target_skeleton_v, gstate.skeleton_b);
+		auto center_target_form = std::make_shared<CurveTargetForm>(initial_garment_v, tmp_curves, gstate.skeleton_v, gstate.target_skeleton_v, gstate.skeleton_b);
 		center_target_form->set_weight(state.args["new_curve_center_target_weight"]);
 		persistent_full_forms.push_back(center_target_form);
 
@@ -282,7 +282,7 @@ int main(int argc, char **argv)
 			center_target_form->set_weight(state.args["curve_center_target_weight"]);
 			forms.push_back(center_target_form);
 
-			fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()), gstate.avatar_v, gstate.avatar_f, 0.1);
+			fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()), gstate.avatar_v, gstate.avatar_f, state.args["voxel_size"]);
 			fit_form->disable();
 			fit_form->set_weight(state.args["fit_weight"]);
 			forms.push_back(fit_form);

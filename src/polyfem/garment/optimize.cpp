@@ -447,7 +447,7 @@ namespace polyfem {
     void GarmentSolver::normalize_meshes()
     {
         // Source side
-        const double source_scaling = 1e2;
+        const double source_scaling = 2. / bbox_size(skeleton_v).maxCoeff();
         skeleton_v *= source_scaling;
         garment.v *= source_scaling;
         // skinny_avatar_v *= source_scaling;

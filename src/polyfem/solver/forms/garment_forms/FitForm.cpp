@@ -148,23 +148,23 @@ namespace polyfem::solver
         }
 
         // export SDF as a triangle mesh
-        // {
-        //     tools::volumeToMesh(*grid, points, quads, 0.);
-        //     Eigen::MatrixXd outpoints(points.size(), 3);
-        //     Eigen::MatrixXi outtriangles(2 * quads.size(), 3);
-        //     for (int i = 0; i < points.size(); i++)
-        //     {
-        //         outpoints.row(i) << points[i](0), points[i](1), points[i](2);
-        //     }
-        //     for (int i = 0; i < quads.size(); i++)
-        //     {
-        //         outtriangles.row(2 * i) << quads[i](0), quads[i](1), quads[i](2);
-        //         outtriangles.row(2 * i + 1) << quads[i](0), quads[i](2), quads[i](3);
-        //     }
+        {
+            tools::volumeToMesh(*grid, points, quads, 0.);
+            Eigen::MatrixXd outpoints(points.size(), 3);
+            Eigen::MatrixXi outtriangles(2 * quads.size(), 3);
+            for (int i = 0; i < points.size(); i++)
+            {
+                outpoints.row(i) << points[i](0), points[i](1), points[i](2);
+            }
+            for (int i = 0; i < quads.size(); i++)
+            {
+                outtriangles.row(2 * i) << quads[i](0), quads[i](1), quads[i](2);
+                outtriangles.row(2 * i + 1) << quads[i](0), quads[i](2), quads[i](3);
+            }
 
-		// 	io::OBJWriter::write(
-		// 		"sdf.obj", outpoints, Eigen::MatrixXi(), outtriangles);
-        // }
+			io::OBJWriter::write(
+				"sdf.obj", outpoints, Eigen::MatrixXi(), outtriangles);
+        }
     }
 
     template <int n_refs>

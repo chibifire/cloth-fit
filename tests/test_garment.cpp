@@ -130,6 +130,7 @@ TEST_CASE("Garment full forms derivatives", "[form][form_derivatives][garment]")
 	target_skeleton_v = source_skeleton_v + Eigen::MatrixXd::Random(source_skeleton_v.rows(), source_skeleton_v.cols()) * (source_skeleton_v.norm() / 100.);
 
 	std::vector<std::unique_ptr<Form>> forms;
+	forms.push_back(std::make_unique<CurveTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
 	forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
 	forms.push_back(std::make_unique<CurveCenterProjectedTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
 

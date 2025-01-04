@@ -600,7 +600,7 @@ namespace polyfem::solver
 	{
 		const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
-        typedef DScalar2<double, Eigen::Matrix<double, Eigen::Dynamic, 1>, Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>> ADHess;
+        typedef DScalar2<double, Eigen::Matrix<double, 12, 1>, Eigen::Matrix<double, 12, 12>> ADHess;
         DiffScalarBase::setVariableCount(12);
 
 		std::vector<Eigen::Triplet<double>> triplets;
