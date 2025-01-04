@@ -217,7 +217,7 @@ int main(int argc, char **argv)
 		curvature_form->set_weight(state.args["curvature_penalty_weight"]);
 		persistent_forms.push_back(curvature_form);
 
-		auto twist_form = std::make_shared<CurveTwistForm>(collision_vertices, curves);
+		auto twist_form = std::make_shared<CurveTorsionForm>(collision_vertices, curves);
 		twist_form->set_weight(state.args["twist_penalty_weight"]);
 		persistent_forms.push_back(twist_form);
 

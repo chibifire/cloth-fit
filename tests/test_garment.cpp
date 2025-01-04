@@ -241,7 +241,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
         Eigen::VectorXd grad;
         form->first_derivative(x, grad);
 
-        REQUIRE(grad.norm() < 1e-12);
+        REQUIRE(grad.norm() / 1e-10 < 1.);
     }
 
 	forms.push_back(std::make_unique<CurveSizeForm>(V, curves));

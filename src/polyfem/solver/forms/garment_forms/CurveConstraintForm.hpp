@@ -143,6 +143,8 @@ namespace polyfem::solver
 		void second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const override;
 
     private:
+		const double c = 0.01;
+		
         std::vector<Eigen::MatrixXd> compute_angles(const Eigen::MatrixXd &V) const;
 
 		const Eigen::MatrixXd V_;
