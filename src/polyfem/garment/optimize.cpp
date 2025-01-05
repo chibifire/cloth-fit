@@ -164,25 +164,52 @@ namespace polyfem {
 
     void GarmentSolver::load_garment_mesh(
         const std::string &path,
-        const std::string &garment_skinning_weights_path, 
         int n_refs)
 	{
-        garment.read(path);
+        garment.read(path + "/garment.obj");
 
-        if (std::filesystem::exists(garment_skinning_weights_path))
+        if (std::filesystem::exists(path + "/no-fit.txt"))
+        {   
+            Eigen::MatrixXi tmp_vids;
+            io::read_matrix<int>(path + "/no-fit.txt", tmp_vids);
+            
+            Eigen::VectorXi vmask = Eigen::VectorXi::Zero(garment.v.rows());
+            for (int i = 0; i < tmp_vids.size(); i++)
+                vmask(tmp_vids(i)) = 1;
+                
+            for (int i = 0; i < garment.f.rows(); i++)
+                if (vmask(garment.f(i, 0)) && vmask(garment.f(i, 1)) && vmask(garment.f(i, 2)))
+                    not_fit_fids.push_back(i);
+        }
+        else
+            logger().warn("Cannot find {}", path + "/no-fit.txt");
+
+        // if (std::filesystem::exists(path + "/skin.txt"))
+        // {
+        //     log_and_throw_error("Utilizing garment skinning weight is not supported!");
+            
+        //     io::read_matrix(path + "/skin.txt", garment_skinning_weights);
+        //     assert(garment_skinning_weights.rows() == skeleton_v.rows());
+        //     assert(garment.v.rows() == garment_skinning_weights.cols());
+        //     assert(garment_skinning_weights.minCoeff() >= 0. && garment_skinning_weights.maxCoeff() <= 1.);
+        // }
+        // else
         {
-            io::read_matrix(garment_skinning_weights_path, garment_skinning_weights);
-            assert(garment_skinning_weights.rows() == skeleton_v.rows());
-            assert(garment.v.rows() == garment_skinning_weights.cols());
-            assert(garment_skinning_weights.minCoeff() >= 0. && garment_skinning_weights.maxCoeff() <= 1.);
+            while (n_refs-- > 0)
+            {
+                std::tie(garment.v, garment.f) = refine(garment.v, garment.f);
+                
+                std::vector<int> not_fit_fids_new;
+                for (int i = 0; i < not_fit_fids.size(); i++)
+                    for (int j = 0; j < 4; j++)
+                        not_fit_fids_new.push_back(not_fit_fids[i] * 4 + j);
+                std::swap(not_fit_fids, not_fit_fids_new);
+            }
+            assert(n_refs == 0);
         }
 
 		// remove duplicate vertices in the garment
         // remove_duplicate_vertices(garment.v, garment.f, 1e-6);
-
-		// while (n_refs-- > 0)
-		// 	std::tie(garment.v, garment.f) = refine(garment.v, garment.f);
-        assert(n_refs == 0);
 	}
 
     void GarmentSolver::check_intersections(

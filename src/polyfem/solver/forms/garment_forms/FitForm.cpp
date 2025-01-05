@@ -110,7 +110,7 @@ namespace {
 namespace polyfem::solver
 {
     template <int n_refs>
-    FitForm<n_refs>::FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const double voxel_size) : V_(V), F_(F), voxel_size_(voxel_size), totalP(std::vector<openvdb::tools::HessType<double>>(F_.rows() * n_loc_samples, openvdb::tools::HessType<double>(0.)))
+    FitForm<n_refs>::FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const double voxel_size, const std::vector<int> &not_fit_faces) : V_(V), F_(F), voxel_size_(voxel_size), totalP(std::vector<openvdb::tools::HessType<double>>(F_.rows() * n_loc_samples, openvdb::tools::HessType<double>(0.)))
     {
         math::Transform::Ptr xform = math::Transform::createLinearTransform(voxel_size);
 
@@ -132,6 +132,14 @@ namespace polyfem::solver
             Eigen::Matrix<double, n_loc_samples, 4> tmp = upsample_standard<n_refs>();
             P = tmp.template leftCols<3>();
             weights = tmp.col(3);
+        }
+
+        {
+            for (int i = 0; i < F.rows(); i++)
+            {
+                if (std::find(not_fit_faces.begin(), not_fit_faces.end(), i) == not_fit_faces.end())
+                    fit_faces_ids.push_back(i);
+            }
         }
 
         // {
@@ -175,7 +183,7 @@ namespace polyfem::solver
         double val = 0;
         double max_dist = 0;
         typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
-        for (int f = 0; f < F_.rows(); f++) {
+        for (int f : fit_faces_ids) {
             const double area = (V_.row(F_(f, 1)) - V_.row(F_(f, 0))).template head<3>().cross((V_.row(F_(f, 2)) - V_.row(F_(f, 0))).template head<3>()).norm() / 2;
             for (int i = 0; i < P.rows(); i++) {
                 const double tmp = totalP[f * n_loc_samples + i].x;
@@ -201,9 +209,10 @@ namespace polyfem::solver
 
         auto storage = create_thread_storage(LocalThreadMatStorage(g.rows(), g.cols()));
 
-        maybe_parallel_for(F_.rows(), [&](int start, int end, int thread_id) {
+        maybe_parallel_for(fit_faces_ids.size(), [&](int start, int end, int thread_id) {
             LocalThreadMatStorage &local_storage = get_local_thread_storage(storage, thread_id);
-            for (int f = start; f < end; f++) {
+            for (int f_aux = start; f_aux < end; f_aux++) {
+                int f = fit_faces_ids[f_aux];
                 const double area = (V_.row(F_(f, 1)) - V_.row(F_(f, 0))).template head<3>().cross((V_.row(F_(f, 2)) - V_.row(F_(f, 0))).template head<3>()).norm() / 2;
                 for (int i = 0; i < P.rows(); i++) {
                     const auto &tmp = totalP[f * n_loc_samples + i];
@@ -229,9 +238,10 @@ namespace polyfem::solver
 
         const Eigen::MatrixXd V = unflatten(new_x, 3) + V_;
 
-        maybe_parallel_for(F_.rows(), [&](int start, int end, int thread_id) {
+        maybe_parallel_for(fit_faces_ids.size(), [&](int start, int end, int thread_id) {
             typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
-            for (int f = start; f < end; f++) {
+            for (int f_aux = start; f_aux < end; f_aux++) {
+                int f = fit_faces_ids[f_aux];
                 const Eigen::Matrix3d M = V({F_(f, 0),F_(f, 1),F_(f, 2)}, Eigen::all);
                 Eigen::Matrix<double, n_loc_samples, 3> samples = P * M;
                 const double area = (V_.row(F_(f, 1)) - V_.row(F_(f, 0))).template head<3>().cross((V_.row(F_(f, 2)) - V_.row(F_(f, 0))).template head<3>()).norm() / 2;
@@ -261,10 +271,11 @@ namespace polyfem::solver
 
         igl::Timer timer;
         timer.start();
-        maybe_parallel_for(F_.rows(), [&](int start, int end, int thread_id) {
+        maybe_parallel_for(fit_faces_ids.size(), [&](int start, int end, int thread_id) {
             LocalThreadSparseMatStorage &local_storage = get_local_thread_storage(storage, thread_id);
             Eigen::Matrix<double, 9, 9> local_hess;
-            for (int f = start; f < end; f++) {
+            for (int f_aux = start; f_aux < end; f_aux++) {
+                int f = fit_faces_ids[f_aux];
                 const double area = (V_.row(F_(f, 1)) - V_.row(F_(f, 0))).template head<3>().cross((V_.row(F_(f, 2)) - V_.row(F_(f, 0))).template head<3>()).norm() / 2;
                 local_hess.setZero();
                 for (int i = 0; i < P.rows(); i++) {

@@ -36,7 +36,6 @@ namespace polyfem {
 
         void load_garment_mesh(
             const std::string &path,
-            const std::string &garment_skinning_weights_path,
             int n_refs = 0);
 
         void read_meshes(
@@ -76,5 +75,7 @@ namespace polyfem {
 
         Eigen::MatrixXd target_avatar_skinning_weights;
         Eigen::MatrixXd garment_skinning_weights;
+
+        std::vector<int> not_fit_fids;
     };
 }

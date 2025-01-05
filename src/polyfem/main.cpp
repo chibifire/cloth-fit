@@ -126,7 +126,7 @@ int main(int argc, char **argv)
 
 	const std::string out_folder = state.args["/output/directory"_json_pointer];
 	const std::string avatar_mesh_path = state.args["avatar_mesh_path"];
-	const std::string garment_mesh_path = state.args["garment_mesh_path"];
+	const std::string garment_path = state.args["garment_path"];
 	const std::string source_skeleton_path = state.args["source_skeleton_path"];
 	const std::string target_skeleton_path = state.args["target_skeleton_path"];
 	const std::string avatar_skin_weights_path = state.args["avatar_skin_weights_path"];
@@ -135,8 +135,8 @@ int main(int argc, char **argv)
 	if (!std::filesystem::exists(avatar_mesh_path))
 		log_and_throw_error("Invalid avatar mesh path: {}", avatar_mesh_path);
 
-	if (!std::filesystem::exists(garment_mesh_path))
-		log_and_throw_error("Invalid garment mesh path: {}", garment_mesh_path);
+	if (!std::filesystem::exists(garment_path + "/garment.obj"))
+		log_and_throw_error("Invalid garment path: {}", garment_path);
 
 	if (!std::filesystem::exists(source_skeleton_path))
 		log_and_throw_error("Invalid source skeleton mesh path: {}", source_skeleton_path);
@@ -147,13 +147,10 @@ int main(int argc, char **argv)
 	if (!std::filesystem::exists(avatar_skin_weights_path))
 		log_and_throw_error("Invalid skin weights path: {}", avatar_skin_weights_path);
 
-	// if (!std::filesystem::exists(garment_skin_weights_path))
-	// 	log_and_throw_error("Invalid skin weights path: {}", garment_skin_weights_path);
-
 	gstate.out_folder = out_folder;
 
 	gstate.read_meshes(avatar_mesh_path, source_skeleton_path, target_skeleton_path, avatar_skin_weights_path);
-	gstate.load_garment_mesh(garment_mesh_path, garment_skin_weights_path, state.args["geometry"][0]["n_refs"]);
+	gstate.load_garment_mesh(garment_path, state.args["geometry"][0]["n_refs"]);
 	gstate.normalize_meshes();
 	gstate.project_avatar_to_skeleton();
 
@@ -216,7 +213,6 @@ int main(int argc, char **argv)
 	std::vector<std::shared_ptr<Form>> persistent_forms;
 	std::vector<std::shared_ptr<Form>> persistent_full_forms;
 	std::shared_ptr<CurveSizeForm> curve_size_form;
-	std::shared_ptr<ContactForm> contact_form;
 	{
 		// auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
 		// angle_form->set_weight(state.args["angle_penalty_weight"]);
@@ -251,7 +247,7 @@ int main(int argc, char **argv)
 		{
 			const double dhat = state.args["contact"]["dhat"];
 
-			contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
+			std::shared_ptr<ContactForm> contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
 			contact_form->set_weight(1);
 			contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
 			contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
@@ -302,7 +298,7 @@ int main(int argc, char **argv)
 			// center_target_form->set_weight(state.args["curve_center_target_weight"]);
 			// forms.push_back(center_target_form);
 
-			fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()), gstate.avatar_v, gstate.avatar_f, state.args["voxel_size"]);
+			fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()), gstate.avatar_v, gstate.avatar_f, state.args["voxel_size"], gstate.not_fit_fids);
 			fit_form->disable();
 			fit_form->set_weight(state.args["fit_weight"]);
 			forms.push_back(fit_form);

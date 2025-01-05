@@ -261,7 +261,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 		Eigen::MatrixXi avatar_f;
 		igl::read_triangle_mesh(POLYFEM_DATA_DIR + std::string("/../tests/cage.obj"), avatar_v, avatar_f);
 		
-		forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1));
+		forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1, std::vector<int>()));
 	}
 
 	for (auto &form : forms)
