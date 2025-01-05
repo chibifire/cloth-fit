@@ -134,18 +134,18 @@ namespace polyfem::solver
             weights = tmp.col(3);
         }
 
-        {
+        // {
             initial_distance.setZero(F_.rows() * n_loc_samples);
-            typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
-            for (int f = 0; f < F_.rows(); f++) {
-                const Eigen::Matrix3d M = V_({F_(f, 0),F_(f, 1),F_(f, 2)}, Eigen::all);
-                Eigen::Matrix<double, n_loc_samples, 3> samples = P * M;
-                for (int i = 0; i < P.rows(); i++) {
-                    math::Vec3<double> p(samples(i, 0), samples(i, 1), samples(i, 2));
-                    initial_distance(f * n_loc_samples + i) = tools::SplineSampler::sample(acc, grid->transformPtr()->worldToIndex(p));
-                }
-            }
-        }
+        //     typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
+        //     for (int f = 0; f < F_.rows(); f++) {
+        //         const Eigen::Matrix3d M = V_({F_(f, 0),F_(f, 1),F_(f, 2)}, Eigen::all);
+        //         Eigen::Matrix<double, n_loc_samples, 3> samples = P * M;
+        //         for (int i = 0; i < P.rows(); i++) {
+        //             math::Vec3<double> p(samples(i, 0), samples(i, 1), samples(i, 2));
+        //             initial_distance(f * n_loc_samples + i) = tools::SplineSampler::sample(acc, grid->transformPtr()->worldToIndex(p));
+        //         }
+        //     }
+        // }
 
         // export SDF as a triangle mesh
         {
