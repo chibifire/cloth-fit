@@ -194,7 +194,7 @@ namespace polyfem {
         //     assert(garment_skinning_weights.minCoeff() >= 0. && garment_skinning_weights.maxCoeff() <= 1.);
         // }
         // else
-        {
+        if (n_refs > 0) {
             while (n_refs-- > 0)
             {
                 std::tie(garment.v, garment.f) = refine(garment.v, garment.f);
