@@ -212,7 +212,7 @@ int main(int argc, char **argv)
 
 	std::vector<std::shared_ptr<Form>> persistent_forms;
 	std::vector<std::shared_ptr<Form>> persistent_full_forms;
-	std::shared_ptr<CurveSizeForm> curve_size_form;
+	// std::shared_ptr<CurveSizeForm> curve_size_form;
 	{
 		// auto angle_form = std::make_shared<AngleForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
 		// angle_form->set_weight(state.args["angle_penalty_weight"]);
@@ -239,10 +239,10 @@ int main(int argc, char **argv)
 		if (sym_form->enabled())
 			persistent_forms.push_back(sym_form);
 
-		curve_size_form = std::make_shared<CurveSizeForm>(collision_vertices, curves);
-		curve_size_form->disable();
-		curve_size_form->set_weight(state.args["curve_size_weight"]);
-		persistent_forms.push_back(curve_size_form);
+		// curve_size_form = std::make_shared<CurveSizeForm>(collision_vertices, curves);
+		// curve_size_form->disable();
+		// curve_size_form->set_weight(state.args["curve_size_weight"]);
+		// persistent_forms.push_back(curve_size_form);
 
 		{
 			const double dhat = state.args["contact"]["dhat"];
@@ -303,7 +303,7 @@ int main(int argc, char **argv)
 			fit_form->set_weight(state.args["fit_weight"]);
 			forms.push_back(fit_form);
 
-			curve_size_form->disable();
+			// curve_size_form->disable();
 		}
 
 		GarmentNLProblem nl_problem(1 + initial_garment_v.size(), utils::flatten(gstate.avatar_v - gstate.skinny_avatar_v), forms, persistent_full_forms);
@@ -354,8 +354,8 @@ int main(int argc, char **argv)
 		al_solver.solve_al(nl_solver, nl_problem, sol);
 
 		fit_form->enable();
-		if (substep == total_steps - 1)
-			curve_size_form->enable();
+		// if (substep == total_steps - 1)
+		// 	curve_size_form->enable();
 
 		nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
 		al_solver.solve_reduced(nl_solver, nl_problem, sol);

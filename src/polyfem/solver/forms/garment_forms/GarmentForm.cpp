@@ -743,7 +743,7 @@ namespace polyfem::solver
 				if (TT(i, j) < 0)
 					continue;
 
-				const Eigen::Vector3d v = V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, lv(j)));
+				const Eigen::Vector3d v = (V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, lv(j)))).normalized();
 				const Eigen::Vector3d e = V.row(F_(i, le(j, 1))) - V.row(F_(i, le(j, 0)));
 				const Eigen::Vector3d e0 = V.row(F_(i, lv(j))) - V.row(F_(i, le(j, 0)));
 				const Eigen::Vector3d e1 = V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, le(j, 0)));
