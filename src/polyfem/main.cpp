@@ -130,7 +130,6 @@ int main(int argc, char **argv)
 	const std::string source_skeleton_path = state.args["source_skeleton_path"];
 	const std::string target_skeleton_path = state.args["target_skeleton_path"];
 	const std::string avatar_skin_weights_path = state.args["avatar_skin_weights_path"];
-	const std::string garment_skin_weights_path = state.args["garment_skin_weights_path"];
 
 	if (!std::filesystem::exists(avatar_mesh_path))
 		log_and_throw_error("Invalid avatar mesh path: {}", avatar_mesh_path);

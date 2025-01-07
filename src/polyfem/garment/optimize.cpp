@@ -87,6 +87,30 @@ namespace polyfem {
                 }
             }
         }
+
+        bool are_same_edges(const Eigen::MatrixXi &A, const Eigen::MatrixXi &B)
+        {
+            if (A.rows() != B.rows())
+                return false;
+            
+            for (int i = 0; i < A.rows(); i++)
+            {
+                bool flag = false;
+                for (int j = 0; j < B.rows(); j++)
+                {
+                    if ((std::min(A(i, 0), A(i, 1)) == std::min(B(j, 0), B(j, 1)))
+                    && (std::max(A(i, 0), A(i, 1)) == std::max(B(j, 0), B(j, 1))))
+                    {
+                        flag = true;
+                        break;
+                    }
+                }
+                if (!flag)
+                    return false;
+            }
+
+            return true;
+        }
     }
 
     void OBJMesh::read(const std::string &path)
@@ -243,13 +267,8 @@ namespace polyfem {
 
         read_edge_mesh(source_skeleton_path, skeleton_v, skeleton_b);
         read_edge_mesh(target_skeleton_path, target_skeleton_v, target_skeleton_b);
-        // assert((skeleton_b - target_skeleton_b).squaredNorm() < 1);
-        for (int i = 0; i < skeleton_b.rows(); i++)
-        {
-            if ((std::min(skeleton_b(i, 0), skeleton_b(i, 1)) != std::min(target_skeleton_b(i, 0), target_skeleton_b(i, 1)))
-            || (std::max(skeleton_b(i, 0), skeleton_b(i, 1)) != std::max(target_skeleton_b(i, 0), target_skeleton_b(i, 1))))
-                log_and_throw_error("Inconsistent skeletons!");
-        }
+        if (!are_same_edges(skeleton_b, target_skeleton_b))
+            log_and_throw_error("Inconsistent skeletons!");
         target_skeleton_b = skeleton_b;
 
         io::read_matrix(target_avatar_skinning_weights_path, target_avatar_skinning_weights);
