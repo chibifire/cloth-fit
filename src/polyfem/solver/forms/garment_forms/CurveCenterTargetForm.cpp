@@ -37,6 +37,78 @@ namespace polyfem::solver
             const T dist = (d - t * e).squaredNorm();
             return Eigen::Vector<T, 2>(dist, t);
         }
+
+        Eigen::Vector3d fit_plane(const Eigen::MatrixXd &points)
+        {
+            const int N = points.rows();
+            Eigen::Vector3d center = points.colwise().sum() / N;
+
+            Eigen::Matrix3d A = Eigen::Matrix3d::Zero();
+            for (int i = 0; i < N; i++)
+            {
+                Eigen::Vector3d v = points.row(i).transpose() - center;
+                A += v * v.transpose();
+            }
+            A /= N;
+
+            Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigensolver(A);
+            Eigen::Vector3d eigenvalues = eigensolver.eigenvalues();
+            if (eigenvalues(0) > eigenvalues(1) * 0.1)
+            {
+                logger().warn("The curve is not well approximated by a plane, error is {}", eigenvalues(0) / eigenvalues(1));
+            }
+
+            return eigensolver.eigenvectors().col(0);
+        }
+
+        bool is_bone_available(int n_bones, Eigen::Vector2i bone)
+        {
+            if (bone(0) > bone(1))
+                std::swap(bone(0), bone(1));
+
+            if (n_bones == 23)
+            { 
+                if (bone(0) == 0)
+                {
+                    if (bone(1) == 5 || bone(1) == 1)
+                    {
+                        return false;
+                    }
+                }
+                else if (bone(0) == 11)
+                {
+                    if (bone(1) == 14 || bone(1) == 19)
+                    {
+                        return false;
+                    }
+                }
+                else
+                    return true;
+            }
+            else if (n_bones == 14)
+            {
+                if (bone(0) == 1)
+                {
+                    if (bone(1) == 3 || bone(1) == 6)
+                    {
+                        return false;
+                    }
+                }
+                else if (bone(0) == 0)
+                {
+                    if (bone(1) == 12 || bone(1) == 9)
+                    {
+                        return false;
+                    }
+                }
+                else
+                    return true;
+            }
+            else
+                log_and_throw_error("Invalid number of bones in the skeleton!");
+                
+            return true;
+        }
     }
 
     double OldCurveCenterTargetForm::value_unweighted(const Eigen::VectorXd &x) const 
@@ -462,13 +534,17 @@ namespace polyfem::solver
         for (int j = 0; j < curves_.size(); j++)
         {
             const Eigen::Vector3d center = V(curves_[j], Eigen::all).colwise().sum() / curves_[j].size();
+            const Eigen::Vector3d normal = fit_plane(V(curves_[j], Eigen::all)).normalized();
 
             // Project centers to original skeleton bones
             double closest_dist = std::numeric_limits<double>::max();
             for (int i = 0; i < skeleton_edges.rows(); i++)
             {
-                Eigen::Vector2d tmp = point_edge_closest_distance(center, source_skeleton_v.row(skeleton_edges(i, 0)), source_skeleton_v.row(skeleton_edges(i, 1)));
-                if (tmp(0) < closest_dist)
+                Eigen::Vector2i edge = skeleton_edges.row(i);
+                Eigen::Vector3d e0 = source_skeleton_v.row(edge(0));
+                Eigen::Vector3d e1 = source_skeleton_v.row(edge(1));
+                Eigen::Vector2d tmp = point_edge_closest_distance(center, e0, e1);
+                if (tmp(0) < closest_dist && is_bone_available(skeleton_edges.rows(), edge))
                 {
                     closest_dist = tmp(0);
                     bones(j) = i;

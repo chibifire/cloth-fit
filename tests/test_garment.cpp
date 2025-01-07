@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <memory>
+#include <math.h>
 ////////////////////////////////////////////////////////////////////////////////
 
 using namespace polyfem;
@@ -328,4 +329,27 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 			}
 		}
 	}
+}
+
+TEST_CASE("PCA", "[form][form_derivatives][garment]")
+{
+	const int N = 20;
+	Eigen::MatrixXd points(N, 3);
+	for (int i = 0; i < N; i++)
+	{
+		const double theta = (double)i / N * 2. * M_PI;
+		points.row(i) << cos(theta), sin(theta), (rand() % 100) / 1e3;
+	}
+
+	Eigen::Vector3d center = points.colwise().sum() / N;
+	Eigen::Matrix3d A = Eigen::Matrix3d::Zero();
+	for (int i = 0; i < N; i++)
+	{
+		Eigen::Vector3d v = points.row(i).transpose() - center;
+		A += v * v.transpose();
+	}
+
+	Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigensolver(A);
+	std::cout << eigensolver.eigenvalues().transpose() << std::endl;
+	std::cout << eigensolver.eigenvectors() << std::endl;
 }
