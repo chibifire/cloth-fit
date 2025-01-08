@@ -27,6 +27,18 @@ using namespace polyfem::mesh;
 
 namespace polyfem {
     namespace {
+        Eigen::Vector2d project_to_line(
+            const Eigen::Vector3d &a,
+            const Eigen::Vector3d &b,
+            const Eigen::Vector3d &p)
+        {
+            Eigen::Vector3d s = b - a;
+            double t = (p - a).dot(s) / s.squaredNorm();
+            double d = (p - (a + t * s)).squaredNorm();
+
+            return Eigen::Vector2d(d, t);
+        }
+
         /// @brief Returns the squared distance of p to edge ab, and the parametric coordinate of the closest point
         Eigen::Vector2d project_to_edge(
             const Eigen::Vector3d &a,
@@ -111,6 +123,19 @@ namespace polyfem {
 
             return true;
         }
+
+        bool is_end_node(const Eigen::MatrixXi &edges, const int vid)
+        {
+            int cnt = 0;
+            for (int i = 0; i < edges.size(); i++)
+            {
+                if (edges(i) == vid)
+                    cnt++;
+            }
+            if (cnt == 0)
+                log_and_throw_error("vid not found in is_end_node()!");
+            return (cnt == 1);
+        }
     }
 
     void OBJMesh::read(const std::string &path)
@@ -177,6 +202,7 @@ namespace polyfem {
 
         garment.v = current_vertices.bottomRows(garment.v.rows());
         garment.write(path + "/step_garment_" + std::to_string(index) + ".obj");
+        logger().debug("Save OBJ to {}", path + "/step_garment_" + std::to_string(index) + ".obj");
 
         igl::write_triangle_mesh(path + "/step_avatar_" + std::to_string(index) + ".obj", current_vertices.topRows(n_avatar_vertices()), avatar_f);
     }
@@ -196,7 +222,7 @@ namespace polyfem {
         {   
             Eigen::MatrixXi tmp_vids;
             io::read_matrix<int>(path + "/no-fit.txt", tmp_vids);
-            
+
             Eigen::VectorXi vmask = Eigen::VectorXi::Zero(garment.v.rows());
             for (int i = 0; i < tmp_vids.size(); i++)
                 vmask(tmp_vids(i)) = 1;
@@ -338,11 +364,18 @@ namespace polyfem {
                 {
                     if (target_skeleton_b(e, 0) == maxRow || target_skeleton_b(e, 1) == maxRow)
                     {
-                        const Eigen::Vector2d tmp = project_to_edge(target_skeleton_v.row(target_skeleton_b(e, 0)), target_skeleton_v.row(target_skeleton_b(e, 1)), avatar_v.row(i));
-                        if (tmp(0) < dists(i))
+                        Eigen::Vector2d tmp1 = project_to_edge(target_skeleton_v.row(target_skeleton_b(e, 0)), target_skeleton_v.row(target_skeleton_b(e, 1)), avatar_v.row(i));
+                        if (tmp1(0) < dists(i))
                         {
-                            dists(i) = tmp(0);
-                            coord(i) = tmp(1);
+                            dists(i) = tmp1(0);
+                            {
+                                Eigen::Vector2d tmp2 = project_to_line(target_skeleton_v.row(target_skeleton_b(e, 0)), target_skeleton_v.row(target_skeleton_b(e, 1)), avatar_v.row(i));
+                                if (!is_end_node(target_skeleton_b, target_skeleton_b(e, 0)))
+                                    tmp2(1) = std::max(0., tmp2(1));
+                                if (!is_end_node(target_skeleton_b, target_skeleton_b(e, 1)))
+                                    tmp2(1) = std::min(1., tmp2(1));
+                                coord(i) = tmp2(1);
+                            }
                             eid(i) = e;
                         }
                     }
