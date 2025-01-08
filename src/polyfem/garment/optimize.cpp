@@ -18,6 +18,7 @@
 
 #include <ipc/ipc.hpp>
 #include <ipc/distance/point_edge.hpp>
+#include <ipc/distance/point_line.hpp>
 
 #include <unordered_set>
 #include <filesystem>
@@ -415,8 +416,8 @@ namespace polyfem {
                         Eigen::Vector3d b0 = skeleton_v.row(target_skeleton_b(i, 0));
                         Eigen::Vector3d b1 = skeleton_v.row(target_skeleton_b(i, 1));
 
-                        if (ipc::point_edge_distance(vb, b0, b1) < 1e-4 * (b1 - b0).squaredNorm() &&
-                            ipc::point_edge_distance(va, b0, b1) < 1e-4 * (b1 - b0).squaredNorm())
+                        if (ipc::point_line_distance(vb, b0, b1) < 1e-4 * (b1 - b0).squaredNorm() &&
+                            ipc::point_line_distance(va, b0, b1) < 1e-4 * (b1 - b0).squaredNorm())
                         {
                             edge_overlap_with_skeleton = true;
                             break;
