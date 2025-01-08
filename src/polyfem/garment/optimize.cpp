@@ -423,9 +423,6 @@ namespace polyfem {
                         }
                     }
 
-                    if (b >= eid.size() || b < 0)
-                        std::cout << "debug";
-
                     int source = eid(b);
                     int cur = eid(a);
 
@@ -454,8 +451,6 @@ namespace polyfem {
                     std::vector<std::array<int, 2>> inserted_tmp;
                     while (cur != source)
                     {
-                        if (cur < 0 || source < 0 || source >= parent.rows() || cur >= parent.cols() || parent(source, cur) < 0)
-                            std::cout << std::endl;
                         std::array<int, 2> tmp{{shared_vtx(cur, parent(source, cur)), cur}};
                         inserted_tmp.push_back(tmp);
                         cur = parent(source, cur);
