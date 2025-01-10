@@ -18,7 +18,7 @@ namespace polyfem::solver
 	public:
 		constexpr static int n_loc_samples = ((n_refs+1)*(n_refs+2))/2;
 
-		FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const double voxel_size, const std::vector<int> &not_fit_faces);
+		FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const double voxel_size, const std::vector<int> &not_fit_faces, const std::string out_dir);
 
 		std::string name() const override { return "garment-fit"; }
 

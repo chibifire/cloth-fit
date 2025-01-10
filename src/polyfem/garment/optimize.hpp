@@ -58,20 +58,25 @@ namespace polyfem {
         
         int n_garment_vertices() const { return garment.v.rows(); }
         int n_garment_faces() const { return garment.f.rows(); }
-        int n_avatar_vertices() const { return avatar_v.rows(); }
 
         std::string out_folder;
     
+        // Original avatar mesh
         Eigen::MatrixXd avatar_v;
         Eigen::MatrixXi avatar_f;
+
+        // Non-conforming avatar mesh after projection
+        Eigen::MatrixXd nc_avatar_v;
+        Eigen::MatrixXi nc_avatar_f;
+
+        // Projected avatar mesh that shares the same connectivity as nc_avatar
+        Eigen::MatrixXd skinny_avatar_v;
+        Eigen::MatrixXi skinny_avatar_f;
 
         OBJMesh garment;
 
         Eigen::MatrixXd skeleton_v, target_skeleton_v;
         Eigen::MatrixXi skeleton_b, target_skeleton_b;
-
-        Eigen::MatrixXd skinny_avatar_v;
-        Eigen::MatrixXi skinny_avatar_f;
 
         Eigen::MatrixXd target_avatar_skinning_weights;
         Eigen::MatrixXd garment_skinning_weights;

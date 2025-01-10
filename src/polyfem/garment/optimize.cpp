@@ -137,6 +137,27 @@ namespace polyfem {
                 log_and_throw_error("vid not found in is_end_node()!");
             return (cnt == 1);
         }
+
+        void explode_trimesh(
+            const Eigen::MatrixXd &Vin,
+            const Eigen::MatrixXi &Fin,
+            Eigen::MatrixXd &Vout,
+            Eigen::MatrixXi &Fout,
+            Eigen::VectorXi &index_map)
+        {
+            Vout = Eigen::MatrixXd::Zero(Fin.size(), 3);
+            Fout = Fin;
+            index_map.setZero(Vout.rows());
+            for (int f = 0; f < Fin.rows(); f++)
+            {
+                for (int i = 0; i < Fin.cols(); i++)
+                {
+                    Vout.row(f * Fin.cols() + i) = Vin.row(Fin(f, i));
+                    Fout(f, i) = f * Fin.cols() + i;
+                    index_map(f * Fin.cols() + i) = Fin(f, i);
+                }
+            }
+        }
     }
 
     void OBJMesh::read(const std::string &path)
@@ -173,7 +194,7 @@ namespace polyfem {
         //     while (existing_names.count(name) != 0)
         //         name += "_";
         //     existing_names.insert(name);
-        //     grad.head(n_avatar_vertices() * 3).setZero();
+        //     grad.head(nc_avatar_v.rows() * 3).setZero();
         //     writer.add_field(name, utils::unflatten(grad, 3));
         //     total_grad += grad;
         // }
@@ -190,11 +211,11 @@ namespace polyfem {
         //     writer.add_field(name, utils::unflatten(grad, 3));
         //     total_grad += grad;
         // }
-        // total_grad.head(n_avatar_vertices() * 3).setZero();
+        // total_grad.head(nc_avatar_v.rows() * 3).setZero();
         // writer.add_field("grad", utils::unflatten(total_grad, 3));
 
         // Eigen::VectorXd body_ids = Eigen::VectorXd::Zero(V.rows());
-        // body_ids.head(n_avatar_vertices()).array() = 1;
+        // body_ids.head(nc_avatar_v.rows()).array() = 1;
         // writer.add_field("body_ids", body_ids);
 
         const Eigen::MatrixXd current_vertices = utils::unflatten(complete_disp, V.cols()) + V;
@@ -205,7 +226,7 @@ namespace polyfem {
         garment.write(path + "/step_garment_" + std::to_string(index) + ".obj");
         logger().debug("Save OBJ to {}", path + "/step_garment_" + std::to_string(index) + ".obj");
 
-        igl::write_triangle_mesh(path + "/step_avatar_" + std::to_string(index) + ".obj", current_vertices.topRows(n_avatar_vertices()), avatar_f);
+        igl::write_triangle_mesh(path + "/step_avatar_" + std::to_string(index) + ".obj", current_vertices.topRows(nc_avatar_v.rows()), nc_avatar_f);
     }
 
     Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V)
@@ -333,24 +354,31 @@ namespace polyfem {
         }
 
         // explode avatar mesh
-        Eigen::MatrixXd new_avatar_v(avatar_f.size(), 3);
-        Eigen::MatrixXd new_skinning_weights(target_avatar_skinning_weights.rows(), new_avatar_v.rows());
-        for (int f = 0; f < avatar_f.rows(); f++)
+        Eigen::MatrixXd new_skinning_weights;
         {
-            for (int i = 0; i < avatar_f.cols(); i++)
-            {
-                new_avatar_v.row(f * avatar_f.cols() + i) = avatar_v.row(avatar_f(f, i));
-                new_skinning_weights.col(f * avatar_f.cols() + i) = target_avatar_skinning_weights.col(avatar_f(f, i));
-                avatar_f(f, i) = f * avatar_f.cols() + i;
-            }
+            Eigen::VectorXi index_map;
+            explode_trimesh(avatar_v, avatar_f, nc_avatar_v, nc_avatar_f, index_map);
+            new_skinning_weights = target_avatar_skinning_weights(Eigen::all, index_map);
         }
-        std::swap(new_avatar_v, avatar_v);
+        // nc_avatar_v = Eigen::MatrixXd::Zero(avatar_f.size(), 3);
+        // Eigen::MatrixXd new_skinning_weights(target_avatar_skinning_weights.rows(), nc_avatar_v.rows());
+        // nc_avatar_f = avatar_f;
+        // for (int f = 0; f < avatar_f.rows(); f++)
+        // {
+        //     for (int i = 0; i < avatar_f.cols(); i++)
+        //     {
+        //         nc_avatar_v.row(f * avatar_f.cols() + i) = avatar_v.row(avatar_f(f, i));
+        //         new_skinning_weights.col(f * avatar_f.cols() + i) = target_avatar_skinning_weights.col(avatar_f(f, i));
+        //         nc_avatar_f(f, i) = f * avatar_f.cols() + i;
+        //     }
+        // }
+        
 
         Eigen::VectorXi eid;
         Eigen::VectorXd coord;
         // first pass
         {
-            const int N = avatar_v.rows();
+            const int N = nc_avatar_v.rows();
             Eigen::VectorXd dists(N);
             dists.setConstant(std::numeric_limits<double>::max());
             coord.setZero(N);
@@ -365,12 +393,12 @@ namespace polyfem {
                 {
                     if (target_skeleton_b(e, 0) == maxRow || target_skeleton_b(e, 1) == maxRow)
                     {
-                        Eigen::Vector2d tmp1 = project_to_edge(target_skeleton_v.row(target_skeleton_b(e, 0)), target_skeleton_v.row(target_skeleton_b(e, 1)), avatar_v.row(i));
+                        Eigen::Vector2d tmp1 = project_to_edge(target_skeleton_v.row(target_skeleton_b(e, 0)), target_skeleton_v.row(target_skeleton_b(e, 1)), nc_avatar_v.row(i));
                         if (tmp1(0) < dists(i))
                         {
                             dists(i) = tmp1(0);
                             {
-                                Eigen::Vector2d tmp2 = project_to_line(target_skeleton_v.row(target_skeleton_b(e, 0)), target_skeleton_v.row(target_skeleton_b(e, 1)), avatar_v.row(i));
+                                Eigen::Vector2d tmp2 = project_to_line(target_skeleton_v.row(target_skeleton_b(e, 0)), target_skeleton_v.row(target_skeleton_b(e, 1)), nc_avatar_v.row(i));
                                 if (!is_end_node(target_skeleton_b, target_skeleton_b(e, 0)))
                                     tmp2(1) = std::max(0., tmp2(1));
                                 if (!is_end_node(target_skeleton_b, target_skeleton_b(e, 1)))
@@ -385,14 +413,14 @@ namespace polyfem {
                     log_and_throw_error("Failed to project vertex to the bone!");
             }
 
-            skinny_avatar_v.setZero(avatar_v.rows(), avatar_v.cols());
-            for (int i = 0; i < avatar_v.rows(); i++)
+            skinny_avatar_v.setZero(nc_avatar_v.rows(), nc_avatar_v.cols());
+            for (int i = 0; i < nc_avatar_v.rows(); i++)
                 skinny_avatar_v.row(i) += coord(i) * (skeleton_v(skeleton_b(eid(i), 1), Eigen::all) - skeleton_v(skeleton_b(eid(i), 0), Eigen::all)) + skeleton_v(skeleton_b(eid(i), 0), Eigen::all);
-            skinny_avatar_f = avatar_f;
+            skinny_avatar_f = nc_avatar_f;
         }
 
-        // igl::write_triangle_mesh(out_folder + "/avatar_old.obj", avatar_v, avatar_f);
-        igl::write_triangle_mesh(out_folder + "/projected_avatar_old.obj", skinny_avatar_v, avatar_f);
+        // igl::write_triangle_mesh(out_folder + "/avatar_old.obj", nc_avatar_v, nc_avatar_f);
+        igl::write_triangle_mesh(out_folder + "/projected_avatar_old.obj", skinny_avatar_v, nc_avatar_f);
 
         // iteratively reduce distance
         for (int iter = 0; iter < 10; iter++) {
@@ -464,9 +492,9 @@ namespace polyfem {
 
                         Eigen::Matrix<double, 6, 3> X;
                         X << p_prev, p, skinny_avatar_v.row(c),
-                             avatar_v.row(a) + (avatar_v.row(b) - avatar_v.row(a)) * ((double)k / (inserted_tmp.size() + 1)),
-                             avatar_v.row(a) + (avatar_v.row(b) - avatar_v.row(a)) * ((double)(k+1) / (inserted_tmp.size() + 1)),
-                             avatar_v.row(c);
+                             nc_avatar_v.row(a) + (nc_avatar_v.row(b) - nc_avatar_v.row(a)) * ((double)k / (inserted_tmp.size() + 1)),
+                             nc_avatar_v.row(a) + (nc_avatar_v.row(b) - nc_avatar_v.row(a)) * ((double)(k+1) / (inserted_tmp.size() + 1)),
+                             nc_avatar_v.row(c);
                         new_faces.push_back(X);
                         eid.conservativeResize(eid.size() + 3);
                         eid.tail(3) << (int)((k == 0) ? eid(a) : inserted_tmp[k-1][1]), inserted_tmp[k][1], eid(c);
@@ -475,7 +503,7 @@ namespace polyfem {
                     }
 
                     skinny_avatar_v.row(a) = p_prev;
-                    avatar_v.row(a) += (avatar_v.row(b) - avatar_v.row(a)) * ((double)inserted_tmp.size() / (inserted_tmp.size() + 1));
+                    nc_avatar_v.row(a) += (nc_avatar_v.row(b) - nc_avatar_v.row(a)) * ((double)inserted_tmp.size() / (inserted_tmp.size() + 1));
                     eid(a) = inserted_tmp.back()[1];
                 }
             }
@@ -492,31 +520,31 @@ namespace polyfem {
             }
 
             {
-                Eigen::MatrixXd tmp(avatar_v.rows() + new_faces.size() * 3, 3);
-                tmp.topRows(avatar_v.rows()) = avatar_v;
+                Eigen::MatrixXd tmp(nc_avatar_v.rows() + new_faces.size() * 3, 3);
+                tmp.topRows(nc_avatar_v.rows()) = nc_avatar_v;
                 for (int i = 0; i < new_faces.size(); i++)
-                    tmp.block(avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].bottomRows(3);
-                std::swap(avatar_v, tmp);
+                    tmp.block(nc_avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].bottomRows(3);
+                std::swap(nc_avatar_v, tmp);
             }
 
             skinny_avatar_f = Eigen::VectorXi::LinSpaced(skinny_avatar_v.rows(), 0, skinny_avatar_v.rows() - 1).reshaped(3, skinny_avatar_v.rows() / 3).transpose();
-            avatar_f = skinny_avatar_f;
+            nc_avatar_f = skinny_avatar_f;
         
             igl::write_triangle_mesh(out_folder + "/projected_avatar_new_" + std::to_string(iter) + ".obj", skinny_avatar_v, skinny_avatar_f);
-            igl::write_triangle_mesh(out_folder + "/avatar_new_" + std::to_string(iter) + ".obj", avatar_v, avatar_f);
+            igl::write_triangle_mesh(out_folder + "/avatar_new_" + std::to_string(iter) + ".obj", nc_avatar_v, nc_avatar_f);
         }
 
         {
-            Eigen::MatrixXd tmp_v(avatar_v.rows(), avatar_v.cols() + skinny_avatar_v.cols());
-            tmp_v << avatar_v, skinny_avatar_v;
-            const auto [svi, svj] = remove_duplicate_vertices(tmp_v, avatar_f, 1e-10);
+            Eigen::MatrixXd tmp_v(nc_avatar_v.rows(), nc_avatar_v.cols() + skinny_avatar_v.cols());
+            tmp_v << nc_avatar_v, skinny_avatar_v;
+            const auto [svi, svj] = remove_duplicate_vertices(tmp_v, nc_avatar_f, 1e-10);
 
-            avatar_v = tmp_v.template leftCols<3>();
+            nc_avatar_v = tmp_v.template leftCols<3>();
             skinny_avatar_v = tmp_v.template rightCols<3>();
-            skinny_avatar_f = avatar_f;
+            skinny_avatar_f = nc_avatar_f;
         }
         
-        skinny_avatar_v += (avatar_v - skinny_avatar_v) * 1e-5;
+        skinny_avatar_v += (nc_avatar_v - skinny_avatar_v) * 1e-5;
     }
 
     void GarmentSolver::normalize_meshes()

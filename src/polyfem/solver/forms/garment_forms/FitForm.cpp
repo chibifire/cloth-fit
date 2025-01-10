@@ -110,7 +110,7 @@ namespace {
 namespace polyfem::solver
 {
     template <int n_refs>
-    FitForm<n_refs>::FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const double voxel_size, const std::vector<int> &not_fit_faces) : V_(V), F_(F), voxel_size_(voxel_size), totalP(std::vector<openvdb::tools::HessType<double>>(F_.rows() * n_loc_samples, openvdb::tools::HessType<double>(0.)))
+    FitForm<n_refs>::FitForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F, const Eigen::MatrixXd &surface_v, const Eigen::MatrixXi &surface_f, const double voxel_size, const std::vector<int> &not_fit_faces, const std::string out_dir) : V_(V), F_(F), voxel_size_(voxel_size), totalP(std::vector<openvdb::tools::HessType<double>>(F_.rows() * n_loc_samples, openvdb::tools::HessType<double>(0.)))
     {
         math::Transform::Ptr xform = math::Transform::createLinearTransform(voxel_size);
 
@@ -142,6 +142,9 @@ namespace polyfem::solver
             }
         }
 
+        io::OBJWriter::write(
+            out_dir + "/fit-faces-debug.obj", V, Eigen::MatrixXi(), F(fit_faces_ids, Eigen::all));
+
         // {
             initial_distance.setZero(F_.rows() * n_loc_samples);
         //     typename DoubleGrid::ConstAccessor acc = grid->getConstAccessor();
@@ -171,7 +174,7 @@ namespace polyfem::solver
             }
 
 			io::OBJWriter::write(
-				"sdf.obj", outpoints, Eigen::MatrixXi(), outtriangles);
+				out_dir + "/sdf.obj", outpoints, Eigen::MatrixXi(), outtriangles);
         }
     }
 
