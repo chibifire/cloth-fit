@@ -130,6 +130,7 @@ int main(int argc, char **argv)
 	const std::string source_skeleton_path = state.args["source_skeleton_path"];
 	const std::string target_skeleton_path = state.args["target_skeleton_path"];
 	const std::string avatar_skin_weights_path = state.args["avatar_skin_weights_path"];
+	const bool self_collision = state.args["contact"]["enabled"];
 
 	if (!std::filesystem::exists(avatar_mesh_path))
 		log_and_throw_error("Invalid avatar mesh path: {}", avatar_mesh_path);
@@ -175,8 +176,11 @@ int main(int argc, char **argv)
 			collision_vertices, collision_edges, collision_triangles);
 
 		const int n_avatar_verts = gstate.nc_avatar_v.rows();
-		collision_mesh.can_collide = [n_avatar_verts](size_t vi, size_t vj) {
-			return vi >= n_avatar_verts || vj >= n_avatar_verts;
+		collision_mesh.can_collide = [n_avatar_verts, self_collision](size_t vi, size_t vj) {
+			if (self_collision)
+				return vi >= n_avatar_verts || vj >= n_avatar_verts;
+			else
+				return (vi >= n_avatar_verts && vj < n_avatar_verts) || (vi < n_avatar_verts && vj >= n_avatar_verts);
 		};
 
 		gstate.check_intersections(collision_mesh, collision_vertices);
@@ -217,9 +221,19 @@ int main(int argc, char **argv)
 		// angle_form->set_weight(state.args["angle_penalty_weight"]);
 		// persistent_forms.push_back(angle_form);
 
-		// auto def_form = std::make_shared<DefGradForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
-		// def_form->set_weight(state.args["deformation_penalty_weight"]);
-		// persistent_forms.push_back(def_form);
+		if (state.args.contains("deformation_penalty_weight") && state.args["deformation_penalty_weight"] > 0)
+		{
+			auto def_form = std::make_shared<DefGradForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
+			def_form->set_weight(state.args["deformation_penalty_weight"]);
+			persistent_forms.push_back(def_form);
+		}
+
+		if (state.args.contains("normal_penalty_weight") && state.args["normal_penalty_weight"] > 0)
+		{
+			auto normal_form = std::make_shared<NormalForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
+			normal_form->set_weight(state.args["normal_penalty_weight"]);
+			persistent_forms.push_back(normal_form);
+		}
 
 		auto similarity_form = std::make_shared<NewSimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
 		similarity_form->set_weight(state.args["similarity_penalty_weight"]);

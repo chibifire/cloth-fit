@@ -534,7 +534,6 @@ namespace polyfem::solver
         for (int j = 0; j < curves_.size(); j++)
         {
             const Eigen::Vector3d center = V(curves_[j], Eigen::all).colwise().sum() / curves_[j].size();
-            const Eigen::Vector3d normal = fit_plane(V(curves_[j], Eigen::all)).normalized();
 
             // Project centers to original skeleton bones
             double closest_dist = std::numeric_limits<double>::max();
