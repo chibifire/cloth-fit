@@ -228,6 +228,87 @@ namespace polyfem::solver
 		hessian.setFromTriplets(triplets.begin(), triplets.end());
 	}
 
+	NormalForm::NormalForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : V_(V), F_(F) 
+	{
+		Eigen::MatrixXd normals = compute_normals(V, F_);
+		orig_areas = normals.rowwise().norm();
+		orig_areas /= 2;
+	}
+
+	double NormalForm::value_unweighted(const Eigen::VectorXd &x) const
+	{
+		double total = 0;
+		const Eigen::MatrixXd V = utils::unflatten(x, V_.cols()) + V_;
+		for (int e = 0; e < F_.rows(); e++)
+		{
+			Eigen::Vector3d a0 = V_.row(F_(e, 1)) - V_.row(F_(e, 0));
+			Eigen::Vector3d b0 = V_.row(F_(e, 2)) - V_.row(F_(e, 0));
+			Eigen::Vector3d n0 = a0.cross(b0).normalized();
+			Eigen::Vector3d a1 = V.row(F_(e, 1)) - V.row(F_(e, 0));
+			Eigen::Vector3d b1 = V.row(F_(e, 2)) - V.row(F_(e, 0));
+			Eigen::Vector3d n1 = a1.cross(b1).normalized();
+
+			total += orig_areas(e) * (1 - n0.dot(n1));
+		}
+		return total;
+	}
+
+	void NormalForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
+	{
+		gradv.setZero(x.size());
+		const Eigen::MatrixXd V = utils::unflatten(x, V_.cols()) + V_;
+		for (int e = 0; e < F_.rows(); e++)
+		{
+			Eigen::Vector3d a0 = V_.row(F_(e, 1)) - V_.row(F_(e, 0));
+			Eigen::Vector3d b0 = V_.row(F_(e, 2)) - V_.row(F_(e, 0));
+			Eigen::Vector3d n0 = a0.cross(b0).normalized();
+
+			Eigen::Matrix<double, 12, 1> local_grad;
+			normal_gradient(
+				V(F_(e, 0), 0), V(F_(e, 0), 1), V(F_(e, 0), 2),
+				V(F_(e, 1), 0), V(F_(e, 1), 1), V(F_(e, 1), 2),
+				V(F_(e, 2), 0), V(F_(e, 2), 1), V(F_(e, 2), 2),
+				n0(0), n0(1), n0(2),
+				local_grad.data());
+
+			for (int li = 0; li < 3; li++)
+				gradv.segment<3>(F_(e, li) * 3) += orig_areas(e) * local_grad.segment<3>(li * 3);
+		}
+	}
+
+	void NormalForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
+	{
+		POLYFEM_SCOPED_TIMER("normal hessian");
+		hessian.setZero();
+		hessian.resize(x.size(), x.size());
+		std::vector<Eigen::Triplet<double>> triplets;
+
+		const Eigen::MatrixXd V = utils::unflatten(x, V_.cols()) + V_;
+		for (int e = 0; e < F_.rows(); e++)
+		{
+			Eigen::Vector3d a0 = V_.row(F_(e, 1)) - V_.row(F_(e, 0));
+			Eigen::Vector3d b0 = V_.row(F_(e, 2)) - V_.row(F_(e, 0));
+			Eigen::Vector3d n0 = a0.cross(b0).normalized();
+
+			Eigen::Matrix<double, 12, 12> local_hess;
+			local_hess.setZero();
+			normal_hessian(
+				V(F_(e, 0), 0), V(F_(e, 0), 1), V(F_(e, 0), 2),
+				V(F_(e, 1), 0), V(F_(e, 1), 1), V(F_(e, 1), 2),
+				V(F_(e, 2), 0), V(F_(e, 2), 1), V(F_(e, 2), 2),
+				n0(0), n0(1), n0(2),
+				local_hess.data());
+
+			for (int i = 0; i < 3; i++)
+				for (int j = 0; j < 3; j++)
+					for (int di = 0; di < 3; di++)
+						for (int dj = 0; dj < 3; dj++)
+							triplets.emplace_back(3 * F_(e, i) + di, 3 * F_(e, j) + dj, orig_areas(e) * local_hess(i * 3 + di, j * 3 + dj));
+		}
+
+		hessian.setFromTriplets(triplets.begin(), triplets.end());
+	}
+
 	AngleForm::AngleForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : V_(V), F_(F)
 	{
 		igl::triangle_triangle_adjacency(F_, TT, TTi);

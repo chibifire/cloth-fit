@@ -365,5 +365,46 @@ namespace autogen {
         double c1y,
         double c1z,
         double hess[144]);
+
+    // def normal(a, b, c, d):
+    //     normal = numpy.cross(b - a, c - a)
+    //     return 1 - normal.dot(d)
+
+    // x = numpy.array(sympy.symbols(" ".join([f"t{i}_{d}" for i in range(4) for d in "xyz"])))
+    // CXXGradientGenerator(
+    //     normal(*numpy.split(x, 4)), x,
+    //     "normal_gradient", out_param_name="dA")
+    // CXXHessianGenerator(
+    //     normal(*numpy.split(x, 4)), x,
+    //     "normal_hessian", out_param_name="dA")
+    void normal_gradient(
+        double t0_x,
+        double t0_y,
+        double t0_z,
+        double t1_x,
+        double t1_y,
+        double t1_z,
+        double t2_x,
+        double t2_y,
+        double t2_z,
+        double t3_x,
+        double t3_y,
+        double t3_z,
+        double dA[12]);
+    // dA is (144×1) flattened in column-major order
+    void normal_hessian(
+        double t0_x,
+        double t0_y,
+        double t0_z,
+        double t1_x,
+        double t1_y,
+        double t1_z,
+        double t2_x,
+        double t2_y,
+        double t2_z,
+        double t3_x,
+        double t3_y,
+        double t3_z,
+        double dA[144]);
 }
 }

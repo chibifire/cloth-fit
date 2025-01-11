@@ -248,6 +248,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
         REQUIRE(grad.norm() / 1e-10 < 1.);
     }
 
+	forms.push_back(std::make_unique<NormalForm>(V, F));
 	forms.push_back(std::make_unique<CurveSizeForm>(V, curves));
 	forms.push_back(std::make_unique<OldCurveCenterTargetForm>(V, curves, target));
     forms.push_back(std::make_unique<AreaForm>(V, F, 1));

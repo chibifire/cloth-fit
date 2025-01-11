@@ -227,6 +227,7 @@ namespace polyfem {
         logger().debug("Save OBJ to {}", path + "/step_garment_" + std::to_string(index) + ".obj");
 
         igl::write_triangle_mesh(path + "/step_avatar_" + std::to_string(index) + ".obj", current_vertices.topRows(nc_avatar_v.rows()), nc_avatar_f);
+        igl::write_triangle_mesh(path + "/avatar.obj", avatar_v, avatar_f);
     }
 
     Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V)
