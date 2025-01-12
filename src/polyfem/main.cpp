@@ -221,18 +221,25 @@ int main(int argc, char **argv)
 		// angle_form->set_weight(state.args["angle_penalty_weight"]);
 		// persistent_forms.push_back(angle_form);
 
+		if (state.args.contains("area_penalty_weight") && state.args["area_penalty_weight"] > 0)
+		{
+			auto form = std::make_shared<AreaForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()), 1e-4);
+			form->set_weight(state.args["area_penalty_weight"]);
+			persistent_forms.push_back(form);
+		}
+
 		if (state.args.contains("deformation_penalty_weight") && state.args["deformation_penalty_weight"] > 0)
 		{
-			auto def_form = std::make_shared<DefGradForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
-			def_form->set_weight(state.args["deformation_penalty_weight"]);
-			persistent_forms.push_back(def_form);
+			auto form = std::make_shared<DefGradForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
+			form->set_weight(state.args["deformation_penalty_weight"]);
+			persistent_forms.push_back(form);
 		}
 
 		if (state.args.contains("normal_penalty_weight") && state.args["normal_penalty_weight"] > 0)
 		{
-			auto normal_form = std::make_shared<NormalForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
-			normal_form->set_weight(state.args["normal_penalty_weight"]);
-			persistent_forms.push_back(normal_form);
+			auto form = std::make_shared<NormalForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
+			form->set_weight(state.args["normal_penalty_weight"]);
+			persistent_forms.push_back(form);
 		}
 
 		auto similarity_form = std::make_shared<NewSimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
