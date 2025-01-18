@@ -930,6 +930,9 @@ namespace polyfem::solver
 				tmp << V.row(F_(i, le(j, 0))), V.row(F_(i, le(j, 1))), V.row(F_(i, lv(j))), V.row(F_(TT(i, j), lv(TTi(i, j)))), orig_coeffs.row(k);
 				similarity_hessian(tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5), tmp(6), tmp(7), tmp(8), tmp(9), tmp(10), tmp(11), tmp(12), tmp(13), tmp(14), tmp(15), tmp(16), tmp(17), h.data());
 
+				if (is_project_to_psd())
+					h = ipc::project_to_psd(h);
+
                 h *= 0.5 * (orig_areas(i) + orig_areas(TT(i, j)));
                 Eigen::Vector4i indices;
                 indices << F_(i, le(j, 0)), F_(i, le(j, 1)), F_(i, lv(j)), F_(TT(i, j), lv(TTi(i, j)));

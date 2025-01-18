@@ -324,9 +324,9 @@ namespace polyfem {
         target_skeleton_b = skeleton_b;
 
         io::read_matrix(target_avatar_skinning_weights_path, target_avatar_skinning_weights);
-        assert(target_avatar_skinning_weights.rows() == skeleton_v.rows());
-        assert(avatar_v.rows() == target_avatar_skinning_weights.cols());
-        assert(target_avatar_skinning_weights.minCoeff() >= 0. && target_avatar_skinning_weights.maxCoeff() <= 1.);
+        if (target_avatar_skinning_weights.rows() != skeleton_v.rows()
+             || avatar_v.rows() != target_avatar_skinning_weights.cols())
+            log_and_throw_error("Invalid skin weights dimension! {}x{} vs {}x{}", target_avatar_skinning_weights.rows(), target_avatar_skinning_weights.cols(), skeleton_v.rows(), avatar_v.rows());
     }
 
     void GarmentSolver::project_avatar_to_skeleton()
@@ -380,6 +380,7 @@ namespace polyfem {
 
         Eigen::VectorXi eid;
         Eigen::VectorXd coord;
+        Eigen::MatrixXd skinny_avatar_v_debug;
         // first pass
         {
             const int N = nc_avatar_v.rows();
@@ -420,11 +421,17 @@ namespace polyfem {
             skinny_avatar_v.setZero(nc_avatar_v.rows(), nc_avatar_v.cols());
             for (int i = 0; i < nc_avatar_v.rows(); i++)
                 skinny_avatar_v.row(i) += coord(i) * (skeleton_v(skeleton_b(eid(i), 1), Eigen::all) - skeleton_v(skeleton_b(eid(i), 0), Eigen::all)) + skeleton_v(skeleton_b(eid(i), 0), Eigen::all);
+
+            skinny_avatar_v_debug.setZero(nc_avatar_v.rows(), nc_avatar_v.cols());
+            for (int i = 0; i < nc_avatar_v.rows(); i++)
+                skinny_avatar_v_debug.row(i) += coord(i) * (target_skeleton_v(skeleton_b(eid(i), 1), Eigen::all) - target_skeleton_v(skeleton_b(eid(i), 0), Eigen::all)) + target_skeleton_v(skeleton_b(eid(i), 0), Eigen::all);
+
             skinny_avatar_f = nc_avatar_f;
         }
 
         // igl::write_triangle_mesh(out_folder + "/avatar_old.obj", nc_avatar_v, nc_avatar_f);
-        igl::write_triangle_mesh(out_folder + "/projected_avatar_old.obj", skinny_avatar_v, nc_avatar_f);
+        igl::write_triangle_mesh(out_folder + "/projected_avatar_old_source.obj", skinny_avatar_v, nc_avatar_f);
+        igl::write_triangle_mesh(out_folder + "/projected_avatar_old_target.obj", skinny_avatar_v_debug, nc_avatar_f);
 
         // iteratively reduce distance
         for (int iter = 0; iter < 10; iter++) {
@@ -548,11 +555,16 @@ namespace polyfem {
             skinny_avatar_f = nc_avatar_f;
         }
         
-        skinny_avatar_v += (nc_avatar_v - skinny_avatar_v) * 1e-5;
+        skinny_avatar_v += (nc_avatar_v - skinny_avatar_v) * 1e-2;
     }
 
     void GarmentSolver::normalize_meshes()
     {
+        // Center offset
+        const Eigen::RowVector3d center_offset = skeleton_v.colwise().sum() / skeleton_v.rows();
+        skeleton_v.rowwise() -= center_offset;
+        garment.v.rowwise() -= center_offset;
+
         // Source side
         const double source_scaling = 2. / bbox_size(skeleton_v).maxCoeff();
         skeleton_v *= source_scaling;

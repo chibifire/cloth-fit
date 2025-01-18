@@ -162,9 +162,9 @@ namespace polyfem::solver
     private:
         const Eigen::MatrixXd V_;
         std::vector<Eigen::VectorXi> curves_;
-		const Eigen::MatrixXd source_skeleton_v_;
-		const Eigen::MatrixXd target_skeleton_v_;
-		const Eigen::MatrixXi skeleton_edges_;
+		Eigen::MatrixXd source_skeleton_v_;
+		Eigen::MatrixXd target_skeleton_v_;
+		Eigen::MatrixXi skeleton_edges_;
 
 		Eigen::VectorXi bones;
 		std::vector<Eigen::VectorXd> relative_positions;

@@ -13,6 +13,12 @@
 namespace polyfem::solver
 {
     namespace {
+        std::string bone_name(int id)
+        {
+            std::array<std::string, 17> list = {{"LowerTorso","UpperTorso","Head","LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightHand","RightLowerArm","LeftUpperLeg","LeftLowerLeg","LeftFoot","RightUpperLeg","RightLowerLeg","RightFoot", "MidKnee", "MidFoot"}};
+            return list[id];
+        }
+
         Eigen::Vector2d point_edge_closest_distance(
             const Eigen::Vector3d &p,
             const Eigen::Vector3d &a,
@@ -66,7 +72,7 @@ namespace polyfem::solver
             if (bone(0) > bone(1))
                 std::swap(bone(0), bone(1));
 
-            if (n_bones == 23)
+            if (n_bones == 23 + 2)
             { 
                 if (bone(0) == 0)
                 {
@@ -82,10 +88,14 @@ namespace polyfem::solver
                         return false;
                     }
                 }
+                // else if (bone(0) == 14 && bone(1) == 15)
+                //     return false;
+                // else if (bone(0) == 19 && bone(1) == 20)
+                //     return false;
                 else
                     return true;
             }
-            else if (n_bones == 14)
+            else if (n_bones == 14 + 2)
             {
                 if (bone(0) == 1)
                 {
@@ -170,6 +180,7 @@ namespace polyfem::solver
         V_(V), source_skeleton_v_(source_skeleton_v),
         target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges)
     {
+        log_and_throw_error("Buggy!!");
         for (auto curve : curves)
         {
             curves_.push_back(curve.head(curve.size()-1));
@@ -525,6 +536,36 @@ namespace polyfem::solver
         V_(V), source_skeleton_v_(source_skeleton_v),
         target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges)
     {
+        // Insert one skeleton as the average of two legs
+        if (source_skeleton_v_.rows() == 15)
+        {
+            const int nvert = source_skeleton_v_.rows();
+            const int nbone = skeleton_edges_.rows();
+            skeleton_edges_.conservativeResize(nbone + 2, skeleton_edges_.cols());
+            source_skeleton_v_.conservativeResize(nvert + 2, source_skeleton_v_.cols());
+            target_skeleton_v_.conservativeResize(nvert + 2, target_skeleton_v_.cols());
+            source_skeleton_v_.row(nvert) = (source_skeleton_v_.row(10) + source_skeleton_v_.row(13)) / 2.;
+            source_skeleton_v_.row(nvert+1) = (source_skeleton_v_.row(11) + source_skeleton_v_.row(14)) / 2.;
+            target_skeleton_v_.row(nvert) = (target_skeleton_v_.row(10) + target_skeleton_v_.row(13)) / 2.;
+            target_skeleton_v_.row(nvert+1) = (target_skeleton_v_.row(11) + target_skeleton_v_.row(14)) / 2.;
+            skeleton_edges_.row(nbone) << 0, nvert;
+            skeleton_edges_.row(nbone+1) << nvert, nvert + 1;
+        }
+        else if (source_skeleton_v_.rows() == 24)
+        {
+            const int nvert = source_skeleton_v_.rows();
+            const int nbone = skeleton_edges_.rows();
+            skeleton_edges_.conservativeResize(nbone + 2, skeleton_edges_.cols());
+            source_skeleton_v_.conservativeResize(nvert + 2, source_skeleton_v_.cols());
+            target_skeleton_v_.conservativeResize(nvert + 2, target_skeleton_v_.cols());
+            source_skeleton_v_.row(nvert) = (source_skeleton_v_.row(2) + source_skeleton_v_.row(6)) / 2.;
+            source_skeleton_v_.row(nvert+1) = (source_skeleton_v_.row(3) + source_skeleton_v_.row(7)) / 2.;
+            target_skeleton_v_.row(nvert) = (target_skeleton_v_.row(2) + target_skeleton_v_.row(6)) / 2.;
+            target_skeleton_v_.row(nvert+1) = (target_skeleton_v_.row(3) + target_skeleton_v_.row(7)) / 2.;
+            skeleton_edges_.row(nbone) << 0, nvert;
+            skeleton_edges_.row(nbone+1) << nvert, nvert + 1;
+        }
+
         for (auto curve : curves)
         {
             curves_.push_back(curve.head(curve.size()-1));
@@ -537,23 +578,39 @@ namespace polyfem::solver
 
             // Project centers to original skeleton bones
             double closest_dist = std::numeric_limits<double>::max();
-            for (int i = 0; i < skeleton_edges.rows(); i++)
+            for (int i = 0; i < skeleton_edges_.rows(); i++)
             {
-                Eigen::Vector2i edge = skeleton_edges.row(i);
-                Eigen::Vector3d e0 = source_skeleton_v.row(edge(0));
-                Eigen::Vector3d e1 = source_skeleton_v.row(edge(1));
+                Eigen::Vector2i edge = skeleton_edges_.row(i);
+                Eigen::Vector3d e0 = source_skeleton_v_.row(edge(0));
+                Eigen::Vector3d e1 = source_skeleton_v_.row(edge(1));
                 Eigen::Vector2d tmp = point_edge_closest_distance(center, e0, e1);
-                if (tmp(0) < closest_dist && is_bone_available(skeleton_edges.rows(), edge))
+                if (tmp(0) < closest_dist && is_bone_available(skeleton_edges_.rows(), edge))
                 {
                     closest_dist = tmp(0);
                     bones(j) = i;
                 }
             }
+
+            Eigen::RowVector3d sdirec = (source_skeleton_v_.row(skeleton_edges_(bones(j), 1)) - source_skeleton_v_.row(skeleton_edges_(bones(j), 0)));
+            logger().debug("CurveTargetForm set curve center to bone {} - {}, direction is {}", skeleton_edges_(bones(j), 0), skeleton_edges_(bones(j), 1), sdirec.normalized());
+            // Eigen::RowVector3d tdirec = (target_skeleton_v_.row(skeleton_edges_(bones(j), 1)) - target_skeleton_v_.row(skeleton_edges_(bones(j), 0)));
+            // logger().debug("target direction is {}", tdirec.normalized());
+
+            // if (tdirec.dot(sdirec) / tdirec.norm() / sdirec.norm() > 0.99)
+            // {
+            //     logger().debug("Slightly modify the bone direction to match with the source...");
+            //     target_skeleton_v_.row(skeleton_edges_(bones(j), 1)) = sdirec.normalized() * tdirec.norm() + target_skeleton_v_.row(skeleton_edges_(bones(j), 0));
+
+            //     Eigen::RowVector3d tdirec = (target_skeleton_v_.row(skeleton_edges_(bones(j), 1)) - target_skeleton_v_.row(skeleton_edges_(bones(j), 0)));
+            //     logger().debug("new target direction is {}", tdirec.normalized());
+            // }
+
+            logger().debug("curve normal {}", fit_plane(V(curves_[j], Eigen::all)).transpose());
             
             relative_positions[j].resize(curves_[j].size());
             for (int i = 0; i < curves_[j].size(); i++)
             {
-                Eigen::Vector2d tmp = point_line_closest_distance<double>(V.row(curves_[j](i)), source_skeleton_v.row(skeleton_edges(bones(j), 0)), source_skeleton_v.row(skeleton_edges(bones(j), 1)));
+                Eigen::Vector2d tmp = point_line_closest_distance<double>(V.row(curves_[j](i)), source_skeleton_v_.row(skeleton_edges_(bones(j), 0)), source_skeleton_v_.row(skeleton_edges_(bones(j), 1)));
                 relative_positions[j](i) = tmp(1);
             }
         }
@@ -638,6 +695,8 @@ namespace polyfem::solver
         {
             const auto &curve = curves_[j];
 
+            // logger().debug("curve normal {}", fit_plane(V(curves_[j], Eigen::all)).transpose());
+
             const int id = bones(j);
             for (int i = 0; i < curve.size(); i++)
             {
@@ -659,10 +718,14 @@ namespace polyfem::solver
 
                 ADHess err = pow(relative_positions[j](i) - tmp(1), 2) / 2.;
 
+				Eigen::Matrix<double, 4, 4> h = err.getHessian();
+				if (is_project_to_psd())
+					h = ipc::project_to_psd(h);
+
                 std::array<int, 4> indices{{curve(i) * 3 + 1, curve(i) * 3 + 2, curve(i) * 3 + 3, 0}};
                 for (int k = 0; k < 4; k++)
                     for (int l = 0; l < 4; l++)
-                        T.emplace_back(indices[k], indices[l], err.getHessian()(k, l));
+                        T.emplace_back(indices[k], indices[l], h(k, l));
             }
         }
 

@@ -622,11 +622,15 @@ namespace polyfem::solver
 
 				ADHess err = (pow(diff_val(0) - orig_angles[c](i, 0), 2) + pow(diff_val(1) - orig_angles[c](i, 1), 2)) / 2.;
 
+				Eigen::Matrix<double, 12, 12> h = err.getHessian();
+				if (is_project_to_psd())
+					h = ipc::project_to_psd(h);
+
 				for (int lj = 0; lj < 4; lj++)
 					for (int dj = 0; dj < 3; dj++)
 						for (int li = 0; li < 4; li++)
 							for (int di = 0; di < 3; di++)
-								triplets.emplace_back(curve(i + li) * 3 + di, curve(i + lj) * 3 + dj, err.getHessian()(li * 3 + di, lj * 3 + dj));
+								triplets.emplace_back(curve(i + li) * 3 + di, curve(i + lj) * 3 + dj, h(li * 3 + di, lj * 3 + dj));
 			}
 		}
 
