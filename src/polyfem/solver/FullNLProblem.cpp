@@ -51,13 +51,21 @@ namespace polyfem::solver
 	void FullNLProblem::line_search_begin(const TVector &x0, const TVector &x1)
 	{
 		for (auto &f : forms_)
+		{
+			if (!f->enabled())
+				continue;
 			f->line_search_begin(x0, x1);
+		}
 	}
 
 	void FullNLProblem::line_search_end()
 	{
 		for (auto &f : forms_)
+		{
+			if (!f->enabled())
+				continue;
 			f->line_search_end();
+		}
 	}
 
 	double FullNLProblem::max_step_size(const TVector &x0, const TVector &x1)
@@ -124,12 +132,20 @@ namespace polyfem::solver
 	void FullNLProblem::solution_changed(const TVector &x)
 	{
 		for (auto &f : forms_)
+		{
+			if (!f->enabled())
+				continue;
 			f->solution_changed(x);
+		}
 	}
 
 	void FullNLProblem::post_step(const polysolve::nonlinear::PostStepData &data)
 	{
 		for (auto &f : forms_)
+		{
+			if (!f->enabled())
+				continue;
 			f->post_step(data);
+		}
 	}
 } // namespace polyfem::solver
