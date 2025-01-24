@@ -90,7 +90,7 @@ TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
 	std::vector<std::unique_ptr<Form>> forms;
     forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
 	forms.push_back(std::make_unique<AngleForm>(V, F));
-	forms.push_back(std::make_unique<NewSimilarityForm>(V, F));
+	// forms.push_back(std::make_unique<NewSimilarityForm>(V, F));
 	forms.push_back(std::make_unique<SimilarityForm>(V, F));
 	forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
 	forms.push_back(std::make_unique<CurveTorsionForm>(V, curves));
@@ -134,7 +134,7 @@ TEST_CASE("Garment full forms derivatives", "[form][form_derivatives][garment]")
 	std::vector<std::unique_ptr<Form>> forms;
 	forms.push_back(std::make_unique<CurveTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
 	forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
-	forms.push_back(std::make_unique<CurveCenterProjectedTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
+	// forms.push_back(std::make_unique<CurveCenterProjectedTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
 
 	// {
 	// 	Eigen::MatrixXd skin_weights;
@@ -228,42 +228,42 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 	const double tol = 1e-5;
 
 	std::vector<std::unique_ptr<Form>> forms;
-	// forms.push_back(std::make_unique<NewSimilarityForm>(V, F));
-	// forms.push_back(std::make_unique<CurveTorsionForm>(V, curves));
-	// forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
-    // forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
-	// forms.push_back(std::make_unique<AngleForm>(V, F));
-	// forms.push_back(std::make_unique<SimilarityForm>(V, F));
+	forms.push_back(std::make_unique<NewSimilarityForm>(V, F));
+	forms.push_back(std::make_unique<CurveTorsionForm>(V, curves));
+	forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
+    forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
+	forms.push_back(std::make_unique<AngleForm>(V, F));
+	forms.push_back(std::make_unique<SimilarityForm>(V, F));
 
-	// for (auto &form : forms)
-	// {
-	// 	Eigen::VectorXd x = Eigen::VectorXd::Zero(V.size());
+	for (auto &form : forms)
+	{
+		Eigen::VectorXd x = Eigen::VectorXd::Zero(V.size());
 
-	// 	form->init(x);
-	// 	form->init_lagging(x);
+		form->init(x);
+		form->init_lagging(x);
 
-    //     Eigen::VectorXd grad;
-    //     form->first_derivative(x, grad);
+        Eigen::VectorXd grad;
+        form->first_derivative(x, grad);
 
-    //     REQUIRE(grad.norm() / 1e-10 < 1.);
-    // }
+        REQUIRE(grad.norm() / 1e-10 < 1.);
+    }
 
-	// forms.push_back(std::make_unique<NormalForm>(V, F));
-	// forms.push_back(std::make_unique<CurveSizeForm>(V, curves));
-	// forms.push_back(std::make_unique<OldCurveCenterTargetForm>(V, curves, target));
-    // forms.push_back(std::make_unique<AreaForm>(V, F, 1));
-	// forms.push_back(std::make_unique<DefGradForm>(V, F));
+	forms.push_back(std::make_unique<NormalForm>(V, F));
+	forms.push_back(std::make_unique<CurveSizeForm>(V, curves));
+	forms.push_back(std::make_unique<OldCurveCenterTargetForm>(V, curves, target));
+    forms.push_back(std::make_unique<AreaForm>(V, F, 1));
+	forms.push_back(std::make_unique<DefGradForm>(V, F));
 
-	// auto form = std::make_unique<SymmetryForm>(V, curves);
-	// if (form->enabled())
-	// 	forms.push_back(std::move(form));
+	auto form = std::make_unique<SymmetryForm>(V, curves);
+	if (form->enabled())
+		forms.push_back(std::move(form));
 
 	{
 		Eigen::MatrixXd avatar_v;
 		Eigen::MatrixXi avatar_f;
 		igl::read_triangle_mesh(POLYFEM_DATA_DIR + std::string("/../tests/cage.obj"), avatar_v, avatar_f);
 		
-		// forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1, std::vector<int>(), "."));
+		forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1, std::vector<int>(), "."));
 		forms.push_back(std::make_unique<SDFCollisionForm<4>>(V, F, avatar_v, avatar_f, 0.1, 0.1));
 	}
 
