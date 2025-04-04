@@ -10,6 +10,8 @@
 #include <igl/write_triangle_mesh.h>
 #include <finitediff.hpp>
 
+constexpr bool extra_skeleton_bone_for_skirt = true;
+
 namespace polyfem::solver
 {
     namespace {
@@ -72,7 +74,7 @@ namespace polyfem::solver
             if (bone(0) > bone(1))
                 std::swap(bone(0), bone(1));
 
-            if (n_bones == 23 + 2)
+            if (n_bones == 23 + (extra_skeleton_bone_for_skirt ? 2 : 0))
             { 
                 if (bone(0) == 0)
                 {
@@ -95,7 +97,7 @@ namespace polyfem::solver
                 else
                     return true;
             }
-            else if (n_bones == 14 + 2)
+            else if (n_bones == 14 + (extra_skeleton_bone_for_skirt ? 2 : 0))
             {
                 if (bone(0) == 1)
                 {
@@ -537,33 +539,36 @@ namespace polyfem::solver
         target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges)
     {
         // Insert one skeleton as the average of two legs
-        if (source_skeleton_v_.rows() == 15)
+        if constexpr (extra_skeleton_bone_for_skirt)
         {
-            const int nvert = source_skeleton_v_.rows();
-            const int nbone = skeleton_edges_.rows();
-            skeleton_edges_.conservativeResize(nbone + 2, skeleton_edges_.cols());
-            source_skeleton_v_.conservativeResize(nvert + 2, source_skeleton_v_.cols());
-            target_skeleton_v_.conservativeResize(nvert + 2, target_skeleton_v_.cols());
-            source_skeleton_v_.row(nvert) = (source_skeleton_v_.row(10) + source_skeleton_v_.row(13)) / 2.;
-            source_skeleton_v_.row(nvert+1) = (source_skeleton_v_.row(11) + source_skeleton_v_.row(14)) / 2.;
-            target_skeleton_v_.row(nvert) = (target_skeleton_v_.row(10) + target_skeleton_v_.row(13)) / 2.;
-            target_skeleton_v_.row(nvert+1) = (target_skeleton_v_.row(11) + target_skeleton_v_.row(14)) / 2.;
-            skeleton_edges_.row(nbone) << 0, nvert;
-            skeleton_edges_.row(nbone+1) << nvert, nvert + 1;
-        }
-        else if (source_skeleton_v_.rows() == 24)
-        {
-            const int nvert = source_skeleton_v_.rows();
-            const int nbone = skeleton_edges_.rows();
-            skeleton_edges_.conservativeResize(nbone + 2, skeleton_edges_.cols());
-            source_skeleton_v_.conservativeResize(nvert + 2, source_skeleton_v_.cols());
-            target_skeleton_v_.conservativeResize(nvert + 2, target_skeleton_v_.cols());
-            source_skeleton_v_.row(nvert) = (source_skeleton_v_.row(2) + source_skeleton_v_.row(6)) / 2.;
-            source_skeleton_v_.row(nvert+1) = (source_skeleton_v_.row(3) + source_skeleton_v_.row(7)) / 2.;
-            target_skeleton_v_.row(nvert) = (target_skeleton_v_.row(2) + target_skeleton_v_.row(6)) / 2.;
-            target_skeleton_v_.row(nvert+1) = (target_skeleton_v_.row(3) + target_skeleton_v_.row(7)) / 2.;
-            skeleton_edges_.row(nbone) << 0, nvert;
-            skeleton_edges_.row(nbone+1) << nvert, nvert + 1;
+            if (source_skeleton_v_.rows() == 15)
+            {
+                const int nvert = source_skeleton_v_.rows();
+                const int nbone = skeleton_edges_.rows();
+                skeleton_edges_.conservativeResize(nbone + 2, skeleton_edges_.cols());
+                source_skeleton_v_.conservativeResize(nvert + 2, source_skeleton_v_.cols());
+                target_skeleton_v_.conservativeResize(nvert + 2, target_skeleton_v_.cols());
+                source_skeleton_v_.row(nvert) = (source_skeleton_v_.row(10) + source_skeleton_v_.row(13)) / 2.;
+                source_skeleton_v_.row(nvert+1) = (source_skeleton_v_.row(11) + source_skeleton_v_.row(14)) / 2.;
+                target_skeleton_v_.row(nvert) = (target_skeleton_v_.row(10) + target_skeleton_v_.row(13)) / 2.;
+                target_skeleton_v_.row(nvert+1) = (target_skeleton_v_.row(11) + target_skeleton_v_.row(14)) / 2.;
+                skeleton_edges_.row(nbone) << 0, nvert;
+                skeleton_edges_.row(nbone+1) << nvert, nvert + 1;
+            }
+            else if (source_skeleton_v_.rows() == 24)
+            {
+                const int nvert = source_skeleton_v_.rows();
+                const int nbone = skeleton_edges_.rows();
+                skeleton_edges_.conservativeResize(nbone + 2, skeleton_edges_.cols());
+                source_skeleton_v_.conservativeResize(nvert + 2, source_skeleton_v_.cols());
+                target_skeleton_v_.conservativeResize(nvert + 2, target_skeleton_v_.cols());
+                source_skeleton_v_.row(nvert) = (source_skeleton_v_.row(2) + source_skeleton_v_.row(6)) / 2.;
+                source_skeleton_v_.row(nvert+1) = (source_skeleton_v_.row(3) + source_skeleton_v_.row(7)) / 2.;
+                target_skeleton_v_.row(nvert) = (target_skeleton_v_.row(2) + target_skeleton_v_.row(6)) / 2.;
+                target_skeleton_v_.row(nvert+1) = (target_skeleton_v_.row(3) + target_skeleton_v_.row(7)) / 2.;
+                skeleton_edges_.row(nbone) << 0, nvert;
+                skeleton_edges_.row(nbone+1) << nvert, nvert + 1;
+            }
         }
 
         for (auto curve : curves)

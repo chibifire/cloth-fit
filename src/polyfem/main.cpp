@@ -144,9 +144,6 @@ int main(int argc, char **argv)
 	if (!std::filesystem::exists(target_skeleton_path))
 		log_and_throw_error("Invalid target skeleton mesh path: {}", target_skeleton_path);
 
-	if (!std::filesystem::exists(avatar_skin_weights_path))
-		log_and_throw_error("Invalid skin weights path: {}", avatar_skin_weights_path);
-
 	gstate.out_folder = out_folder;
 
 	gstate.read_meshes(avatar_mesh_path, source_skeleton_path, target_skeleton_path, avatar_skin_weights_path);

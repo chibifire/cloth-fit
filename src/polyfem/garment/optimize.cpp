@@ -323,10 +323,18 @@ namespace polyfem {
             log_and_throw_error("Inconsistent skeletons!");
         target_skeleton_b = skeleton_b;
 
-        io::read_matrix(target_avatar_skinning_weights_path, target_avatar_skinning_weights);
-        if (target_avatar_skinning_weights.rows() != skeleton_v.rows()
-             || avatar_v.rows() != target_avatar_skinning_weights.cols())
-            log_and_throw_error("Invalid skin weights dimension! {}x{} vs {}x{}", target_avatar_skinning_weights.rows(), target_avatar_skinning_weights.cols(), skeleton_v.rows(), avatar_v.rows());
+        if (std::filesystem::exists(target_avatar_skinning_weights_path))
+        {
+            io::read_matrix(target_avatar_skinning_weights_path, target_avatar_skinning_weights);
+            if (target_avatar_skinning_weights.rows() != skeleton_v.rows()
+                || avatar_v.rows() != target_avatar_skinning_weights.cols())
+                log_and_throw_error("Invalid skin weights dimension! {}x{} vs {}x{}", target_avatar_skinning_weights.rows(), target_avatar_skinning_weights.cols(), skeleton_v.rows(), avatar_v.rows());
+        }
+        else
+        {
+            target_avatar_skinning_weights.setZero(0, 0);
+            logger().warn("Cannot find target avatar skinning weights, use pure distance-based projection instead...");
+        }
     }
 
     void GarmentSolver::project_avatar_to_skeleton()
@@ -357,25 +365,16 @@ namespace polyfem {
             floydWarshall(graph, dist, parent);
         }
 
+        const bool has_target_avatar_skin_weights = target_avatar_skinning_weights.size() > 0;
+
         // explode avatar mesh
         Eigen::MatrixXd new_skinning_weights;
         {
             Eigen::VectorXi index_map;
             explode_trimesh(avatar_v, avatar_f, nc_avatar_v, nc_avatar_f, index_map);
-            new_skinning_weights = target_avatar_skinning_weights(Eigen::all, index_map);
+            if (has_target_avatar_skin_weights)
+                new_skinning_weights = target_avatar_skinning_weights(Eigen::all, index_map);
         }
-        // nc_avatar_v = Eigen::MatrixXd::Zero(avatar_f.size(), 3);
-        // Eigen::MatrixXd new_skinning_weights(target_avatar_skinning_weights.rows(), nc_avatar_v.rows());
-        // nc_avatar_f = avatar_f;
-        // for (int f = 0; f < avatar_f.rows(); f++)
-        // {
-        //     for (int i = 0; i < avatar_f.cols(); i++)
-        //     {
-        //         nc_avatar_v.row(f * avatar_f.cols() + i) = avatar_v.row(avatar_f(f, i));
-        //         new_skinning_weights.col(f * avatar_f.cols() + i) = target_avatar_skinning_weights.col(avatar_f(f, i));
-        //         nc_avatar_f(f, i) = f * avatar_f.cols() + i;
-        //     }
-        // }
         
 
         Eigen::VectorXi eid;
@@ -390,13 +389,17 @@ namespace polyfem {
             eid = -Eigen::VectorXi::Ones(N);
             for (int i = 0; i < N; i++)
             {
-                Eigen::Index maxRow, maxCol;
-                const double max_skin_weight = new_skinning_weights.col(i).maxCoeff(&maxRow, &maxCol);
+                Eigen::Index maxRow;
+                if (has_target_avatar_skin_weights)
+                {
+                    Eigen::Index maxCol;
+                    const double max_skin_weight = new_skinning_weights.col(i).maxCoeff(&maxRow, &maxCol);
+                    assert(maxCol == 0);
+                }
 
-                assert(maxCol == 0);
                 for (int e = 0; e < target_skeleton_b.rows(); e++)
                 {
-                    if (target_skeleton_b(e, 0) == maxRow || target_skeleton_b(e, 1) == maxRow)
+                    if (!has_target_avatar_skin_weights || target_skeleton_b(e, 0) == maxRow || target_skeleton_b(e, 1) == maxRow)
                     {
                         Eigen::Vector2d tmp1 = project_to_edge(target_skeleton_v.row(target_skeleton_b(e, 0)), target_skeleton_v.row(target_skeleton_b(e, 1)), nc_avatar_v.row(i));
                         if (tmp1(0) < dists(i))
