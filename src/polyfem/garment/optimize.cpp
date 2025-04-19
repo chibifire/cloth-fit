@@ -432,11 +432,25 @@ namespace polyfem {
             skinny_avatar_f = nc_avatar_f;
         }
 
-        // igl::write_triangle_mesh(out_folder + "/avatar_old.obj", nc_avatar_v, nc_avatar_f);
+        igl::write_triangle_mesh(out_folder + "/avatar_old.obj", nc_avatar_v, nc_avatar_f);
         igl::write_triangle_mesh(out_folder + "/projected_avatar_old_source.obj", skinny_avatar_v, nc_avatar_f);
         igl::write_triangle_mesh(out_folder + "/projected_avatar_old_target.obj", skinny_avatar_v_debug, nc_avatar_f);
 
+        // for (int iter = 0; iter <= 100; iter++)
+        // {
+        //     Eigen::MatrixXd v = (skinny_avatar_v_debug - nc_avatar_v) * (iter / 100.) + nc_avatar_v;
+        //     igl::write_triangle_mesh(out_folder + "/proj1_" + std::to_string(iter) + ".obj", v, nc_avatar_f);
+        // }
+
+        // for (int iter = 0; iter <= 100; iter++)
+        // {
+        //     Eigen::MatrixXd v = (skinny_avatar_v - skinny_avatar_v_debug) * (iter / 100.) + skinny_avatar_v_debug;
+        //     igl::write_triangle_mesh(out_folder + "/proj2_" + std::to_string(iter) + ".obj", v, nc_avatar_f);
+        // }
+
         // iteratively reduce distance
+        int n_op = 0;
+        int save_iter = 0;
         for (int iter = 0; iter < 10; iter++) {
             const int n_faces = skinny_avatar_f.rows();
             std::vector<Eigen::Matrix<double, 6, 3>> new_faces;
@@ -520,32 +534,40 @@ namespace polyfem {
                     nc_avatar_v.row(a) += (nc_avatar_v.row(b) - nc_avatar_v.row(a)) * ((double)inserted_tmp.size() / (inserted_tmp.size() + 1));
                     eid(a) = inserted_tmp.back()[1];
                 }
+
+                n_op++;
+
+                if (f == n_faces - 1 || new_faces.size() > 5)
+                {
+                    {
+                        Eigen::MatrixXd tmp(skinny_avatar_v.rows() + new_faces.size() * 3, 3);
+                        tmp.topRows(skinny_avatar_v.rows()) = skinny_avatar_v;
+                        for (int i = 0; i < new_faces.size(); i++)
+                            tmp.block(skinny_avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].topRows(3);
+                        std::swap(skinny_avatar_v, tmp);
+                    }
+        
+                    {
+                        Eigen::MatrixXd tmp(nc_avatar_v.rows() + new_faces.size() * 3, 3);
+                        tmp.topRows(nc_avatar_v.rows()) = nc_avatar_v;
+                        for (int i = 0; i < new_faces.size(); i++)
+                            tmp.block(nc_avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].bottomRows(3);
+                        std::swap(nc_avatar_v, tmp);
+                    }
+        
+                    skinny_avatar_f = Eigen::VectorXi::LinSpaced(skinny_avatar_v.rows(), 0, skinny_avatar_v.rows() - 1).reshaped(3, skinny_avatar_v.rows() / 3).transpose();
+                    nc_avatar_f = skinny_avatar_f;
+                
+                    // igl::write_triangle_mesh(out_folder + "/projected_avatar_new_" + std::to_string(save_iter) + ".obj", skinny_avatar_v, skinny_avatar_f);
+                    // igl::write_triangle_mesh(out_folder + "/avatar_new_" + std::to_string(save_iter) + ".obj", nc_avatar_v, nc_avatar_f);
+                    // save_iter++;
+                    
+                    new_faces.clear();
+                }
             }
 
-            if (new_faces.size() == 0)
+            if (n_faces == nc_avatar_f.rows())
                 break;
-        
-            {
-                Eigen::MatrixXd tmp(skinny_avatar_v.rows() + new_faces.size() * 3, 3);
-                tmp.topRows(skinny_avatar_v.rows()) = skinny_avatar_v;
-                for (int i = 0; i < new_faces.size(); i++)
-                    tmp.block(skinny_avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].topRows(3);
-                std::swap(skinny_avatar_v, tmp);
-            }
-
-            {
-                Eigen::MatrixXd tmp(nc_avatar_v.rows() + new_faces.size() * 3, 3);
-                tmp.topRows(nc_avatar_v.rows()) = nc_avatar_v;
-                for (int i = 0; i < new_faces.size(); i++)
-                    tmp.block(nc_avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].bottomRows(3);
-                std::swap(nc_avatar_v, tmp);
-            }
-
-            skinny_avatar_f = Eigen::VectorXi::LinSpaced(skinny_avatar_v.rows(), 0, skinny_avatar_v.rows() - 1).reshaped(3, skinny_avatar_v.rows() / 3).transpose();
-            nc_avatar_f = skinny_avatar_f;
-        
-            igl::write_triangle_mesh(out_folder + "/projected_avatar_new_" + std::to_string(iter) + ".obj", skinny_avatar_v, skinny_avatar_f);
-            igl::write_triangle_mesh(out_folder + "/avatar_new_" + std::to_string(iter) + ".obj", nc_avatar_v, nc_avatar_f);
         }
 
         {
