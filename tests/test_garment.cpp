@@ -200,7 +200,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 	if (form->enabled())
 		forms.push_back(std::move(form));
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 	{
 		Eigen::MatrixXd avatar_v;
 		Eigen::MatrixXi avatar_f;
