@@ -89,17 +89,6 @@ TEST_CASE("Garment full forms derivatives", "[form][form_derivatives][garment]")
 	std::vector<std::unique_ptr<Form>> forms;
 	forms.push_back(std::make_unique<CurveTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
 	forms.push_back(std::make_unique<CurveCenterTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
-	// forms.push_back(std::make_unique<CurveCenterProjectedTargetForm>(V, curves, source_skeleton_v, target_skeleton_v, skeleton_edges));
-
-	// {
-	// 	Eigen::MatrixXd skin_weights;
-    //     io::read_matrix(POLYFEM_DATA_DIR + std::string("/../tests/skin.txt"), skin_weights);
-    //     assert(skin_weights.rows() == source_skeleton_v.rows());
-    //     assert(V.rows() == skin_weights.cols());
-    //     assert(skin_weights.minCoeff() >= 0. && skin_weights.maxCoeff() <= 1.);
-
-	// 	forms.push_back(std::make_unique<GlobalPositionalForm>(V, F, source_skeleton_v, target_skeleton_v, skeleton_edges, skin_weights));
-	// }
 
 	for (auto &form : forms)
 	{
@@ -211,6 +200,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 	if (form->enabled())
 		forms.push_back(std::move(form));
 
+#ifndef NDEBUG
 	{
 		Eigen::MatrixXd avatar_v;
 		Eigen::MatrixXi avatar_f;
@@ -219,6 +209,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 		forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1, std::vector<int>(), "."));
 		forms.push_back(std::make_unique<SDFCollisionForm<4>>(V, F, avatar_v, avatar_f, 0.1, 0.1));
 	}
+#endif
 
 	for (auto &form : forms)
 	{

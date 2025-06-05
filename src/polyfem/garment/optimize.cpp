@@ -432,21 +432,9 @@ namespace polyfem {
             skinny_avatar_f = nc_avatar_f;
         }
 
-        igl::write_triangle_mesh(out_folder + "/avatar_old.obj", nc_avatar_v, nc_avatar_f);
-        igl::write_triangle_mesh(out_folder + "/projected_avatar_old_source.obj", skinny_avatar_v, nc_avatar_f);
-        igl::write_triangle_mesh(out_folder + "/projected_avatar_old_target.obj", skinny_avatar_v_debug, nc_avatar_f);
-
-        // for (int iter = 0; iter <= 100; iter++)
-        // {
-        //     Eigen::MatrixXd v = (skinny_avatar_v_debug - nc_avatar_v) * (iter / 100.) + nc_avatar_v;
-        //     igl::write_triangle_mesh(out_folder + "/proj1_" + std::to_string(iter) + ".obj", v, nc_avatar_f);
-        // }
-
-        // for (int iter = 0; iter <= 100; iter++)
-        // {
-        //     Eigen::MatrixXd v = (skinny_avatar_v - skinny_avatar_v_debug) * (iter / 100.) + skinny_avatar_v_debug;
-        //     igl::write_triangle_mesh(out_folder + "/proj2_" + std::to_string(iter) + ".obj", v, nc_avatar_f);
-        // }
+        // igl::write_triangle_mesh(out_folder + "/avatar_old.obj", nc_avatar_v, nc_avatar_f);
+        // igl::write_triangle_mesh(out_folder + "/projected_avatar_old_source.obj", skinny_avatar_v, nc_avatar_f);
+        // igl::write_triangle_mesh(out_folder + "/projected_avatar_old_target.obj", skinny_avatar_v_debug, nc_avatar_f);
 
         // iteratively reduce distance
         int n_op = 0;
