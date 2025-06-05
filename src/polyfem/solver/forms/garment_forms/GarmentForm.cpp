@@ -565,7 +565,7 @@ namespace polyfem::solver
 		hessian.setFromTriplets(triplets.begin(), triplets.end());
 	}
 
-	SimilarityForm::SimilarityForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : V_(V), F_(F)
+	RelativeScalingForm::RelativeScalingForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : V_(V), F_(F)
 	{
 		igl::triangle_triangle_adjacency(F_, TT, TTi);
 
@@ -620,7 +620,7 @@ namespace polyfem::solver
 		}
 	}
 
-	double SimilarityForm::value_unweighted(const Eigen::VectorXd &x) const
+	double RelativeScalingForm::value_unweighted(const Eigen::VectorXd &x) const
 	{
 		const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
@@ -654,7 +654,7 @@ namespace polyfem::solver
 		return result / 2.;
 	}
 
-	void SimilarityForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
+	void RelativeScalingForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
 	{
 		const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
@@ -703,7 +703,7 @@ namespace polyfem::solver
 		}
 	}
 
-	void SimilarityForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
+	void RelativeScalingForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
 	{
 		POLYFEM_SCOPED_TIMER("similarity hessian");
 		const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
@@ -782,7 +782,7 @@ namespace polyfem::solver
 		hessian.setFromTriplets(triplets.begin(), triplets.end());
 	}
 
-	NewSimilarityForm::NewSimilarityForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : V_(V), F_(F)
+	SimilarityForm::SimilarityForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : V_(V), F_(F)
 	{
 		igl::triangle_triangle_adjacency(F_, TT, TTi);
 
@@ -830,7 +830,7 @@ namespace polyfem::solver
 				if (TT(i, j) < 0)
 					continue;
 
-				const Eigen::Vector3d v = (V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, lv(j)))).normalized();
+				const Eigen::Vector3d v = (V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, lv(j))));
 				const Eigen::Vector3d e = V.row(F_(i, le(j, 1))) - V.row(F_(i, le(j, 0)));
 				const Eigen::Vector3d e0 = V.row(F_(i, lv(j))) - V.row(F_(i, le(j, 0)));
 				const Eigen::Vector3d e1 = V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, le(j, 0)));
@@ -842,7 +842,7 @@ namespace polyfem::solver
 		}
 	}
 
-	double NewSimilarityForm::value_unweighted(const Eigen::VectorXd &x) const
+	double SimilarityForm::value_unweighted(const Eigen::VectorXd &x) const
 	{
 		const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
@@ -878,7 +878,7 @@ namespace polyfem::solver
 		return result / 2.;
 	}
 
-	void NewSimilarityForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
+	void SimilarityForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
 	{
 		const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
 
@@ -945,7 +945,7 @@ namespace polyfem::solver
 		}
 	}
 
-	void NewSimilarityForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
+	void SimilarityForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
 	{
 		POLYFEM_SCOPED_TIMER("similarity hessian");
 		const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;

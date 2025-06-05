@@ -3,31 +3,13 @@
 # ###############################################################################
 
 set(test_sources
-  test_assembler.cpp
-  test_bases.cpp
-  test_clipping.cpp
-  test_diff.cpp
-  test_opt.cpp
-  test_cmesh.cpp
-  test_collision_proxy.cpp
-  test_form_derivatives.cpp
   test_garment.cpp
   test_geometry_utils.cpp
   test_hdf5.cpp
-  test_interpolation.cpp
   test_matrix.cpp
-  test_ncmesh.cpp
   test_normal.cpp
-  test_output.cpp
-  test_parametrizations.cpp
-  test_problem.cpp
-  test_quadrature.cpp
-  test_rbf.cpp
-  test_restart.cpp
   test_tbb.cpp
-  test_time_integrators.cpp
   test_utils.cpp
-  verify_run.cpp
 )
 
 add_executable(unit_tests ${test_sources})

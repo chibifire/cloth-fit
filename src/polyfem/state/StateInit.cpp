@@ -224,105 +224,10 @@ namespace polyfem
 
 		has_dhat = args_in["contact"].contains("dhat");
 
-		init_time();
-
-		if (is_contact_enabled())
-		{
-			if (args["solver"]["contact"]["friction_iterations"] == 0)
-			{
-				logger().info("specified friction_iterations is 0; disabling friction");
-				args["contact"]["friction_coefficient"] = 0.0;
-			}
-			else if (args["solver"]["contact"]["friction_iterations"] < 0)
-			{
-				args["solver"]["contact"]["friction_iterations"] = std::numeric_limits<int>::max();
-			}
-			if (args["contact"]["friction_coefficient"] == 0.0)
-			{
-				args["solver"]["contact"]["friction_iterations"] = 0;
-			}
-		}
-		else
 		{
 			args["solver"]["contact"]["friction_iterations"] = 0;
 			args["contact"]["friction_coefficient"] = 0;
 			args["contact"]["periodic"] = false;
-		}
-
-		const std::string formulation = this->formulation();
-		assembler = assembler::AssemblerUtils::make_assembler(formulation);
-		assert(assembler->name() == formulation);
-		mass_matrix_assembler = std::make_shared<assembler::Mass>();
-		const auto other_name = assembler::AssemblerUtils::other_assembler_name(formulation);
-
-		if (!other_name.empty())
-		{
-			mixed_assembler = assembler::AssemblerUtils::make_mixed_assembler(formulation);
-			pressure_assembler = assembler::AssemblerUtils::make_assembler(other_name);
-		}
-
-		if (!args.contains("preset_problem"))
-		{
-			if (!assembler->is_tensor())
-				problem = std::make_shared<assembler::GenericScalarProblem>("GenericScalar");
-			else
-				problem = std::make_shared<assembler::GenericTensorProblem>("GenericTensor");
-
-			problem->clear();
-			if (!args["time"].is_null())
-			{
-				const auto tmp = R"({"is_time_dependent": true})"_json;
-				problem->set_parameters(tmp);
-			}
-			// important for the BC
-
-			auto bc = args["boundary_conditions"];
-			bc["root_path"] = root_path();
-			problem->set_parameters(bc);
-			problem->set_parameters(args["initial_conditions"]);
-
-			problem->set_parameters(args["output"]);
-		}
-		else
-		{
-			if (args["preset_problem"]["type"] == "Kernel")
-			{
-				problem = std::make_shared<KernelProblem>("Kernel", *assembler);
-				problem->clear();
-				KernelProblem &kprob = *dynamic_cast<KernelProblem *>(problem.get());
-			}
-			else
-			{
-				problem = ProblemFactory::factory().get_problem(args["preset_problem"]["type"]);
-				problem->clear();
-			}
-			// important for the BC
-			problem->set_parameters(args["preset_problem"]);
-		}
-
-		problem->set_units(*assembler, units);
-
-		if (optimization_enabled == solver::CacheLevel::Derivatives)
-		{
-			if (is_contact_enabled())
-			{
-				if (!args["contact"]["use_convergent_formulation"])
-				{
-					args["contact"]["use_convergent_formulation"] = true;
-					logger().info("Use convergent formulation for differentiable contact...");
-				}
-				if (args["/solver/contact/barrier_stiffness"_json_pointer].is_string())
-				{
-					logger().error("Only constant barrier stiffness is supported in differentiable contact!");
-				}
-			}
-
-			if (args.contains("boundary_conditions") && args["boundary_conditions"].contains("rhs"))
-			{
-				json rhs = args["boundary_conditions"]["rhs"];
-				if ((rhs.is_array() && rhs.size() > 0 && rhs[0].is_string()) || rhs.is_string())
-					logger().error("Only constant rhs over space is supported in differentiable code!");
-			}
 		}
 	}
 

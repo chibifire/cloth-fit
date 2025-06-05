@@ -100,11 +100,11 @@ namespace polyfem::solver
 	};
 
 
-	class SimilarityForm : public Form
+	class RelativeScalingForm : public Form
 	{
 	public:
-		SimilarityForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
-		virtual ~SimilarityForm() = default;
+		RelativeScalingForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
+		virtual ~RelativeScalingForm() = default;
 
 		std::string name() const override { return "similarity"; }
 
@@ -134,11 +134,11 @@ namespace polyfem::solver
 	};
 
 
-	class NewSimilarityForm : public Form
+	class SimilarityForm : public Form
 	{
 	public:
-		NewSimilarityForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
-		virtual ~NewSimilarityForm() = default;
+		SimilarityForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
+		virtual ~SimilarityForm() = default;
 
 		std::string name() const override { return "correct-similarity"; }
 

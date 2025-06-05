@@ -15,7 +15,7 @@
     "similarity_penalty_weight": 1,
     "curvature_penalty_weight": 0.1,
     "twist_penalty_weight": 0.1,
-    "new_curve_center_target_weight": 10,
+    "curve_center_target_weight": 10,
     "fit_weight": 2,
     "symmetry_weight": 0,
     "curve_size_weight": 0,

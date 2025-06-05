@@ -10,7 +10,7 @@
 #include <igl/write_triangle_mesh.h>
 #include <finitediff.hpp>
 
-constexpr bool extra_skeleton_bone_for_skirt = true;
+constexpr bool extra_skeleton_bone_for_skirt = false;
 
 namespace polyfem::solver
 {
@@ -90,10 +90,6 @@ namespace polyfem::solver
                         return false;
                     }
                 }
-                // else if (bone(0) == 14 && bone(1) == 15)
-                //     return false;
-                // else if (bone(0) == 19 && bone(1) == 20)
-                //     return false;
                 else
                     return true;
             }
@@ -171,197 +167,6 @@ namespace polyfem::solver
         hessian.setZero();
         hessian.resize(x.size(), x.size());
         hessian.setFromTriplets(triplets.begin(), triplets.end());
-    }
-
-    CurveCenterProjectedTargetForm::CurveCenterProjectedTargetForm(
-        const Eigen::MatrixXd &V, 
-        const std::vector<Eigen::VectorXi> &curves,
-        const Eigen::MatrixXd &source_skeleton_v,
-        const Eigen::MatrixXd &target_skeleton_v,
-        const Eigen::MatrixXi &skeleton_edges): 
-        V_(V), source_skeleton_v_(source_skeleton_v),
-        target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges)
-    {
-        log_and_throw_error("Buggy!!");
-        for (auto curve : curves)
-        {
-            curves_.push_back(curve.head(curve.size()-1));
-        }
-
-        bones.resize(curves_.size());
-        relative_positions.resize(curves_.size());
-        for (int j = 0; j < curves_.size(); j++)
-        {
-            const Eigen::Vector3d center = V(curves_[j], Eigen::all).colwise().sum() / curves_[j].size();
-
-            // Project centers to original skeleton bones
-            int id = 0;
-            double closest_dist = std::numeric_limits<double>::max(), closest_uv = 0;
-            for (int i = 0; i < skeleton_edges.rows(); i++)
-            {
-                Eigen::Vector2d tmp = point_line_closest_distance<double>(center, source_skeleton_v.row(skeleton_edges(i, 0)), source_skeleton_v.row(skeleton_edges(i, 1)));
-                if (tmp(0) < closest_dist)
-                {
-                    closest_dist = tmp(0);
-                    closest_uv = tmp(1);
-                    id = i;
-                }
-            }
-
-            bones(j) = id;
-            relative_positions(j) = closest_uv;
-        }
-    }
-
-    double CurveCenterProjectedTargetForm::value_unweighted(const Eigen::VectorXd &x) const
-    {
-        const double t = x(0);
-        const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
-        const Eigen::MatrixXd skeleton_v = source_skeleton_v_ + t * (target_skeleton_v_ - source_skeleton_v_);
-
-        double val = 0.;
-        for (int j = 0; j < curves_.size(); j++)
-        {
-            const Eigen::Vector3d center = V(curves_[j], Eigen::all).colwise().sum() / curves_[j].size();
-
-            const int id = bones(j);
-            const double param0 = relative_positions(j);
-
-            const Eigen::Vector2d tmp = point_line_closest_distance<double>(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
-
-            val += pow(param0 - tmp(1), 2);
-        }
-
-        return val / 2.;
-    }
-
-    void CurveCenterProjectedTargetForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
-    {
-        const double t = x(0);
-        const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
-        const Eigen::MatrixXd skeleton_v = source_skeleton_v_ + t * (target_skeleton_v_ - source_skeleton_v_);
-
-        gradv.setZero(x.size());
-        for (int j = 0; j < curves_.size(); j++)
-        {
-            const Eigen::Vector3d center = V(curves_[j], Eigen::all).colwise().sum() / curves_[j].size();
-
-            const int id = bones(j);
-            const double param0 = relative_positions(j);
-
-            const Eigen::Vector2d tmp = point_line_closest_distance<double>(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
-
-            Eigen::Vector4d g;
-            autogen::line_projection_uv_gradient(
-                t, center(0), center(1), center(2), g.data(), 
-                source_skeleton_v_(skeleton_edges_(id, 0), 0), source_skeleton_v_(skeleton_edges_(id, 0), 1), source_skeleton_v_(skeleton_edges_(id, 0), 2),
-                target_skeleton_v_(skeleton_edges_(id, 0), 0), target_skeleton_v_(skeleton_edges_(id, 0), 1), target_skeleton_v_(skeleton_edges_(id, 0), 2),
-                source_skeleton_v_(skeleton_edges_(id, 1), 0), source_skeleton_v_(skeleton_edges_(id, 1), 1), source_skeleton_v_(skeleton_edges_(id, 1), 2),
-                target_skeleton_v_(skeleton_edges_(id, 1), 0), target_skeleton_v_(skeleton_edges_(id, 1), 1), target_skeleton_v_(skeleton_edges_(id, 1), 2));
-            
-            g *= tmp(1) - param0;
-
-            gradv(0) += g(0);
-            g.tail<3>() /= curves_[j].size();
-            for (int k = 0; k < curves_[j].size(); k++)
-                gradv.template segment<3>(1 + curves_[j](k) * 3) += g.tail<3>();
-        }
-    }
-
-    void CurveCenterProjectedTargetForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
-    {
-        hessian.resize(x.size(), x.size());
-        hessian.setZero();
-
-        const double t = x(0);
-        const Eigen::MatrixXd V = V_ + utils::unflatten(x.tail(x.size() - 1), V_.cols());
-        const Eigen::MatrixXd skeleton_v = source_skeleton_v_ + t * (target_skeleton_v_ - source_skeleton_v_);
-
-        // // debug export
-        // {
-        //     mesh::write_edge_mesh("skeleton.obj", skeleton_v, skeleton_edges_);
-        //     Eigen::MatrixXd V1(curves_.size(), 3), V2(curves_.size(), 3);
-        //     for (int j = 0; j < curves_.size(); j++)
-        //     {
-        //         const int N = curves_[j].size();
-        //         const Eigen::Vector3d center = V(curves_[j], Eigen::all).colwise().sum() / N;
-
-        //         const int id = bones(j);
-        //         const double param0 = relative_positions(j);
-
-        //         const Eigen::Vector2d tmp = point_line_closest_distance<double>(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
-        //         V1.row(j) = tmp(1) * (skeleton_v.row(skeleton_edges_(id, 1)) - skeleton_v.row(skeleton_edges_(id, 0))) + skeleton_v.row(skeleton_edges_(id, 0));
-        //         V2.row(j) = param0 * (skeleton_v.row(skeleton_edges_(id, 1)) - skeleton_v.row(skeleton_edges_(id, 0))) + skeleton_v.row(skeleton_edges_(id, 0));
-        //     }
-
-        //     Eigen::MatrixXi F(0, 3);
-        //     igl::write_triangle_mesh("current.obj", V1, F);
-        //     igl::write_triangle_mesh("desired.obj", V2, F);
-        // }
-
-        std::vector<Eigen::Triplet<double>> T;
-        for (int j = 0; j < curves_.size(); j++)
-        {
-            const auto &curve = curves_[j];
-            const int N = curve.size();
-            const Eigen::Vector3d center = V(curve, Eigen::all).colwise().sum() / N;
-
-            const int id = bones(j);
-            const double param0 = relative_positions(j);
-
-            const Eigen::Vector2d tmp = point_line_closest_distance<double>(center, skeleton_v.row(skeleton_edges_(id, 0)), skeleton_v.row(skeleton_edges_(id, 1)));
-
-            Eigen::Vector4d g;
-            autogen::line_projection_uv_gradient(
-                t, center(0), center(1), center(2), g.data(), 
-                source_skeleton_v_(skeleton_edges_(id, 0), 0), source_skeleton_v_(skeleton_edges_(id, 0), 1), source_skeleton_v_(skeleton_edges_(id, 0), 2),
-                target_skeleton_v_(skeleton_edges_(id, 0), 0), target_skeleton_v_(skeleton_edges_(id, 0), 1), target_skeleton_v_(skeleton_edges_(id, 0), 2),
-                source_skeleton_v_(skeleton_edges_(id, 1), 0), source_skeleton_v_(skeleton_edges_(id, 1), 1), source_skeleton_v_(skeleton_edges_(id, 1), 2),
-                target_skeleton_v_(skeleton_edges_(id, 1), 0), target_skeleton_v_(skeleton_edges_(id, 1), 1), target_skeleton_v_(skeleton_edges_(id, 1), 2));
-            
-            Eigen::Matrix4d h;
-            autogen::line_projection_uv_hessian(
-                t, center(0), center(1), center(2), h.data(), 
-                source_skeleton_v_(skeleton_edges_(id, 0), 0), source_skeleton_v_(skeleton_edges_(id, 0), 1), source_skeleton_v_(skeleton_edges_(id, 0), 2),
-                target_skeleton_v_(skeleton_edges_(id, 0), 0), target_skeleton_v_(skeleton_edges_(id, 0), 1), target_skeleton_v_(skeleton_edges_(id, 0), 2),
-                source_skeleton_v_(skeleton_edges_(id, 1), 0), source_skeleton_v_(skeleton_edges_(id, 1), 1), source_skeleton_v_(skeleton_edges_(id, 1), 2),
-                target_skeleton_v_(skeleton_edges_(id, 1), 0), target_skeleton_v_(skeleton_edges_(id, 1), 1), target_skeleton_v_(skeleton_edges_(id, 1), 2));
-
-            h = h.eval() * (tmp(1) - param0) + g * g.transpose();
-
-            Eigen::MatrixXd local_hess = Eigen::MatrixXd::Zero(N * 3 + 1, N * 3 + 1);
-            local_hess(0, 0) = h(0, 0);
-            for (int i0 = 0; i0 < N; i0++)
-            {
-                for (int d0 = 0; d0 < 3; d0++)
-                {
-                    local_hess(i0 * 3 + d0 + 1, 0) = h(d0 + 1, 0) / N;
-                    local_hess(0, i0 * 3 + d0 + 1) = h(0, d0 + 1) / N;
-                    for (int i1 = 0; i1 < N; i1++)
-                    {
-                        for (int d1 = 0; d1 < 3; d1++)
-                        {
-                            local_hess(i0 * 3 + d0 + 1, i1 * 3 + d1 + 1) = h(d0 + 1, d1 + 1) / (N * N);
-                        }
-                    }
-                }
-            }
-
-            T.emplace_back(0, 0, local_hess(0, 0));
-            for (int i0 = 0; i0 < N; i0++)
-            for (int d0 = 0; d0 < 3; d0++)
-            {
-                T.emplace_back(1 + curve(i0) * 3 + d0, 0, local_hess(i0 * 3 + d0 + 1, 0));
-                T.emplace_back(0, 1 + curve(i0) * 3 + d0, local_hess(0, i0 * 3 + d0 + 1));
-                for (int i1 = 0; i1 < N; i1++)
-                for (int d1 = 0; d1 < 3; d1++)
-                {
-                    T.emplace_back(1 + curve(i0) * 3 + d0, 1 + curve(i1) * 3 + d1, local_hess(i0 * 3 + d0 + 1, i1 * 3 + d1 + 1));
-                }
-            }
-        }
-
-        hessian.setFromTriplets(T.begin(), T.end());
     }
 
     CurveCenterTargetForm::CurveCenterTargetForm(
@@ -596,8 +401,8 @@ namespace polyfem::solver
                 }
             }
 
-            Eigen::RowVector3d sdirec = (source_skeleton_v_.row(skeleton_edges_(bones(j), 1)) - source_skeleton_v_.row(skeleton_edges_(bones(j), 0)));
-            logger().debug("CurveTargetForm set curve center to bone {} - {}, direction is {}", skeleton_edges_(bones(j), 0), skeleton_edges_(bones(j), 1), sdirec.normalized());
+            // Eigen::RowVector3d sdirec = (source_skeleton_v_.row(skeleton_edges_(bones(j), 1)) - source_skeleton_v_.row(skeleton_edges_(bones(j), 0)));
+            // logger().debug("CurveTargetForm set curve center to bone {} - {}, direction is {}", skeleton_edges_(bones(j), 0), skeleton_edges_(bones(j), 1), sdirec.normalized());
             // Eigen::RowVector3d tdirec = (target_skeleton_v_.row(skeleton_edges_(bones(j), 1)) - target_skeleton_v_.row(skeleton_edges_(bones(j), 0)));
             // logger().debug("target direction is {}", tdirec.normalized());
 
@@ -610,7 +415,7 @@ namespace polyfem::solver
             //     logger().debug("new target direction is {}", tdirec.normalized());
             // }
 
-            logger().debug("curve normal {}", fit_plane(V(curves_[j], Eigen::all)).transpose());
+            // logger().debug("curve normal {}", fit_plane(V(curves_[j], Eigen::all)).transpose());
             
             relative_positions[j].resize(curves_[j].size());
             for (int i = 0; i < curves_[j].size(); i++)

@@ -23,49 +23,7 @@
 
 using namespace polyfem;
 using namespace polyfem::solver;
-using namespace polyfem::time_integrator;
-using namespace polyfem::assembler;
 
-namespace
-{
-	std::shared_ptr<State> get_state(int dim, const std::string &material_type = "NeoHookean")
-	{
-		const std::string path = POLYFEM_DATA_DIR;
-
-		json material = R"(
-			{
-				"type": "NeoHookean",
-				"E": 20000,
-				"nu": 0.3,
-				"rho": 1000
-			}
-			)"_json;
-
-		json in_args = R"(
-		{
-			"output": {
-				"log": {
-					"level": "warning"
-				}
-			}
-		})"_json;
-		in_args["materials"] = material;
-    
-        in_args["geometry"] = R"([{
-            "transformation": {
-                "scale": [0.1, 1, 1]
-            },
-            "n_refs": 1
-        }])"_json;
-        in_args["geometry"][0]["mesh"] = path + "/contact/meshes/3D/simple/bar/bar-6.msh";
-
-		auto state = std::make_shared<State>();
-		state->init(in_args, true);
-		state->set_max_threads(1);
-
-		return state;
-	}
-} // namespace
 
 TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
 {
@@ -79,7 +37,6 @@ TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
 	}
 
 	const int dim = 3;
-	const auto state_ptr = get_state(dim);
 
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi F;
@@ -90,9 +47,7 @@ TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
 	std::vector<std::unique_ptr<Form>> forms;
     forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
 	forms.push_back(std::make_unique<AngleForm>(V, F));
-	// forms.push_back(std::make_unique<NewSimilarityForm>(V, F));
 	forms.push_back(std::make_unique<SimilarityForm>(V, F));
-	forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
 	forms.push_back(std::make_unique<CurveTorsionForm>(V, curves));
 
 	Eigen::VectorXd x = utils::flatten(1.2 * V * R.transpose() - V);
@@ -105,6 +60,7 @@ TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
         Eigen::VectorXd grad;
         form->first_derivative(x, grad);
 
+		// std::cout << form->name() << " " << form->value(x) << " " << grad.norm() << "\n";
         REQUIRE(form->value(x) < 1e-10);
 		REQUIRE(grad.norm() < 1e-4);
     }
@@ -113,7 +69,6 @@ TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
 TEST_CASE("Garment full forms derivatives", "[form][form_derivatives][garment]")
 {
 	const int dim = 3;
-	const auto state_ptr = get_state(dim);
 
 	utils::NThread::get().set_num_threads(16);
 
@@ -212,7 +167,6 @@ TEST_CASE("Garment full forms derivatives", "[form][form_derivatives][garment]")
 TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 {
 	const int dim = 3;
-	const auto state_ptr = get_state(dim);
 
 	utils::NThread::get().set_num_threads(16);
 
@@ -228,12 +182,11 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 	const double tol = 1e-5;
 
 	std::vector<std::unique_ptr<Form>> forms;
-	forms.push_back(std::make_unique<NewSimilarityForm>(V, F));
+	forms.push_back(std::make_unique<SimilarityForm>(V, F));
 	forms.push_back(std::make_unique<CurveTorsionForm>(V, curves));
-	forms.push_back(std::make_unique<CurveTwistForm>(V, curves));
     forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
 	forms.push_back(std::make_unique<AngleForm>(V, F));
-	forms.push_back(std::make_unique<SimilarityForm>(V, F));
+	forms.push_back(std::make_unique<RelativeScalingForm>(V, F));
 
 	for (auto &form : forms)
 	{
