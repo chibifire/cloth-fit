@@ -153,7 +153,13 @@ TEST_CASE("Garment full forms derivatives", "[form][form_derivatives][garment]")
 	}
 }
 
-TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
+#if defined(NDEBUG)
+std::string tagsdiff = "[form][form_derivatives][garment]";
+#else
+std::string tagsdiff = "[.][form][form_derivatives][garment]";
+#endif
+
+TEST_CASE("Garment forms derivatives", tagsdiff)
 {
 	const int dim = 3;
 
@@ -200,7 +206,6 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 	if (form->enabled())
 		forms.push_back(std::move(form));
 
-#ifdef NDEBUG
 	{
 		Eigen::MatrixXd avatar_v;
 		Eigen::MatrixXi avatar_f;
@@ -209,8 +214,7 @@ TEST_CASE("Garment forms derivatives", "[form][form_derivatives][garment]")
 		forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1, std::vector<int>(), "."));
 		forms.push_back(std::make_unique<SDFCollisionForm<4>>(V, F, avatar_v, avatar_f, 0.1, 0.1));
 	}
-#endif
-
+	
 	for (auto &form : forms)
 	{
 		Eigen::VectorXd x = Eigen::VectorXd::Zero(V.size());
