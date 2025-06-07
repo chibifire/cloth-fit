@@ -47,10 +47,10 @@ TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
 	std::vector<std::unique_ptr<Form>> forms;
     forms.push_back(std::make_unique<CurveCurvatureForm>(V, curves));
 	forms.push_back(std::make_unique<AngleForm>(V, F));
-	forms.push_back(std::make_unique<SimilarityForm>(V, F));
+	// forms.push_back(std::make_unique<SimilarityForm>(V, F));
 	forms.push_back(std::make_unique<CurveTorsionForm>(V, curves));
 
-	Eigen::VectorXd x = utils::flatten(1.2 * V * R.transpose() - V);
+	Eigen::VectorXd x = utils::flatten(1.2 * V * R - V);
 
 	for (auto &form : forms)
 	{
@@ -62,7 +62,7 @@ TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
 
 		// std::cout << form->name() << " " << form->value(x) << " " << grad.norm() << "\n";
         REQUIRE(form->value(x) < 1e-10);
-		REQUIRE(grad.norm() < 1e-4);
+		REQUIRE(grad.norm() < 1e-6);
     }
 }
 

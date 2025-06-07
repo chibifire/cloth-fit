@@ -324,47 +324,8 @@ namespace autogen {
     // vec0 = c0[0] * e + c0[1] * (p2 - p0) + c0[2] * n0
     // vec1 = c1[0] * (p3 - p0) + c1[1] * e + c1[2] * n1
     // T = (vec0 - vec1).dot(vec0 - vec1)
-    void similarity_gradient(
-        double p0x,
-        double p0y,
-        double p0z,
-        double p1x,
-        double p1y,
-        double p1z,
-        double p2x,
-        double p2y,
-        double p2z,
-        double p3x,
-        double p3y,
-        double p3z,
-        double c0x,
-        double c0y,
-        double c0z,
-        double c1x,
-        double c1y,
-        double c1z,
-        double grad[12]);
-    // hess is (144×1) flattened in column-major order
-    void similarity_hessian(
-        double p0x,
-        double p0y,
-        double p0z,
-        double p1x,
-        double p1y,
-        double p1z,
-        double p2x,
-        double p2y,
-        double p2z,
-        double p3x,
-        double p3y,
-        double p3z,
-        double c0x,
-        double c0y,
-        double c0z,
-        double c1x,
-        double c1y,
-        double c1z,
-        double hess[144]);
+    void similarity_gradient(double ve0_x, double ve0_y, double ve0_z, double ve1_x, double ve1_y, double ve1_z, double vf0_x, double vf0_y, double vf0_z, double vf1_x, double vf1_y, double vf1_z, double c1_x, double c1_y, double c1_z, double c2_x, double c2_y, double c2_z, double grad[12]);
+    void similarity_hessian(double ve0_x, double ve0_y, double ve0_z, double ve1_x, double ve1_y, double ve1_z, double vf0_x, double vf0_y, double vf0_z, double vf1_x, double vf1_y, double vf1_z, double c1_x, double c1_y, double c1_z, double c2_x, double c2_y, double c2_z, double hess[144]);
 
     // def normal(a, b, c, d):
     //     normal = numpy.cross(b - a, c - a)

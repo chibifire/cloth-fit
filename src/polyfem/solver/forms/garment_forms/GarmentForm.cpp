@@ -830,12 +830,12 @@ namespace polyfem::solver
 				if (TT(i, j) < 0)
 					continue;
 
-				const Eigen::Vector3d v = (V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, lv(j))));
-				const Eigen::Vector3d e = V.row(F_(i, le(j, 1))) - V.row(F_(i, le(j, 0)));
-				const Eigen::Vector3d e0 = V.row(F_(i, lv(j))) - V.row(F_(i, le(j, 0)));
-				const Eigen::Vector3d e1 = V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, le(j, 0)));
-				const Eigen::Vector3d n0 = e.cross(e0);
-				const Eigen::Vector3d n1 = e1.cross(e);
+				const Eigen::Vector3d v = (V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, lv(j)))).normalized();
+				const Eigen::Vector3d e = (V.row(F_(i, le(j, 1))) - V.row(F_(i, le(j, 0))));
+				const Eigen::Vector3d e0 = (V.row(F_(i, lv(j))) - V.row(F_(i, le(j, 0))));
+				const Eigen::Vector3d e1 = (V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, le(j, 0))));
+				const Eigen::Vector3d n0 = e.cross(e0); // / e.norm();
+				const Eigen::Vector3d n1 = e1.cross(e); // / e.norm();
 				orig_coeffs.block<1, 3>(k, 0) = vector_in_affine_coordinate(e, e0, n0, v);
 				orig_coeffs.block<1, 3>(k, 3) = vector_in_affine_coordinate(e1, e, n1, v);
 			}
@@ -862,11 +862,11 @@ namespace polyfem::solver
 					continue;
 
 				const Eigen::RowVectorXd &coeff = orig_coeffs.row(k);
-				const Eigen::Vector3d e = V.row(F_(i, le(j, 1))) - V.row(F_(i, le(j, 0)));
-				const Eigen::Vector3d e0 = V.row(F_(i, lv(j))) - V.row(F_(i, le(j, 0)));
-				const Eigen::Vector3d e1 = V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, le(j, 0)));
-				const Eigen::Vector3d n0 = e.cross(e0);
-				const Eigen::Vector3d n1 = e1.cross(e);
+				const Eigen::Vector3d e = (V.row(F_(i, le(j, 1))) - V.row(F_(i, le(j, 0))));
+				const Eigen::Vector3d e0 = (V.row(F_(i, lv(j))) - V.row(F_(i, le(j, 0))));
+				const Eigen::Vector3d e1 = (V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, le(j, 0))));
+				const Eigen::Vector3d n0 = e.cross(e0); // / e.norm();
+				const Eigen::Vector3d n1 = e1.cross(e); // / e.norm();
 				const Eigen::Vector3d v0 = coeff(0) * e + coeff(1) * e0 + coeff(2) * n0;
 				const Eigen::Vector3d v1 = coeff(3) * e1 + coeff(4) * e + coeff(5) * n1;
 
@@ -888,40 +888,6 @@ namespace polyfem::solver
 			2, 0;
 		Eigen::Vector3i lv;
 		lv << 2, 0, 1;
-
-		// {
-		// 	std::shared_ptr<paraviewo::ParaviewWriter> tmpw = std::make_shared<paraviewo::VTUWriter>();
-		// 	paraviewo::ParaviewWriter &writer = *tmpw;
-
-		// 	Eigen::VectorXd cell_data = Eigen::VectorXd::Zero(TT.rows());
-		// 	for (int i = 0, k = 0; i < TT.rows(); i++)
-		// 	{
-		// 		for (int j = 0; j < TT.cols(); j++, k++)
-		// 		{
-		// 			if (TT(i, j) < 0)
-		// 				continue;
-	
-		// 			const Eigen::RowVectorXd &coeff = orig_coeffs.row(k);
-		// 			const Eigen::Vector3d e = V.row(F_(i, le(j, 1))) - V.row(F_(i, le(j, 0)));
-		// 			const Eigen::Vector3d e0 = V.row(F_(i, lv(j))) - V.row(F_(i, le(j, 0)));
-		// 			const Eigen::Vector3d e1 = V.row(F_(TT(i, j), lv(TTi(i, j)))) - V.row(F_(i, le(j, 0)));
-		// 			const Eigen::Vector3d n0 = e.cross(e0);
-		// 			const Eigen::Vector3d n1 = e1.cross(e);
-		// 			const Eigen::Vector3d v0 = coeff(0) * e + coeff(1) * e0 + coeff(2) * n0;
-		// 			const Eigen::Vector3d v1 = coeff(3) * e1 + coeff(4) * e + coeff(5) * n1;
-
-		// 			const double err = (v0 - v1).squaredNorm();
-		// 			// result += err * (orig_areas(i) + orig_areas(TT(i, j)));
-		// 			cell_data(i) += err * orig_areas(i);
-		// 			cell_data(TT(i, j)) += err * orig_areas(TT(i, j));
-		// 		}
-		// 	}
-
-		// 	writer.add_cell_field("distortion", cell_data);
-
-		// 	logger().debug("Save VTU to {}", "distortion.vtu");
-		// 	writer.write_mesh("distortion.vtu", V, F_);
-		// }
 
 		gradv.setZero(V.size());
 		for (int i = 0, k = 0; i < TT.rows(); i++)
