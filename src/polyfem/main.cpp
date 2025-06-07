@@ -259,7 +259,7 @@ int main(int argc, char **argv)
 		}
 
 		const auto tmp_curves = boundary_curves(gstate.garment.f);
-		auto center_target_form = std::make_shared<CurveTargetForm>(initial_garment_v, tmp_curves, gstate.skeleton_v, gstate.target_skeleton_v, gstate.skeleton_b);
+		auto center_target_form = std::make_shared<CurveTargetForm>(initial_garment_v, tmp_curves, gstate.skeleton_v, gstate.target_skeleton_v, gstate.skeleton_b, state.args["is_skirt"]);
 		center_target_form->set_weight(state.args["curve_center_target_weight"]);
 		persistent_full_forms.push_back(center_target_form);
 	}

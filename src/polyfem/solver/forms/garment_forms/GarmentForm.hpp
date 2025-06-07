@@ -106,7 +106,7 @@ namespace polyfem::solver
 		RelativeScalingForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
 		virtual ~RelativeScalingForm() = default;
 
-		std::string name() const override { return "similarity"; }
+		std::string name() const override { return "relative-scaling"; }
 
 	protected:
 		/// @brief Compute the potential value
@@ -140,7 +140,7 @@ namespace polyfem::solver
 		SimilarityForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
 		virtual ~SimilarityForm() = default;
 
-		std::string name() const override { return "correct-similarity"; }
+		std::string name() const override { return "similarity"; }
 
 	protected:
 		/// @brief Compute the potential value

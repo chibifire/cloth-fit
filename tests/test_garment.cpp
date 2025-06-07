@@ -198,7 +198,6 @@ TEST_CASE("Garment forms derivatives", tagsdiff)
 
 	forms.push_back(std::make_unique<NormalForm>(V, F));
 	forms.push_back(std::make_unique<CurveSizeForm>(V, curves));
-	forms.push_back(std::make_unique<OldCurveCenterTargetForm>(V, curves, target));
     forms.push_back(std::make_unique<AreaForm>(V, F, 1));
 	forms.push_back(std::make_unique<DefGradForm>(V, F));
 

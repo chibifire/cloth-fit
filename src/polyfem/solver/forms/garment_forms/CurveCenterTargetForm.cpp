@@ -8,19 +8,10 @@
 
 #include <polyfem/mesh/MeshUtils.hpp>
 #include <igl/write_triangle_mesh.h>
-#include <finitediff.hpp>
-
-constexpr bool extra_skeleton_bone_for_skirt = false;
 
 namespace polyfem::solver
 {
     namespace {
-        std::string bone_name(int id)
-        {
-            std::array<std::string, 17> list = {{"LowerTorso","UpperTorso","Head","LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightHand","RightLowerArm","LeftUpperLeg","LeftLowerLeg","LeftFoot","RightUpperLeg","RightLowerLeg","RightFoot", "MidKnee", "MidFoot"}};
-            return list[id];
-        }
-
         Eigen::Vector2d point_edge_closest_distance(
             const Eigen::Vector3d &p,
             const Eigen::Vector3d &a,
@@ -68,105 +59,6 @@ namespace polyfem::solver
 
             return eigensolver.eigenvectors().col(0);
         }
-
-        bool is_bone_available(int n_bones, Eigen::Vector2i bone)
-        {
-            if (bone(0) > bone(1))
-                std::swap(bone(0), bone(1));
-
-            if (n_bones == 23 + (extra_skeleton_bone_for_skirt ? 2 : 0))
-            { 
-                if (bone(0) == 0)
-                {
-                    if (bone(1) == 5 || bone(1) == 1)
-                    {
-                        return false;
-                    }
-                }
-                else if (bone(0) == 11)
-                {
-                    if (bone(1) == 14 || bone(1) == 19)
-                    {
-                        return false;
-                    }
-                }
-                else
-                    return true;
-            }
-            else if (n_bones == 14 + (extra_skeleton_bone_for_skirt ? 2 : 0))
-            {
-                if (bone(0) == 1)
-                {
-                    if (bone(1) == 3 || bone(1) == 6)
-                    {
-                        return false;
-                    }
-                }
-                else if (bone(0) == 0)
-                {
-                    if (bone(1) == 12 || bone(1) == 9)
-                    {
-                        return false;
-                    }
-                }
-                else
-                    return true;
-            }
-            else
-                log_and_throw_error("Invalid number of bones in the skeleton!");
-                
-            return true;
-        }
-    }
-
-    double OldCurveCenterTargetForm::value_unweighted(const Eigen::VectorXd &x) const 
-    {
-        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
-
-        double val = 0;
-        for (int i = 0; i < curves_.size(); i++)
-        {
-            const auto &curve = curves_[i];
-            const Eigen::Matrix<double, 1, 3> c = V(curve, Eigen::all).colwise().sum() / curve.size();
-            val += (c - target_.row(i)).squaredNorm();
-        }
-
-        return val / 2;
-    }
-
-    void OldCurveCenterTargetForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
-    {
-        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
-
-        gradv.setZero(x.size());
-        for (int i = 0; i < curves_.size(); i++)
-        {
-            const auto &curve = curves_[i];
-            const Eigen::Matrix<double, 1, 3> c = V(curve, Eigen::all).colwise().sum() / curve.size();
-            const Eigen::Vector3d g = (c - target_.row(i)) / curve.size();
-            for (int j = 0; j < curve.size(); j++)
-                gradv.segment(curve(j) * 3, 3) += g;
-        }
-    }
-
-    void OldCurveCenterTargetForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const 
-    {
-        const Eigen::MatrixXd V = utils::unflatten(x, 3) + V_;
-
-        std::vector<Eigen::Triplet<double>> triplets;
-        for (int i = 0; i < curves_.size(); i++)
-        {
-            const auto &curve = curves_[i];
-            const double val = 1. / curve.size() / curve.size();
-            for (int j = 0; j < curve.size(); j++)
-                for (int d = 0; d < 3; d++)
-                    for (int k = 0; k < curve.size(); k++)
-                        triplets.emplace_back(curve(j) * 3 + d, curve(k) * 3 + d, val);
-        }
-
-        hessian.setZero();
-        hessian.resize(x.size(), x.size());
-        hessian.setFromTriplets(triplets.begin(), triplets.end());
     }
 
     CurveCenterTargetForm::CurveCenterTargetForm(
@@ -300,22 +192,6 @@ namespace polyfem::solver
                 }
             }
 
-            // {
-			// 	Eigen::MatrixXd fhess;
-            //     Eigen::VectorXd x0(1 + N * 3);
-            //     x0(0) = t;
-            //     for (int i = 0; i < N; i++)
-            //         x0.segment<3>(1 + i * 3) = V.row(curve(i));
-			// 	fd::finite_hessian(
-			// 		x0, [&](const Eigen::VectorXd &y) -> double 
-            //         { 
-            //             const Eigen::Vector3d tmp1 = y(0) * (targetT - targetS) + targetS;
-            //             const Eigen::Vector3d tmp2 = utils::unflatten(y.tail(3 * N), 3).colwise().sum() / N;
-            //             return (tmp1 - tmp2).squaredNorm() / 2.;
-            //         }, fhess,
-			// 		fd::AccuracyOrder::SECOND, 1e-6);
-            //     std::cout << (fhess - local_hess).norm() / h.norm() << std::endl;
-            // }
             T.emplace_back(0, 0, local_hess(0, 0));
             for (int i0 = 0; i0 < N; i0++)
             for (int d0 = 0; d0 < 3; d0++)
@@ -339,12 +215,13 @@ namespace polyfem::solver
         const std::vector<Eigen::VectorXi> &curves,
         const Eigen::MatrixXd &source_skeleton_v,
         const Eigen::MatrixXd &target_skeleton_v,
-        const Eigen::MatrixXi &skeleton_edges): 
-        V_(V), source_skeleton_v_(source_skeleton_v),
+        const Eigen::MatrixXi &skeleton_edges,
+		const bool is_skirt): 
+        is_skirt_(is_skirt), V_(V), source_skeleton_v_(source_skeleton_v),
         target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges)
     {
         // Insert one skeleton as the average of two legs
-        if constexpr (extra_skeleton_bone_for_skirt)
+        if (is_skirt_)
         {
             if (source_skeleton_v_.rows() == 15)
             {
@@ -426,6 +303,55 @@ namespace polyfem::solver
         }
     }
 
+    bool CurveTargetForm::is_bone_available(int n_bones, Eigen::Vector2i bone) const
+    {
+        if (bone(0) > bone(1))
+            std::swap(bone(0), bone(1));
+
+        if (n_bones == 23 + (is_skirt_ ? 2 : 0))
+        { 
+            if (bone(0) == 0)
+            {
+                if (bone(1) == 5 || bone(1) == 1)
+                {
+                    return false;
+                }
+            }
+            else if (bone(0) == 11)
+            {
+                if (bone(1) == 14 || bone(1) == 19)
+                {
+                    return false;
+                }
+            }
+            else
+                return true;
+        }
+        else if (n_bones == 14 + (is_skirt_ ? 2 : 0))
+        {
+            if (bone(0) == 1)
+            {
+                if (bone(1) == 3 || bone(1) == 6)
+                {
+                    return false;
+                }
+            }
+            else if (bone(0) == 0)
+            {
+                if (bone(1) == 12 || bone(1) == 9)
+                {
+                    return false;
+                }
+            }
+            else
+                return true;
+        }
+        else
+            log_and_throw_error("Invalid number of bones in the skeleton!");
+            
+        return true;
+    }
+    
     double CurveTargetForm::value_unweighted(const Eigen::VectorXd &x) const
     {
         const double t = x(0);

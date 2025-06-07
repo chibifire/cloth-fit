@@ -10,43 +10,6 @@
 
 namespace polyfem::solver
 {
-	class OldCurveCenterTargetForm : public Form
-	{
-	public:
-		OldCurveCenterTargetForm(const Eigen::MatrixXd &V, const std::vector<Eigen::VectorXi> &curves, const Eigen::MatrixXd &target) : V_(V), target_(target) 
-		{
-			for (auto curve : curves)
-			{
-				curves_.push_back(curve.head(curve.size()-1));
-			}
-		}
-		virtual ~OldCurveCenterTargetForm() = default;
-
-		std::string name() const override { return "old-curve-target"; }
-
-	protected:
-		/// @brief Compute the potential value
-		/// @param x Current solution
-		/// @return Value of the contact barrier potential
-		double value_unweighted(const Eigen::VectorXd &x) const override;
-
-		/// @brief Compute the first derivative of the value wrt x
-		/// @param[in] x Current solution
-		/// @param[out] gradv Output gradient of the value wrt x
-		void first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const override;
-
-		/// @brief Compute the second derivative of the value wrt x
-		/// @param x Current solution
-		/// @param hessian Output Hessian of the value wrt x
-		void second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const override;
-
-    private:
-        const Eigen::MatrixXd V_;
-
-        std::vector<Eigen::VectorXi> curves_;
-        const Eigen::MatrixXd target_;
-	};
-
 	class CurveCenterTargetForm : public Form
 	{
 	public:
@@ -97,7 +60,8 @@ namespace polyfem::solver
 			const std::vector<Eigen::VectorXi> &curves,
 			const Eigen::MatrixXd &source_skeleton_v,
 			const Eigen::MatrixXd &target_skeleton_v,
-			const Eigen::MatrixXi &skeleton_edges);
+			const Eigen::MatrixXi &skeleton_edges,
+			const bool is_skirt = false);
 		virtual ~CurveTargetForm() = default;
 
 		std::string name() const override { return "curve-target"; }
@@ -119,6 +83,7 @@ namespace polyfem::solver
 		void second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const override;
 
     private:
+		const bool is_skirt_;
         const Eigen::MatrixXd V_;
         std::vector<Eigen::VectorXi> curves_;
 		Eigen::MatrixXd source_skeleton_v_;
@@ -127,5 +92,7 @@ namespace polyfem::solver
 
 		Eigen::VectorXi bones;
 		std::vector<Eigen::VectorXd> relative_positions;
+
+		bool is_bone_available(int n_bones, Eigen::Vector2i bone) const;
 	};
 }
