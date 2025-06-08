@@ -157,14 +157,9 @@ namespace polyfem
 			rules = jse.inject_include(rules);
 
 			polysolve::linear::Solver::apply_default_solver(rules, "/solver/linear");
-			polysolve::linear::Solver::apply_default_solver(rules, "/solver/adjoint_linear");
 		}
 
 		polysolve::linear::Solver::select_valid_solver(args_in["solver"]["linear"], logger());
-		if (args_in["solver"]["adjoint_linear"].is_null())
-			args_in["solver"]["adjoint_linear"] = args_in["solver"]["linear"];
-		else
-			polysolve::linear::Solver::select_valid_solver(args_in["solver"]["adjoint_linear"], logger());
 
 		// Use the /solver/nonlinear settings as the default for /solver/augmented_lagrangian/nonlinear
 		if (args_in.contains("/solver/nonlinear"_json_pointer))

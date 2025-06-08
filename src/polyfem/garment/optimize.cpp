@@ -270,19 +270,19 @@ namespace polyfem {
         //     assert(garment_skinning_weights.minCoeff() >= 0. && garment_skinning_weights.maxCoeff() <= 1.);
         // }
         // else
-        if (n_refs > 0) {
-            while (n_refs-- > 0)
-            {
-                std::tie(garment.v, garment.f) = refine(garment.v, garment.f);
+        // if (n_refs > 0) {
+        //     while (n_refs-- > 0)
+        //     {
+        //         std::tie(garment.v, garment.f) = refine(garment.v, garment.f);
                 
-                std::vector<int> not_fit_fids_new;
-                for (int i = 0; i < not_fit_fids.size(); i++)
-                    for (int j = 0; j < 4; j++)
-                        not_fit_fids_new.push_back(not_fit_fids[i] * 4 + j);
-                std::swap(not_fit_fids, not_fit_fids_new);
-            }
-            assert(n_refs == 0);
-        }
+        //         std::vector<int> not_fit_fids_new;
+        //         for (int i = 0; i < not_fit_fids.size(); i++)
+        //             for (int j = 0; j < 4; j++)
+        //                 not_fit_fids_new.push_back(not_fit_fids[i] * 4 + j);
+        //         std::swap(not_fit_fids, not_fit_fids_new);
+        //     }
+        //     assert(n_refs == 0);
+        // }
 
 		// remove duplicate vertices in the garment
         // remove_duplicate_vertices(garment.v, garment.f, 1e-6);

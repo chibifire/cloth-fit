@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 	command_line.ignore_underscore();
 
 	// Eigen::setNbThreads(1);
-	unsigned max_threads = std::numeric_limits<unsigned>::max();
+	unsigned max_threads = 16;
 	command_line.add_option("--max_threads", max_threads, "Maximum number of threads");
 
 	auto input = command_line.add_option_group("input");
@@ -119,18 +119,21 @@ int main(int argc, char **argv)
 		in_args.merge_patch(tmp);
 	}
 
-	State state;
-	state.init(in_args, false);
+	{
+		State state;
+		state.init(in_args, false);
+		in_args = state.args;
+	}
 
 	GarmentSolver gstate;
 
-	const std::string out_folder = state.args["/output/directory"_json_pointer];
-	const std::string avatar_mesh_path = state.args["avatar_mesh_path"];
-	const std::string garment_path = state.args["garment_path"];
-	const std::string source_skeleton_path = state.args["source_skeleton_path"];
-	const std::string target_skeleton_path = state.args["target_skeleton_path"];
-	const std::string avatar_skin_weights_path = state.args["avatar_skin_weights_path"];
-	const bool self_collision = state.args["contact"]["enabled"];
+	const std::string out_folder = in_args["/output/directory"_json_pointer];
+	const std::string avatar_mesh_path = in_args["avatar_mesh_path"];
+	const std::string garment_path = in_args["garment_path"];
+	const std::string source_skeleton_path = in_args["source_skeleton_path"];
+	const std::string target_skeleton_path = in_args["target_skeleton_path"];
+	const std::string avatar_skin_weights_path = in_args["avatar_skin_weights_path"];
+	const bool self_collision = in_args["contact"]["enabled"];
 
 	if (!std::filesystem::exists(avatar_mesh_path))
 		log_and_throw_error("Invalid avatar mesh path: {}", avatar_mesh_path);
@@ -147,7 +150,7 @@ int main(int argc, char **argv)
 	gstate.out_folder = out_folder;
 
 	gstate.read_meshes(avatar_mesh_path, source_skeleton_path, target_skeleton_path, avatar_skin_weights_path);
-	gstate.load_garment_mesh(garment_path, state.args["geometry"][0]["n_refs"]);
+	gstate.load_garment_mesh(garment_path, 0);
 	gstate.normalize_meshes();
 	gstate.project_avatar_to_skeleton();
 
@@ -184,7 +187,7 @@ int main(int argc, char **argv)
 	}
 
 	{
-		const double dhat = state.args["contact"]["dhat"];
+		const double dhat = in_args["contact"]["dhat"];
 
 		Eigen::MatrixXi collision_edges_tmp;
 		igl::edges(gstate.garment.f, collision_edges_tmp);
@@ -195,7 +198,7 @@ int main(int argc, char **argv)
 
 		ipc::Collisions collision_set;
 		Eigen::MatrixXd displaced_surface = collision_mesh_tmp.displace_vertices(Eigen::MatrixXd::Zero(collision_mesh_tmp.full_num_vertices(), 3));
-		collision_set.build(collision_mesh_tmp, displaced_surface, dhat, 0, state.args["solver"]["contact"]["CCD"]["broad_phase"]);
+		collision_set.build(collision_mesh_tmp, displaced_surface, dhat, 0, in_args["solver"]["contact"]["CCD"]["broad_phase"]);
 		double dist = collision_set.compute_minimum_distance(collision_mesh_tmp, displaced_surface);
 		logger().info("Initial distance {}, dhat {}", sqrt(dist), dhat);
 	}
@@ -207,60 +210,60 @@ int main(int argc, char **argv)
 	const Eigen::MatrixXd initial_garment_v = gstate.garment.v;
 	Eigen::MatrixXd cur_garment_v = gstate.garment.v;
 	int save_id = 0;
-	const int total_steps = state.args["incremental_steps"];
-	const int stride = state.args["output"]["paraview"]["skip_frame"];
+	const int total_steps = in_args["incremental_steps"];
+	const int stride = in_args["output"]["paraview"]["skip_frame"];
 
 	std::vector<std::shared_ptr<Form>> persistent_forms;
 	std::vector<std::shared_ptr<Form>> persistent_full_forms;
 	std::shared_ptr<CurveSizeForm> curve_size_form;
 	{
 		auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
-		similarity_form->set_weight(state.args["similarity_penalty_weight"]);
+		similarity_form->set_weight(in_args["similarity_penalty_weight"]);
 		persistent_forms.push_back(similarity_form);
 
-		if (state.args["curvature_penalty_weight"] > 0)
+		if (in_args["curvature_penalty_weight"] > 0)
 		{
 			auto curvature_form = std::make_shared<CurveCurvatureForm>(collision_vertices, curves);
-			curvature_form->set_weight(state.args["curvature_penalty_weight"]);
+			curvature_form->set_weight(in_args["curvature_penalty_weight"]);
 			persistent_forms.push_back(curvature_form);
 		}
 
-		if (state.args["twist_penalty_weight"] > 0)
+		if (in_args["twist_penalty_weight"] > 0)
 		{
 			auto twist_form = std::make_shared<CurveTorsionForm>(collision_vertices, curves);
-			twist_form->set_weight(state.args["twist_penalty_weight"]);
+			twist_form->set_weight(in_args["twist_penalty_weight"]);
 			persistent_forms.push_back(twist_form);
 		}
 
-		if (state.args["symmetry_weight"] > 0)
+		if (in_args["symmetry_weight"] > 0)
 		{
 			auto sym_form = std::make_shared<SymmetryForm>(collision_vertices, curves);
-			sym_form->set_weight(state.args["symmetry_weight"]);
+			sym_form->set_weight(in_args["symmetry_weight"]);
 			if (sym_form->enabled())
 				persistent_forms.push_back(sym_form);
 		}
 
-		if (state.args["curve_size_weight"] > 0)
+		if (in_args["curve_size_weight"] > 0)
 		{
 			curve_size_form = std::make_shared<CurveSizeForm>(collision_vertices, curves);
 			curve_size_form->disable();
-			curve_size_form->set_weight(state.args["curve_size_weight"]);
+			curve_size_form->set_weight(in_args["curve_size_weight"]);
 			persistent_forms.push_back(curve_size_form);
 		}
 
 		{
-			const double dhat = state.args["contact"]["dhat"];
+			const double dhat = in_args["contact"]["dhat"];
 
-			std::shared_ptr<ContactForm> contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, state.args["solver"]["contact"]["CCD"]["broad_phase"], state.args["solver"]["contact"]["CCD"]["tolerance"], state.args["solver"]["contact"]["CCD"]["max_iterations"]);
+			std::shared_ptr<ContactForm> contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, in_args["solver"]["contact"]["CCD"]["broad_phase"], in_args["solver"]["contact"]["CCD"]["tolerance"], in_args["solver"]["contact"]["CCD"]["max_iterations"]);
 			contact_form->set_weight(1);
-			contact_form->set_barrier_stiffness(state.args["solver"]["contact"]["barrier_stiffness"]);
-			contact_form->save_ccd_debug_meshes = state.args["output"]["advanced"]["save_ccd_debug_meshes"];
+			contact_form->set_barrier_stiffness(in_args["solver"]["contact"]["barrier_stiffness"]);
+			contact_form->save_ccd_debug_meshes = in_args["output"]["advanced"]["save_ccd_debug_meshes"];
 			persistent_forms.push_back(contact_form);
 		}
 
 		const auto tmp_curves = boundary_curves(gstate.garment.f);
-		auto center_target_form = std::make_shared<CurveTargetForm>(initial_garment_v, tmp_curves, gstate.skeleton_v, gstate.target_skeleton_v, gstate.skeleton_b, state.args["is_skirt"]);
-		center_target_form->set_weight(state.args["curve_center_target_weight"]);
+		auto center_target_form = std::make_shared<CurveTargetForm>(initial_garment_v, tmp_curves, gstate.skeleton_v, gstate.target_skeleton_v, gstate.skeleton_b, in_args["is_skirt"]);
+		center_target_form->set_weight(in_args["curve_center_target_weight"]);
 		persistent_full_forms.push_back(center_target_form);
 	}
 
@@ -290,12 +293,12 @@ int main(int argc, char **argv)
 			lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(next_avatar_v - gstate.skinny_avatar_v), indices);
 			forms.push_back(lagr_form);
 
-			fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()), gstate.avatar_v, gstate.avatar_f, state.args["voxel_size"], gstate.not_fit_fids, out_folder);
+			fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()), gstate.avatar_v, gstate.avatar_f, in_args["voxel_size"], gstate.not_fit_fids, out_folder);
 			fit_form->disable();
-			fit_form->set_weight(state.args["fit_weight"]);
+			fit_form->set_weight(in_args["fit_weight"]);
 			forms.push_back(fit_form);
 
-			if (state.args["curve_size_weight"] > 0)
+			if (in_args["curve_size_weight"] > 0)
 				curve_size_form->disable();
 		}
 
@@ -308,21 +311,19 @@ int main(int argc, char **argv)
 			|| !nl_problem.is_step_collision_free(sol, sol))
 			log_and_throw_error("Failed to apply boundary conditions!");
 
-		std::shared_ptr<polysolve::nonlinear::Solver> nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["augmented_lagrangian"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
+		std::shared_ptr<polysolve::nonlinear::Solver> nl_solver = polysolve::nonlinear::Solver::create(in_args["solver"]["augmented_lagrangian"]["nonlinear"], in_args["solver"]["linear"], 1., logger());
 
-		double initial_weight = state.args["solver"]["augmented_lagrangian"]["initial_weight"];
-		const double scaling = state.args["solver"]["augmented_lagrangian"]["scaling"];
-		const double max_weight = state.args["solver"]["augmented_lagrangian"]["max_weight"].get<double>();
+		double initial_weight = in_args["solver"]["augmented_lagrangian"]["initial_weight"];
+		const double scaling = in_args["solver"]["augmented_lagrangian"]["scaling"];
+		const double max_weight = in_args["solver"]["augmented_lagrangian"]["max_weight"].get<double>();
 		logger().debug("Set initial AL weight to {}", initial_weight);
 
 		ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm> al_solver(
 			lagr_form, pen_form,
 			initial_weight, scaling, max_weight,
-			state.args["solver"]["augmented_lagrangian"]["eta"],
-			state.args["solver"]["augmented_lagrangian"]["error_threshold"],
-			[&](const Eigen::VectorXd &x) {
-				state.solve_data.update_barrier_stiffness(sol);
-			});
+			in_args["solver"]["augmented_lagrangian"]["eta"],
+			in_args["solver"]["augmented_lagrangian"]["error_threshold"],
+			[](const Eigen::VectorXd &x) {});
 
 		nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
 			if (save_id % stride == 0)
@@ -333,10 +334,10 @@ int main(int argc, char **argv)
 		al_solver.solve_al(nl_solver, nl_problem, sol);
 
 		fit_form->enable();
-		if (state.args["curve_size_weight"] > 0 && substep == total_steps - 1)
+		if (in_args["curve_size_weight"] > 0 && substep == total_steps - 1)
 			curve_size_form->enable();
 
-		nl_solver = polysolve::nonlinear::Solver::create(state.args["solver"]["nonlinear"], state.args["solver"]["linear"], 1., logger());
+		nl_solver = polysolve::nonlinear::Solver::create(in_args["solver"]["nonlinear"], in_args["solver"]["linear"], 1., logger());
 		al_solver.solve_reduced(nl_solver, nl_problem, sol);
 
 		cur_garment_v = initial_garment_v + utils::unflatten(sol.bottomRows(cur_garment_v.size()), 3);

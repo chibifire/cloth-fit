@@ -40,7 +40,7 @@ TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
 
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi F;
-    igl::read_triangle_mesh(POLYFEM_DATA_DIR + std::string("/../tests/garment.obj"), V, F);
+    igl::read_triangle_mesh(POLYFEM_SOURCE_DIR + std::string("/tests/garment.obj"), V, F);
 	
 	auto curves = boundary_curves(F);
 
@@ -74,7 +74,7 @@ TEST_CASE("Garment full forms derivatives", "[form][form_derivatives][garment]")
 
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi F;
-    igl::read_triangle_mesh(POLYFEM_DATA_DIR + std::string("/../tests/garment.obj"), V, F);
+    igl::read_triangle_mesh(POLYFEM_SOURCE_DIR + std::string("/tests/garment.obj"), V, F);
 
 	auto curves = boundary_curves(F);
 	
@@ -83,7 +83,7 @@ TEST_CASE("Garment full forms derivatives", "[form][form_derivatives][garment]")
 
 	Eigen::MatrixXd target_skeleton_v, source_skeleton_v;
 	Eigen::MatrixXi skeleton_edges;
-	mesh::read_edge_mesh(POLYFEM_DATA_DIR + std::string("/../tests/skeleton.obj"), source_skeleton_v, skeleton_edges);
+	mesh::read_edge_mesh(POLYFEM_SOURCE_DIR + std::string("/tests/skeleton.obj"), source_skeleton_v, skeleton_edges);
 	target_skeleton_v = source_skeleton_v + Eigen::MatrixXd::Random(source_skeleton_v.rows(), source_skeleton_v.cols()) * (source_skeleton_v.norm() / 100.);
 
 	std::vector<std::unique_ptr<Form>> forms;
@@ -167,7 +167,7 @@ TEST_CASE("Garment forms derivatives", tagsdiff)
 
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi F;
-    igl::read_triangle_mesh(POLYFEM_DATA_DIR + std::string("/../tests/garment.obj"), V, F);
+    igl::read_triangle_mesh(POLYFEM_SOURCE_DIR + std::string("/tests/garment.obj"), V, F);
 
 	auto curves = boundary_curves(F);
 	Eigen::MatrixXd target(curves.size(), 3);
@@ -208,7 +208,7 @@ TEST_CASE("Garment forms derivatives", tagsdiff)
 	{
 		Eigen::MatrixXd avatar_v;
 		Eigen::MatrixXi avatar_f;
-		igl::read_triangle_mesh(POLYFEM_DATA_DIR + std::string("/../tests/cage.obj"), avatar_v, avatar_f);
+		igl::read_triangle_mesh(POLYFEM_SOURCE_DIR + std::string("/tests/cage.obj"), avatar_v, avatar_f);
 		
 		forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1, std::vector<int>(), "."));
 		forms.push_back(std::make_unique<SDFCollisionForm<4>>(V, F, avatar_v, avatar_f, 0.1, 0.1));

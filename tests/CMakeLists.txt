@@ -5,11 +5,9 @@
 set(test_sources
   test_garment.cpp
   test_geometry_utils.cpp
-  test_hdf5.cpp
   test_matrix.cpp
   test_normal.cpp
   test_tbb.cpp
-  test_utils.cpp
 )
 
 add_executable(unit_tests ${test_sources})
@@ -26,15 +24,6 @@ target_link_libraries(unit_tests PUBLIC polyfem::warnings)
 
 include(catch2)
 target_link_libraries(unit_tests PUBLIC Catch2::Catch2WithMain)
-
-include(polyfem_data)
-target_link_libraries(unit_tests PUBLIC polyfem::data)
-
-include(polyfem_pref)
-target_link_libraries(unit_tests PUBLIC polyfem::pref)
-
-include(polyfem_polyspline)
-target_link_libraries(unit_tests PUBLIC polyfem::polyspline)
 
 ################################################################################
 # Compiler options

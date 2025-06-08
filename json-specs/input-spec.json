@@ -329,7 +329,6 @@
         "optional": [
             "max_threads",
             "linear",
-            "adjoint_linear",
             "nonlinear",
             "augmented_lagrangian",
             "contact",
@@ -340,7 +339,7 @@
     },
     {
         "pointer": "/solver/max_threads",
-        "default": 0,
+        "default": 16,
         "type": "int",
         "min": 0,
         "doc": "Maximum number of threads used; 0 is unlimited."
@@ -599,7 +598,7 @@
     },
     {
         "pointer": "/output/directory",
-        "default": "",
+        "default": ".",
         "type": "string",
         "doc": "Directory for output files."
     },
