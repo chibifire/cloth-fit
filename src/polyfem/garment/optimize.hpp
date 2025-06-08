@@ -35,8 +35,8 @@ namespace polyfem {
             const Eigen::MatrixXd &collision_vertices) const;
 
         void load_garment_mesh(
-            const std::string &path,
-            int n_refs = 0);
+            const std::string &mesh_path,
+            const std::string &no_fit_spec_path);
 
         void read_meshes(
             const std::string &avatar_mesh_path,

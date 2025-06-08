@@ -4,7 +4,8 @@
         "type": "object",
         "required": [
             "avatar_mesh_path",
-            "garment_path",
+            "garment_mesh_path",
+            "no_fit_spec_path",
             "source_skeleton_path",
             "target_skeleton_path",
             "fit_weight",
@@ -52,7 +53,7 @@
         "pointer": "/avatar_skin_weights_path",
         "default": "",
         "type": "file",
-        "doc": "The path to the file that stores the skinning weights of the target avatar. The skinning weights should be a matrix of size #number_of_skeleton_bones times #number_of_vertices. The skinning weights will be used to project the target avatar to its skeleton. If this file is not provided, the vertices will be simply projected to the closest bone in distance."
+        "doc": "The path to the file that stores the skinning weights of the target avatar. The skinning weights should be a matrix of size #number_of_skeleton_nodes times #number_of_vertices. The skinning weights will be used to project the target avatar to its skeleton. If this file is not provided, the vertices will be simply projected to the closest bone in distance."
     },
     {
         "pointer": "/avatar_mesh_path",
@@ -63,12 +64,20 @@
         "doc": "The path to the target avatar mesh. The target avatar mesh should be one or multiple closed surfaces, so that it can be converted to a signed distance field by OpenVDB."
     },
     {
-        "pointer": "/garment_path",
+        "pointer": "/garment_mesh_path",
         "type": "file",
         "extensions": [
             ".obj"
         ],
-        "doc": "The path to the source garment mesh. The garment mesh should be a connected manifold surface."
+        "doc": "The path to the source garment mesh. The garment mesh should be a connected manifold triangular mesh."
+    },
+    {
+        "pointer": "/no_fit_spec_path",
+        "type": "file",
+        "extensions": [
+            ".obj"
+        ],
+        "doc": "The path to a text file with a list of vertex IDs indicating the faces on the source garment mesh that should not fit tightly to the avatar."
     },
     {
         "pointer": "/source_skeleton_path",

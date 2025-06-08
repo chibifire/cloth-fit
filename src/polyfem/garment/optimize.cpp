@@ -230,7 +230,6 @@ namespace polyfem {
         logger().debug("Save OBJ to {}", path + "/step_garment_" + std::to_string(index) + ".obj");
 
         igl::write_triangle_mesh(path + "/step_avatar_" + std::to_string(index) + ".obj", current_vertices.topRows(nc_avatar_v.rows()), nc_avatar_f);
-        igl::write_triangle_mesh(path + "/avatar.obj", avatar_v, avatar_f);
     }
 
     Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V)
@@ -239,15 +238,18 @@ namespace polyfem {
     }
 
     void GarmentSolver::load_garment_mesh(
-        const std::string &path,
-        int n_refs)
+        const std::string &mesh_path,
+        const std::string &no_fit_spec_path)
 	{
-        garment.read(path + "/garment.obj");
+        garment.read(mesh_path);
 
-        if (std::filesystem::exists(path + "/no-fit.txt"))
+        if (std::filesystem::exists(no_fit_spec_path))
         {   
             Eigen::MatrixXi tmp_vids;
-            io::read_matrix<int>(path + "/no-fit.txt", tmp_vids);
+            io::read_matrix<int>(no_fit_spec_path, tmp_vids);
+
+            if (tmp_vids.maxCoeff() >= garment.v.rows() || tmp_vids.minCoeff() < 0)
+                log_and_throw_error("Vertex ID {} in no-fit.txt out of range!");
 
             Eigen::VectorXi vmask = Eigen::VectorXi::Zero(garment.v.rows());
             for (int i = 0; i < tmp_vids.size(); i++)
@@ -258,7 +260,7 @@ namespace polyfem {
                     not_fit_fids.push_back(i);
         }
         else
-            logger().warn("Cannot find {}", path + "/no-fit.txt");
+            logger().debug("Cannot find {}, will fit the garment tightly everywhere...", no_fit_spec_path);
 
         // if (std::filesystem::exists(path + "/skin.txt"))
         // {
@@ -328,7 +330,7 @@ namespace polyfem {
             io::read_matrix(target_avatar_skinning_weights_path, target_avatar_skinning_weights);
             if (target_avatar_skinning_weights.rows() != skeleton_v.rows()
                 || avatar_v.rows() != target_avatar_skinning_weights.cols())
-                log_and_throw_error("Invalid skin weights dimension! {}x{} vs {}x{}", target_avatar_skinning_weights.rows(), target_avatar_skinning_weights.cols(), skeleton_v.rows(), avatar_v.rows());
+                log_and_throw_error("Inconsistent skin weights dimension with the number of vertices and bones! Skin weights dimension: {}x{}, number of bones: {}, number of vertices: {}", target_avatar_skinning_weights.rows(), target_avatar_skinning_weights.cols(), skeleton_v.rows(), avatar_v.rows());
         }
         else
         {

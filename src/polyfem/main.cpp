@@ -129,7 +129,7 @@ int main(int argc, char **argv)
 
 	const std::string out_folder = in_args["/output/directory"_json_pointer];
 	const std::string avatar_mesh_path = in_args["avatar_mesh_path"];
-	const std::string garment_path = in_args["garment_path"];
+	const std::string garment_mesh_path = in_args["garment_mesh_path"];
 	const std::string source_skeleton_path = in_args["source_skeleton_path"];
 	const std::string target_skeleton_path = in_args["target_skeleton_path"];
 	const std::string avatar_skin_weights_path = in_args["avatar_skin_weights_path"];
@@ -138,8 +138,8 @@ int main(int argc, char **argv)
 	if (!std::filesystem::exists(avatar_mesh_path))
 		log_and_throw_error("Invalid avatar mesh path: {}", avatar_mesh_path);
 
-	if (!std::filesystem::exists(garment_path + "/garment.obj"))
-		log_and_throw_error("Invalid garment path: {}", garment_path);
+	if (!std::filesystem::exists(garment_mesh_path))
+		log_and_throw_error("Invalid garment mesh path: {}", garment_mesh_path);
 
 	if (!std::filesystem::exists(source_skeleton_path))
 		log_and_throw_error("Invalid source skeleton mesh path: {}", source_skeleton_path);
@@ -150,7 +150,7 @@ int main(int argc, char **argv)
 	gstate.out_folder = out_folder;
 
 	gstate.read_meshes(avatar_mesh_path, source_skeleton_path, target_skeleton_path, avatar_skin_weights_path);
-	gstate.load_garment_mesh(garment_path, 0);
+	gstate.load_garment_mesh(in_args["garment_mesh_path"], in_args["no_fit_spec_path"]);
 	gstate.normalize_meshes();
 	gstate.project_avatar_to_skeleton();
 
@@ -158,7 +158,6 @@ int main(int argc, char **argv)
 	igl::write_triangle_mesh(out_folder + "/projected_avatar.obj", gstate.skinny_avatar_v, gstate.nc_avatar_f);
 	write_edge_mesh(out_folder + "/target_skeleton.obj", gstate.target_skeleton_v, gstate.target_skeleton_b);
 	write_edge_mesh(out_folder + "/source_skeleton.obj", gstate.skeleton_v, gstate.skeleton_b);
-	igl::write_triangle_mesh(out_folder + "/garment.obj", gstate.garment.v, gstate.garment.f);
 
 	logger().info("avatar n_verts: {}, garment n_verts: {}, total n_verts: {}", gstate.nc_avatar_v.rows(), gstate.n_garment_vertices(), gstate.nc_avatar_v.rows() + gstate.n_garment_vertices());
 

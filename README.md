@@ -1,109 +1,72 @@
-<h1 align="center">
-<a href="https://polyfem.github.io/"><img alt="polyfem" src="https://polyfem.github.io/img/polyfem.png" width="60%"></a>
-</h1><br>
+[![Build](https://github.com/Huangzizhou/cloth-fit/actions/workflows/continuous.yml/badge.svg)](https://github.com/Huangzizhou/cloth-fit/actions/workflows/continuous.yml)
 
-[![Build](https://github.com/polyfem/polyfem/actions/workflows/continuous.yml/badge.svg?label=test)](https://github.com/polyfem/polyfem/actions/workflows/continuous.yml)
-[![codecov](https://codecov.io/github/polyfem/polyfem/graph/badge.svg?token=ZU9KLLTTDT)](https://codecov.io/github/polyfem/polyfem)
-[![Nightly](https://github.com/polyfem/polyfem/actions/workflows/nightly.yml/badge.svg)](https://github.com/polyfem/polyfem/actions/workflows/nightly.yml)
-[![Docs](https://github.com/polyfem/polyfem/actions/workflows/docs.yml/badge.svg)](https://polyfem.github.io/polyfem)
+# [Siggraph 2025] Intersection-free Garment Retargeting
 
-PolyFEM is a polyvalent C++ FEM library.
-
-Compilation
------------
-
-All the C++ dependencies required to build the code are included. It should work on Windows, macOS, and Linux, and it should build out-of-the-box with CMake:
-
-    mkdir build
-    cd build
-    cmake ..
-    make -j4
-
-On Linux, `zenity` is required for the file dialog window to work. On macOS and Windows, the native windows are used directly.
+This is the opensource reference implementation of the SIGGRAPH 2025 paper [Intersection-free Garment Retargeting](https://huangzizhou.github.io/assets/img/research/cloth/paper.pdf). This code is modified based on [PolyFEM](https://github.com/polyfem/polyfem). It uses the nonlinear optimizers, linear solvers, and collision handling in [PolyFEM](https://github.com/polyfem/polyfem).
 
 
-### Optional
-The formula for higher-order bases is optionally computed at CMake time using an external python script. Consequently, PolyFEM might require a working installation of Python and some additional packages to build correctly:
+## Files
 
-- `numpy` and `sympy` (optional)
-- `quadpy` (optional)
+* `src/`: source code
+* `cmake/` and `CMakeLists.txt`: CMake files
+* `json-specs/`: input JSON configuration specifications
+* `garment-data/`: input data and scripts needed to run the code
+* `tests/`: unit-tests
 
-Usage
------
+## Build
 
-The main executable, `./PolyFEM_bin`, can be called with a GUI or through a command-line interface. Simply run:
+The code can be compiled with
+```
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j4
+```
+gcc 7 or later is recommended.
 
-    ./PolyFEM_bin
+## Run
 
-A more detailed documentation can be found on the [website](https://polyfem.github.io/).
-
-Documentation
--------------
-
-The full documentation can be found at [https://polyfem.github.io/](https://polyfem.github.io/)
-
-
-
-License
--------
-
-The code of PolyFEM itself is licensed under [MIT License](LICENSE). However, please be mindful of third-party libraries which are used by PolyFEM and may be available under a different license.
-
-Citation
---------
-
-If you use PolyFEM in your project, please consider citing our work:
-
-```bibtex
-@misc{polyfem,
-  author = {Teseo Schneider and Jérémie Dumas and Xifeng Gao and Denis Zorin and Daniele Panozzo},
-  title = {{Polyfem}},
-  howpublished = "\url{https://polyfem.github.io/}",
-  year = {2019},
-}
+The folder `garment-data` contains four basic examples of retargeting garments to target avatars: `foxgirl_skirt`, `Goblin_Jacket`, `Goblin_Jumpsuit`, and `Trex_Jacket`. To run the examples, e.g. for `foxgirl_skirt`,
+```
+cd garment-data/foxgirl_skirt
+../../build/PolyFEM_bin -j setup.json --max_threads 16 > log
 ```
 
-```bibtex
-@article{Schneider:2019:PFM,
-  author = {Schneider, Teseo and Dumas, J{\'e}r{\'e}mie and Gao, Xifeng and Botsch, Mario and Panozzo, Daniele and Zorin, Denis},
-  title = {Poly-Spline Finite-Element Method},
-  journal = {ACM Trans. Graph.},
-  volume = {38},
-  number = {3},
-  month = mar,
-  year = {2019},
-  url = {http://doi.acm.org/10.1145/3313797},
-  publisher = {ACM}
-}
-```
+## Output Files
+* `step_avatar_<n>.obj`: optimization sequence of the target avatar geometry
+* `step_garment_<n>.obj`: optimization sequence of the retargeted garment surface
+* `sdf.obj`: avatar surface converted from the signed distance field
+* `source_skeleton.obj`: skeleton of the source garment
+* `target_skeleton.obj`: skeleton of the target avatar
+* `target_avatar.obj`: target avatar geometry
+* `projected_avatar.obj`: projected target avatar on its skeleton
 
-```bibtex
-@article{Schneider:2018:DSA,
-    author = {Teseo Schneider and Yixin Hu and Jérémie Dumas and Xifeng Gao and Daniele Panozzo and Denis Zorin},
-    journal = {ACM Transactions on Graphics},
-    link = {},
-    month = {10},
-    number = {6},
-    publisher = {Association for Computing Machinery (ACM)},
-    title = {Decoupling Simulation Accuracy from Mesh Quality},
-    volume = {37},
-    year = {2018}
-}
-```
+## Script Settings
 
-Acknowledgments & Funding
---------
-The software is being developed in the [Geometric Computing Lab](https://cims.nyu.edu/gcl/index.html) at NYU Courant Institute of Mathematical Sciences and the University of Victoria, Canada.
+The specification of each JSON configuration is described in `json-specs/input-spec.json`.
 
+### Meshes
 
-This work was partially supported by:
+* `avatar_mesh_path`: the target avatar mesh
+* `garment_mesh_path`: the source garment mesh
+* `source_skeleton_path`: the skeleton edge mesh of the source garment in `.obj` format
+* `target_skeleton_path`: the skeleton edge mesh of the target avatar in `.obj` format
+* `avatar_skin_weights_path`: the skinning weights of the target avatar, a matrix of size `#number_of_skeleton_nodes` times `#number_of_vertices` (optional)
 
-* the NSF CAREER award 1652515
-* the NSF grant IIS-1320635
-* the NSF grant DMS-1436591
-* the NSF grant 1835712
-* the SNSF grant P2TIP2_175859
-* the NSERC grant RGPIN-2021-03707
-* the NSERC grant DGECR-2021-00461
-* Adobe Research
-* nTopology
+For avatars and garments, only `.obj` triangular mesh is supported. The source and target skeletons should share the same mesh connectivity, and skeleton joints should be ordered in the same way. The skinning weights will be used to project the target avatar to its skeleton. If `avatar_skin_weights_path` is not provided, the vertices will be simply projected to the closest bone in distance. Ideally, the source and target skeletons are in the same pose, so that the difference in pose does not cause unecessary geometric distortion on the garment.
+
+### Objectives and Weights
+
+There are multiple objectives used in the method, each has its own weight:
+
+* `similarity_penalty_weight`: $L_\text{surf}$ preserves the surface shape, always set to 1
+* `curvature_penalty_weight`: $L_\text{curvature}$ preserves the curve curvature
+* `twist_penalty_weight`: $L_\text{torsion}$ preserves the curve torsion
+* `curve_center_target_weight`: $L_\text{pos}$ preserves the relative position of curve loops (e.g. hem, cuff)
+* `solver/contact/barrier_stiffness`: $L_\text{contact}$ avoids contact by adding a barrier
+
+The choice of `barrier_stiffness` depends on the mesh resolution, geometry scale, and the specific problem setup. The general rule is that when the min distance reported in the log is much smaller than `dhat` (say 1/100 of `dhat`), then it should probably be increased.
+
+### Optimizer
+
+The nonlinear optimizer lives in a separate Github repository called [PolySolve](https://github.com/Huangzizhou/polysolve/tree/garment). The optimizer parameters are specified under JSON entry `solver/nonlinear`, whose specification is in [nonlinear-solver-spec.json](https://github.com/Huangzizhou/polysolve/blob/garment/nonlinear-solver-spec.json).
