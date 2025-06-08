@@ -4,7 +4,7 @@
 
 This is the opensource reference implementation of the SIGGRAPH 2025 paper [Intersection-free Garment Retargeting](https://huangzizhou.github.io/assets/img/research/cloth/paper.pdf). This code is modified based on [PolyFEM](https://github.com/polyfem/polyfem). It uses the nonlinear optimizers, linear solvers, and collision handling in [PolyFEM](https://github.com/polyfem/polyfem).
 
-<video src='https://huangzizhou.github.io/assets/img/research/cloth/video.mp4' width=180/>
+![Output sample](./garment-data/output.gif)
 
 ## Files
 
