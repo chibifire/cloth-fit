@@ -1,10 +1,4 @@
 {
-    "geometry": [
-        {
-            "mesh": "",
-            "n_refs": 0
-        }
-    ],
     "incremental_steps": 2,
     "avatar_mesh_path": "../assets/avatars/FoxGirl/avatar.obj",
     "target_skeleton_path": "../assets/avatars/FoxGirl/skeleton.obj",
@@ -70,9 +64,7 @@
         }
     },
     "output": {
-        "paraview": {
-            "skip_frame": 2
-        },
+        "skip_frame": 2,
         "log": {
             "level": "debug"
         }

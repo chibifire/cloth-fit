@@ -5,8 +5,6 @@
 set(test_sources
   test_garment.cpp
   test_geometry_utils.cpp
-  test_matrix.cpp
-  test_normal.cpp
   test_tbb.cpp
 )
 

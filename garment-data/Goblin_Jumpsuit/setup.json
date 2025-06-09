@@ -1,10 +1,4 @@
 {
-    "geometry": [
-        {
-            "mesh": "",
-            "n_refs": 0
-        }
-    ],
     "incremental_steps": 1,
     "avatar_mesh_path": "../assets/avatars/Goblin/avatar.obj",
     "target_skeleton_path": "../assets/avatars/Goblin/skeleton.obj",
@@ -69,9 +63,7 @@
         }
     },
     "output": {
-        "paraview": {
-            "skip_frame": 2
-        },
+        "skip_frame": 2,
         "log": {
             "level": "debug"
         }

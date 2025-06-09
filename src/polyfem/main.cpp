@@ -8,7 +8,6 @@
 
 #include <polysolve/nonlinear/Solver.hpp>
 
-#include <polyfem/State.hpp>
 #include <polyfem/utils/StringUtils.hpp>
 #include <polyfem/solver/forms/ContactForm.hpp>
 #include <polyfem/solver/forms/garment_forms/GarmentForm.hpp>
@@ -120,9 +119,7 @@ int main(int argc, char **argv)
 	}
 
 	{
-		State state;
-		state.init(in_args, false);
-		in_args = state.args;
+		in_args = init(in_args, false);
 	}
 
 	GarmentSolver gstate;
@@ -210,7 +207,7 @@ int main(int argc, char **argv)
 	Eigen::MatrixXd cur_garment_v = gstate.garment.v;
 	int save_id = 0;
 	const int total_steps = in_args["incremental_steps"];
-	const int stride = in_args["output"]["paraview"]["skip_frame"];
+	const int stride = in_args["output"]["skip_frame"];
 
 	std::vector<std::shared_ptr<Form>> persistent_forms;
 	std::vector<std::shared_ptr<Form>> persistent_full_forms;
@@ -256,7 +253,7 @@ int main(int argc, char **argv)
 			std::shared_ptr<ContactForm> contact_form = std::make_shared<ContactForm>(collision_mesh, dhat, 1, false, false, false, false, in_args["solver"]["contact"]["CCD"]["broad_phase"], in_args["solver"]["contact"]["CCD"]["tolerance"], in_args["solver"]["contact"]["CCD"]["max_iterations"]);
 			contact_form->set_weight(1);
 			contact_form->set_barrier_stiffness(in_args["solver"]["contact"]["barrier_stiffness"]);
-			contact_form->save_ccd_debug_meshes = in_args["output"]["advanced"]["save_ccd_debug_meshes"];
+			contact_form->save_ccd_debug_meshes = false;
 			persistent_forms.push_back(contact_form);
 		}
 

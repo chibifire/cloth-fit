@@ -2,15 +2,9 @@ set(SOURCES
 	autodiff.h
 	AutodiffTypes.hpp
 	Bessel.hpp
-	BoundarySampler.cpp
-	BoundarySampler.hpp
 	ClipperUtils.cpp
 	ClipperUtils.hpp
 	DisableWarnings.hpp
-	EdgeSampler.cpp
-	EdgeSampler.hpp
-	ElasticityUtils.cpp
-	ElasticityUtils.hpp
 	EnableWarnings.hpp
 	ExpressionValue.cpp
 	ExpressionValue.hpp
@@ -20,10 +14,6 @@ set(SOURCES
 	GeometryUtils.hpp
 	getRSS.c
 	HashUtils.hpp
-	IntegrableFunctional.cpp
-	IntegrableFunctional.hpp
-	InterpolatedFunction.cpp
-	InterpolatedFunction.hpp
 	Interpolation.cpp
 	Interpolation.hpp
 	JSONUtils.cpp
@@ -38,24 +28,12 @@ set(SOURCES
 	MaybeParallelFor.tpp
 	par_for.cpp
 	par_for.hpp
-	raster.cpp
-	raster.hpp
-	RBFInterpolation.cpp
-	RBFInterpolation.hpp
-	RefElementSampler.cpp
-	RefElementSampler.hpp
-	BSplineParametrization.cpp
-	BSplineParametrization.hpp
-	CubicHermiteSplineParametrization.hpp
 	Selection.cpp
 	Selection.hpp
 	StringUtils.cpp
 	StringUtils.hpp
 	Timer.hpp
 	Types.hpp
-	LazyCubicInterpolator.cpp
-	LazyCubicInterpolator.hpp
-	svd/ImplicitQRSVD.h
 	svd/Tools.h
 	svd.hpp
 )

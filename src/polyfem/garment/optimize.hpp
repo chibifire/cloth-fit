@@ -83,4 +83,6 @@ namespace polyfem {
 
         std::vector<int> not_fit_fids;
     };
+
+	json init(const json &p_args_in, const bool strict_validation);
 }

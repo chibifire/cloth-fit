@@ -1,6 +1,4 @@
 #include "ALSolver.hpp"
-#include <polyfem/solver/forms/BCLagrangianForm.hpp>
-#include <polyfem/solver/forms/BCPenaltyForm.hpp>
 #include <polyfem/solver/forms/garment_forms/GarmentALForm.hpp>
 
 #include <polyfem/utils/Logger.hpp>
@@ -134,18 +132,6 @@ namespace polyfem::solver
 	}
 
 	template <>
-	double ALSolver<NLProblem, BCLagrangianForm, BCPenaltyForm>::compute_error(NLProblem &nl_problem, const Eigen::MatrixXd &sol) const
-	{
-		return pen_form->compute_error(sol);
-	}
-
-	template <>
-	void ALSolver<NLProblem, BCLagrangianForm, BCPenaltyForm>::update_lagrangian(NLProblem &nl_problem, const Eigen::MatrixXd &sol, double al_weight)
-	{
-		lagr_form->update_lagrangian(sol, al_weight);
-	}
-
-	template <>
 	double ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm>::compute_error(GarmentNLProblem &nl_problem, const Eigen::MatrixXd &sol) const
 	{
 		return pen_form->compute_error(nl_problem.full_to_complete(sol));
@@ -179,6 +165,5 @@ namespace polyfem::solver
 		}
 	}
 
-	template class ALSolver<NLProblem, BCLagrangianForm, BCPenaltyForm>;
 	template class ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm>;
 } // namespace polyfem::solver

@@ -10,6 +10,8 @@
 #include <igl/connected_components.h>
 #include <igl/edges_to_path.h>
 
+DECLARE_DIFFSCALAR_BASE();
+
 using namespace polyfem::autogen;
 
 namespace polyfem::solver
