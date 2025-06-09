@@ -2,12 +2,8 @@ set(SOURCES
 	autodiff.h
 	AutodiffTypes.hpp
 	Bessel.hpp
-	ClipperUtils.cpp
-	ClipperUtils.hpp
 	DisableWarnings.hpp
 	EnableWarnings.hpp
-	GeogramUtils.cpp
-	GeogramUtils.hpp
 	GeometryUtils.cpp
 	GeometryUtils.hpp
 	getRSS.c
@@ -26,14 +22,10 @@ set(SOURCES
 	MaybeParallelFor.tpp
 	par_for.cpp
 	par_for.hpp
-	Selection.cpp
-	Selection.hpp
 	StringUtils.cpp
 	StringUtils.hpp
 	Timer.hpp
 	Types.hpp
-	svd/Tools.h
-	svd.hpp
 )
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Source Files" FILES ${SOURCES})

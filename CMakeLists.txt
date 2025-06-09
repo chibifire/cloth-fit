@@ -237,10 +237,6 @@ target_link_libraries(polyfem PUBLIC simple_bvh::simple_bvh)
 include(mshio)
 target_link_libraries(polyfem PUBLIC mshio)
 
-# Geogram
-include(geogram)
-target_link_libraries(polyfem PUBLIC geogram)
-
 # paraviewo (includes HDF5 and h5pp)
 include(paraviewo)
 target_link_libraries(polyfem PUBLIC paraviewo::paraviewo)
@@ -253,9 +249,9 @@ target_link_libraries(polyfem PUBLIC spdlog::spdlog)
 include(jse)
 target_link_libraries(polyfem PUBLIC jse::jse)
 
-# natsort library
-include(natsort)
-target_link_libraries(polyfem PUBLIC natsort::natsort)
+# # natsort library
+# include(natsort)
+# target_link_libraries(polyfem PUBLIC natsort::natsort)
 
 # GLOB library
 include(glob)
@@ -269,26 +265,11 @@ target_link_libraries(polyfem PUBLIC yaml-cpp::yaml-cpp)
 # Optional libraries
 ################################################################################
 
-# # MMG wrapper
-if(POLYFEM_WITH_MMG)
-    include(mmg)
-    target_link_libraries(polyfem PUBLIC mmg::mmg)
-    target_compile_definitions(polyfem PUBLIC -DPOLYFEM_WITH_MMG)
-endif()
-
-# wmtk library
-# Include lagrange first to fetch a newer version than
-# what is used in the toolkit.
-include(lagrange)
-
 if(POLYFEM_WITH_CLIPPER)
     include(clipper)
     target_link_libraries(polyfem PUBLIC clipper::clipper)
     target_compile_definitions(polyfem PUBLIC -DPOLYFEM_WITH_CLIPPER)
 endif()
-
-include(polyclipper)
-target_link_libraries(polyfem PUBLIC PolyClipper::PolyClipper)
 
 # Extra warnings (link this here so it has top priority)
 include(polyfem_warnings)

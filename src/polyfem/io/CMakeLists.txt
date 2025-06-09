@@ -3,8 +3,6 @@ set(SOURCES
 	MatrixIO.hpp
 	MshReader.cpp
 	MshReader.hpp
-	MshWriter.cpp
-	MshWriter.hpp
 	OBJReader.cpp
 	OBJReader.hpp
 	OBJWriter.cpp
