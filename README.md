@@ -1,6 +1,5 @@
-[![Build](https://github.com/Huangzizhou/cloth-fit/actions/workflows/continuous.yml/badge.svg)](https://github.com/Huangzizhou/cloth-fit/actions/workflows/continuous.yml)
-
 # [Siggraph 2025] Intersection-free Garment Retargeting
+[![Build](https://github.com/Huangzizhou/cloth-fit/actions/workflows/continuous.yml/badge.svg)](https://github.com/Huangzizhou/cloth-fit/actions/workflows/continuous.yml)
 
 This is the opensource reference implementation of the SIGGRAPH 2025 paper [Intersection-free Garment Retargeting](https://huangzizhou.github.io/assets/img/research/cloth/paper.pdf). This code is modified based on [PolyFEM](https://github.com/polyfem/polyfem). It uses the nonlinear optimizers, linear solvers, and collision handling in [PolyFEM](https://github.com/polyfem/polyfem).
 
