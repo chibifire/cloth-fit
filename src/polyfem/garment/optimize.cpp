@@ -8,6 +8,8 @@
 #include <polyfem/utils/JSONUtils.hpp>
 #include <polyfem/utils/par_for.hpp>
 #include <polyfem/utils/StringUtils.hpp>
+#include <polyfem/utils/Logger.hpp>
+#include <polyfem/utils/MatrixUtils.hpp>
 
 #include <igl/edges.h>
 #include <igl/read_triangle_mesh.h>

@@ -67,7 +67,7 @@ option(POLYFEM_WITH_CLIPPER   "Use clipper, necessary for polygonal bases"  ON)
 option(POLYFEM_WITH_MMG       "Build MMG utils for remeshing"              OFF)
 option(POLYFEM_WITH_TRIANGLE  "Build target igl_restricted::triangle"      OFF)
 option(POLYFEM_BUILD_DOCS     "Build documentation using Doxygen"          OFF)
-option(POLYFEM_REGENERATE_AUTOGEN    "Generate the python autogen files" OFF)
+option(POLYFEM_REGENERATE_AUTOGEN    "Generate the python autogen files"   OFF)
 set(POLYFEM_THREADING "TBB" CACHE STRING "Multithreading library to use (options: CPP, TBB, NONE)")
 set_property(CACHE POLYFEM_THREADING PROPERTY STRINGS "CPP" "TBB" "NONE")
 option(POLYFEM_CODE_COVERAGE "Enable coverage reporting" OFF)
@@ -119,12 +119,6 @@ add_library(polyfem::polyfem ALIAS polyfem)
 
 target_link_libraries(polyfem PUBLIC polyfem_coverage_config)
 
-# Must be call in the same "CMakeLists.txt" where add_library(polyfem ...) is called
-polyfem_autogen(polyfem eigs.py auto_eigs)
-polyfem_autogen(polyfem p_bases.py auto_p_bases)
-polyfem_autogen(polyfem q_bases.py auto_q_bases)
-polyfem_autogen(polyfem elasticity_rhs.py auto_elasticity_rhs)
-
 # Add source and header files to polyfem
 add_subdirectory("${POLYFEM_SOURCE_DIR}")
 
@@ -148,8 +142,6 @@ set(POLYFEM_JSON_SPEC_DIR "${PROJECT_SOURCE_DIR}/json-specs")
 target_compile_definitions(polyfem PUBLIC POLYFEM_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 target_compile_definitions(polyfem PUBLIC POLYFEM_JSON_SPEC_DIR="${POLYFEM_JSON_SPEC_DIR}")
 target_compile_definitions(polyfem PUBLIC POLYFEM_INPUT_SPEC="${POLYFEM_JSON_SPEC_DIR}/input-spec.json")
-target_compile_definitions(polyfem PUBLIC POLYFEM_OPT_INPUT_SPEC="${POLYFEM_JSON_SPEC_DIR}/opt-input-spec.json")
-target_compile_definitions(polyfem PUBLIC POLYFEM_OBJECTIVE_INPUT_SPEC="${POLYFEM_JSON_SPEC_DIR}/objective-spec.json")
 
 if (MSVC)
     add_compile_options(/bigobj)
@@ -245,10 +237,6 @@ target_link_libraries(polyfem PUBLIC simple_bvh::simple_bvh)
 include(mshio)
 target_link_libraries(polyfem PUBLIC mshio)
 
-# Nanospline
-include(nanospline)
-target_link_libraries(polyfem PUBLIC nanospline)
-
 # Geogram
 include(geogram)
 target_link_libraries(polyfem PUBLIC geogram)
@@ -261,10 +249,6 @@ target_link_libraries(polyfem PUBLIC paraviewo::paraviewo)
 include(spdlog)
 target_link_libraries(polyfem PUBLIC spdlog::spdlog)
 
-# TinyExpr library
-include(tinyexpr)
-target_link_libraries(polyfem PUBLIC tinyexpr::tinyexpr)
-
 # JSON Specification Engine library
 include(jse)
 target_link_libraries(polyfem PUBLIC jse::jse)
@@ -276,10 +260,6 @@ target_link_libraries(polyfem PUBLIC natsort::natsort)
 # GLOB library
 include(glob)
 target_link_libraries(polyfem PUBLIC Glob::Glob)
-
-# units
-include(units)
-target_link_libraries(polyfem PUBLIC units::units)
 
 # YAML library
 include(yaml)
@@ -300,8 +280,6 @@ endif()
 # Include lagrange first to fetch a newer version than
 # what is used in the toolkit.
 include(lagrange)
-include(wmtk)
-target_link_libraries(polyfem PUBLIC wmtk::toolkit)
 
 if(POLYFEM_WITH_CLIPPER)
     include(clipper)
@@ -333,20 +311,6 @@ if(POLYFEM_TOPLEVEL_PROJECT)
 
     if(NOT (${CMAKE_VERSION} VERSION_LESS "3.6.0"))
         set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME}_bin)
-    endif()
-
-    if(POLYFEM_BUILD_DOCS)
-        # check if Doxygen is installed
-        find_package(Doxygen)
-        if (DOXYGEN_FOUND)
-            add_custom_target(polyfem_doc_doxygen ALL
-                COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                COMMENT "Generating API documentation with Doxygen"
-                VERBATIM)
-        else (DOXYGEN_FOUND)
-            message("Doxygen need to be installed to generate the doxygen documentation")
-        endif (DOXYGEN_FOUND)
     endif()
 endif()
 

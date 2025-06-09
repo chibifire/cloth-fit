@@ -1,9 +1,6 @@
 #pragma once
 
 #include <polyfem/solver/FullNLProblem.hpp>
-#include <polyfem/assembler/RhsAssembler.hpp>
-#include <polyfem/mesh/LocalBoundary.hpp>
-#include <polyfem/assembler/PeriodicBoundary.hpp>
 
 namespace polyfem::solver
 {

@@ -1,6 +1,4 @@
 set(SOURCES
-	Evaluator.cpp
-	Evaluator.hpp
 	MatrixIO.cpp
 	MatrixIO.hpp
 	MshReader.cpp

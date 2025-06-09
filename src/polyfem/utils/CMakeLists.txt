@@ -6,8 +6,6 @@ set(SOURCES
 	ClipperUtils.hpp
 	DisableWarnings.hpp
 	EnableWarnings.hpp
-	ExpressionValue.cpp
-	ExpressionValue.hpp
 	GeogramUtils.cpp
 	GeogramUtils.hpp
 	GeometryUtils.cpp

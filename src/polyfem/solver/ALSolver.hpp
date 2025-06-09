@@ -1,6 +1,5 @@
 #pragma once
 
-#include <polyfem/solver/NLProblem.hpp>
 #include <polyfem/solver/GarmentNLProblem.hpp>
 #include <polysolve/nonlinear/Solver.hpp>
 #include <polyfem/Common.hpp>

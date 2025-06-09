@@ -1,7 +1,5 @@
 #include "ContactForm.hpp"
 
-#include <polyfem/solver/NLProblem.hpp>
-#include <polyfem/solver/forms/FrictionForm.hpp>
 #include <polyfem/utils/Types.hpp>
 #include <polyfem/utils/Timer.hpp>
 #include <polyfem/utils/Logger.hpp>
@@ -10,6 +8,8 @@
 
 #include <polyfem/io/OBJWriter.hpp>
 
+#include <ipc/ipc.hpp>
+#include <ipc/collision_mesh.hpp>
 #include <ipc/barrier/adaptive_stiffness.hpp>
 #include <ipc/utils/world_bbox_diagonal_length.hpp>
 

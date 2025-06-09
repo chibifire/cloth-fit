@@ -1,6 +1,9 @@
 #include "GarmentNLProblem.hpp"
 
+#include <polyfem/io/MatrixIO.hpp>
 #include <polyfem/io/OBJWriter.hpp>
+#include <polyfem/utils/Logger.hpp>
+#include <polyfem/utils/MatrixUtils.hpp>
 
 namespace polyfem::solver
 {
