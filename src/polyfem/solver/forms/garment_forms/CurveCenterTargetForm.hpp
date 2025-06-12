@@ -92,7 +92,5 @@ namespace polyfem::solver
 
 		Eigen::VectorXi bones;
 		std::vector<Eigen::VectorXd> relative_positions;
-
-		bool is_bone_available(int n_bones, Eigen::Vector2i bone) const;
 	};
 }

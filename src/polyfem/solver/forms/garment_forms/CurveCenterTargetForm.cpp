@@ -251,6 +251,10 @@ namespace polyfem::solver
                 skeleton_edges_.row(nbone) << 0, nvert;
                 skeleton_edges_.row(nbone+1) << nvert, nvert + 1;
             }
+            else
+            {
+                log_and_throw_error("\"is_skirt\" option should be re-implemented for a new skeleton topology!");
+            }
         }
 
         for (auto curve : curves)
@@ -259,40 +263,35 @@ namespace polyfem::solver
         }
         bones.resize(curves_.size());
         relative_positions.resize(curves_.size());
+
         for (int j = 0; j < curves_.size(); j++)
         {
             const Eigen::Vector3d center = V(curves_[j], Eigen::all).colwise().sum() / curves_[j].size();
 
+            const Eigen::Vector3d curve_normal = fit_plane(V(curves_[j], Eigen::all)).normalized();
+            logger().debug("curve normal {}", curve_normal.transpose());
+
             // Project centers to original skeleton bones
             double closest_dist = std::numeric_limits<double>::max();
+            Eigen::Vector3d sdirec;
             for (int i = 0; i < skeleton_edges_.rows(); i++)
             {
                 Eigen::Vector2i edge = skeleton_edges_.row(i);
                 Eigen::Vector3d e0 = source_skeleton_v_.row(edge(0));
                 Eigen::Vector3d e1 = source_skeleton_v_.row(edge(1));
                 Eigen::Vector2d tmp = point_edge_closest_distance(center, e0, e1);
-                if (tmp(0) < closest_dist && is_bone_available(skeleton_edges_.rows(), edge))
+
+                sdirec = (source_skeleton_v_.row(skeleton_edges_(i, 1)) - source_skeleton_v_.row(skeleton_edges_(i, 0))).normalized();
+
+                // if (tmp(0) < closest_dist && is_bone_available(skeleton_edges_.rows(), edge))
+                if (abs(sdirec.dot(curve_normal)) > 0.5 && tmp(0) < closest_dist)
                 {
                     closest_dist = tmp(0);
                     bones(j) = i;
                 }
             }
-
-            // Eigen::RowVector3d sdirec = (source_skeleton_v_.row(skeleton_edges_(bones(j), 1)) - source_skeleton_v_.row(skeleton_edges_(bones(j), 0)));
-            // logger().debug("CurveTargetForm set curve center to bone {} - {}, direction is {}", skeleton_edges_(bones(j), 0), skeleton_edges_(bones(j), 1), sdirec.normalized());
-            // Eigen::RowVector3d tdirec = (target_skeleton_v_.row(skeleton_edges_(bones(j), 1)) - target_skeleton_v_.row(skeleton_edges_(bones(j), 0)));
-            // logger().debug("target direction is {}", tdirec.normalized());
-
-            // if (tdirec.dot(sdirec) / tdirec.norm() / sdirec.norm() > 0.99)
-            // {
-            //     logger().debug("Slightly modify the bone direction to match with the source...");
-            //     target_skeleton_v_.row(skeleton_edges_(bones(j), 1)) = sdirec.normalized() * tdirec.norm() + target_skeleton_v_.row(skeleton_edges_(bones(j), 0));
-
-            //     Eigen::RowVector3d tdirec = (target_skeleton_v_.row(skeleton_edges_(bones(j), 1)) - target_skeleton_v_.row(skeleton_edges_(bones(j), 0)));
-            //     logger().debug("new target direction is {}", tdirec.normalized());
-            // }
-
-            // logger().debug("curve normal {}", fit_plane(V(curves_[j], Eigen::all)).transpose());
+            
+            logger().debug("CurveTargetForm set curve center to bone {} - {}, direction is {}", skeleton_edges_(bones(j), 0), skeleton_edges_(bones(j), 1), sdirec.transpose());
             
             relative_positions[j].resize(curves_[j].size());
             for (int i = 0; i < curves_[j].size(); i++)
@@ -303,55 +302,6 @@ namespace polyfem::solver
         }
     }
 
-    bool CurveTargetForm::is_bone_available(int n_bones, Eigen::Vector2i bone) const
-    {
-        if (bone(0) > bone(1))
-            std::swap(bone(0), bone(1));
-
-        if (n_bones == 23 + (is_skirt_ ? 2 : 0))
-        { 
-            if (bone(0) == 0)
-            {
-                if (bone(1) == 5 || bone(1) == 1)
-                {
-                    return false;
-                }
-            }
-            else if (bone(0) == 11)
-            {
-                if (bone(1) == 14 || bone(1) == 19)
-                {
-                    return false;
-                }
-            }
-            else
-                return true;
-        }
-        else if (n_bones == 14 + (is_skirt_ ? 2 : 0))
-        {
-            if (bone(0) == 1)
-            {
-                if (bone(1) == 3 || bone(1) == 6)
-                {
-                    return false;
-                }
-            }
-            else if (bone(0) == 0)
-            {
-                if (bone(1) == 12 || bone(1) == 9)
-                {
-                    return false;
-                }
-            }
-            else
-                return true;
-        }
-        else
-            log_and_throw_error("Invalid number of bones in the skeleton!");
-            
-        return true;
-    }
-    
     double CurveTargetForm::value_unweighted(const Eigen::VectorXd &x) const
     {
         const double t = x(0);
