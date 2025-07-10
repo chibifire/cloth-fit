@@ -3,7 +3,7 @@
 #include <iostream>
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/autogen/auto_derivatives.hpp>
-#include <polyfem/utils/AutodiffTypes.hpp>
+#include <polyfem/utils/autodiff.h>
 #include <polyfem/utils/Timer.hpp>
 
 #include <polyfem/mesh/MeshUtils.hpp>

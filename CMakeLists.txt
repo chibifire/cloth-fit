@@ -63,14 +63,10 @@ set(POLYFEM_BIG_N   1000 CACHE STRING "Maximum length for stack-allocated vector
 
 # Polyfem options for enabling/disabling optional libraries
 option(POLYFEM_WITH_TESTS     "Build tests"                                 ON)
-option(POLYFEM_WITH_CLIPPER   "Use clipper, necessary for polygonal bases"  ON)
-option(POLYFEM_WITH_MMG       "Build MMG utils for remeshing"              OFF)
-option(POLYFEM_WITH_TRIANGLE  "Build target igl_restricted::triangle"      OFF)
-option(POLYFEM_BUILD_DOCS     "Build documentation using Doxygen"          OFF)
-option(POLYFEM_REGENERATE_AUTOGEN    "Generate the python autogen files"   OFF)
 set(POLYFEM_THREADING "TBB" CACHE STRING "Multithreading library to use (options: CPP, TBB, NONE)")
 set_property(CACHE POLYFEM_THREADING PROPERTY STRINGS "CPP" "TBB" "NONE")
 option(POLYFEM_CODE_COVERAGE "Enable coverage reporting" OFF)
+option(POLYFEM_WITH_PARAVIEWO "Enable advanced export with paraviewo" OFF)
 
 set(POLYSOLVE_WITH_AMGCL OFF)
 
@@ -223,23 +219,12 @@ elseif(POLYFEM_THREADING STREQUAL "TBB")
     target_compile_definitions(polyfem PUBLIC -DPOLYFEM_WITH_TBB)
 endif()
 
-
-if(POLYFEM_WITH_TRIANGLE)
-    target_link_libraries(polyfem PUBLIC igl_restricted::triangle)
-    target_compile_definitions(polyfem PUBLIC -DPOLYFEM_WITH_TRIANGLE)
-endif()
-
-# SimpleBVH
-include(simple_bvh)
-target_link_libraries(polyfem PUBLIC simple_bvh::simple_bvh)
-
-# MSHIO
-include(mshio)
-target_link_libraries(polyfem PUBLIC mshio)
-
 # paraviewo (includes HDF5 and h5pp)
-include(paraviewo)
-target_link_libraries(polyfem PUBLIC paraviewo::paraviewo)
+if(POLYFEM_WITH_PARAVIEWO)
+    include(paraviewo)
+    target_link_libraries(polyfem PUBLIC paraviewo::paraviewo)
+    target_compile_definitions(polyfem PUBLIC -DPOLYFEM_WITH_PARAVIEWO)
+endif()
 
 # spdlog
 include(spdlog)
@@ -249,27 +234,9 @@ target_link_libraries(polyfem PUBLIC spdlog::spdlog)
 include(jse)
 target_link_libraries(polyfem PUBLIC jse::jse)
 
-# # natsort library
-# include(natsort)
-# target_link_libraries(polyfem PUBLIC natsort::natsort)
-
-# GLOB library
-include(glob)
-target_link_libraries(polyfem PUBLIC Glob::Glob)
-
-# YAML library
-include(yaml)
-target_link_libraries(polyfem PUBLIC yaml-cpp::yaml-cpp)
-
 ################################################################################
 # Optional libraries
 ################################################################################
-
-if(POLYFEM_WITH_CLIPPER)
-    include(clipper)
-    target_link_libraries(polyfem PUBLIC clipper::clipper)
-    target_compile_definitions(polyfem PUBLIC -DPOLYFEM_WITH_CLIPPER)
-endif()
 
 # Extra warnings (link this here so it has top priority)
 include(polyfem_warnings)

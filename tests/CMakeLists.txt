@@ -4,7 +4,6 @@
 
 set(test_sources
   test_garment.cpp
-  test_geometry_utils.cpp
   test_tbb.cpp
 )
 

@@ -1,15 +1,8 @@
 set(SOURCES
 	autodiff.h
-	AutodiffTypes.hpp
-	Bessel.hpp
 	DisableWarnings.hpp
 	EnableWarnings.hpp
-	GeometryUtils.cpp
-	GeometryUtils.hpp
 	getRSS.c
-	HashUtils.hpp
-	Interpolation.cpp
-	Interpolation.hpp
 	JSONUtils.cpp
 	JSONUtils.hpp
 	Logger.cpp
