@@ -20,8 +20,10 @@
 
 #include <polysolve/linear/Solver.hpp>
 
+#ifdef POLYFEM_WITH_PARAVIEWO
 #include <paraviewo/ParaviewWriter.hpp>
 #include <paraviewo/VTUWriter.hpp>
+#endif
 
 #include <ipc/ipc.hpp>
 #include <ipc/distance/point_edge.hpp>
@@ -211,12 +213,13 @@ namespace polyfem {
         const Eigen::MatrixXi &F,
         const Eigen::VectorXd &sol)
     {
-        std::shared_ptr<paraviewo::ParaviewWriter> tmpw = std::make_shared<paraviewo::VTUWriter>();
-        paraviewo::ParaviewWriter &writer = *tmpw;
-
         const Eigen::VectorXd full_disp = prob.reduced_to_full(sol);
         const Eigen::VectorXd complete_disp = prob.full_to_complete(full_disp);
         const Eigen::MatrixXd current_vertices = utils::unflatten(complete_disp, V.cols()) + V;
+
+#ifdef POLYFEM_WITH_PARAVIEWO
+        std::shared_ptr<paraviewo::ParaviewWriter> tmpw = std::make_shared<paraviewo::VTUWriter>();
+        paraviewo::ParaviewWriter &writer = *tmpw;
 
         if (false)
         {
@@ -257,7 +260,7 @@ namespace polyfem {
             logger().debug("Save VTU to {}", path + "/step_" + std::to_string(index) + ".vtu");
             writer.write_mesh(path + "/step_" + std::to_string(index) + ".vtu", current_vertices, F);
         }
-
+#endif
         garment.v = current_vertices.bottomRows(garment.v.rows());
         garment.write(path + "/step_garment_" + std::to_string(index) + ".obj");
         logger().debug("Save OBJ to {}", path + "/step_garment_" + std::to_string(index) + ".obj");

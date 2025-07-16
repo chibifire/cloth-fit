@@ -4,11 +4,7 @@
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/utils/Timer.hpp>
 #include <polyfem/autogen/auto_derivatives.hpp>
-#include <finitediff.hpp>
 #include <unordered_set>
-
-// #include <paraviewo/ParaviewWriter.hpp>
-// #include <paraviewo/VTUWriter.hpp>
 
 using namespace polyfem::autogen;
 
