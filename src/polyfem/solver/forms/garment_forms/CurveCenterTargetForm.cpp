@@ -61,6 +61,10 @@ namespace polyfem::solver
             return eigensolver.eigenvectors().col(0);
         }
 
+        // Nvidia actively chooses to use the MIT license for this section of code.
+        // SPDX-License-Identifier: MIT
+        // #########################################################
+
 		template <class T>
 		Eigen::Matrix<T, -1, 3> project_points_to_plane(
 			const Eigen::Matrix<T, -1, 3> &points,
@@ -322,6 +326,7 @@ namespace polyfem::solver
 			skeleton_edges.row(new_edge_idx) << 0, start_idx; // Root vertex index is 0
 			skeleton_edges.row(new_edge_idx + 1) << start_idx, end_idx;
 		}
+        // #########################################################
 	}
 
     CurveCenterTargetForm::CurveCenterTargetForm(
@@ -533,6 +538,9 @@ namespace polyfem::solver
             const Eigen::Vector3d center = V(curves_[j], Eigen::all).colwise().sum() / curves_[j].size();
             const Eigen::Vector3d curve_normal = fit_plane(V(curves_[j], Eigen::all)).normalized();
 
+            // Nvidia actively chooses to use the MIT license for this section of code.
+            // SPDX-License-Identifier: MIT
+            // #########################################################
             auto bone_intersection_points = count_bone_intersections<double>(V(curves_[j], Eigen::all), source_skeleton_v_, skeleton_edges_);
             if (bone_intersection_points.size() > 0)
             {
@@ -557,7 +565,7 @@ namespace polyfem::solver
 
                 add_bone_to_both_skeletons_with_root_as_parent(start_point, end_point, source_skeleton_v_, target_skeleton_v_, skeleton_edges_);
             }
-
+            // #########################################################
 
             logger().debug("curve normal {}", curve_normal.transpose());
 
