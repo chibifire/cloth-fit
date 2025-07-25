@@ -484,9 +484,11 @@ namespace polyfem::solver
         const Eigen::MatrixXd &source_skeleton_v,
         const Eigen::MatrixXd &target_skeleton_v,
         const Eigen::MatrixXi &skeleton_edges,
-		const bool is_skirt): 
+		const bool is_skirt, 
+		const bool automatic_bone_generation
+    ): 
         is_skirt_(is_skirt), V_(V), source_skeleton_v_(source_skeleton_v),
-        target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges)
+        target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges), automatic_bone_generation_(automatic_bone_generation)
     {
         // Insert one skeleton as the average of two legs
         if (is_skirt_)
@@ -541,29 +543,31 @@ namespace polyfem::solver
             // Nvidia actively chooses to use the MIT license for this section of code.
             // SPDX-License-Identifier: MIT
             // #########################################################
-            auto bone_intersection_points = count_bone_intersections<double>(V(curves_[j], Eigen::all), source_skeleton_v_, skeleton_edges_);
-            if (bone_intersection_points.size() > 0)
-            {
-                logger().debug("curve {} has {} bone intersections", j, bone_intersection_points.size());
-            } 
+            if (automatic_bone_generation_){
+                auto bone_intersection_points = count_bone_intersections<double>(V(curves_[j], Eigen::all), source_skeleton_v_, skeleton_edges_);
+                if (bone_intersection_points.size() > 0)
+                {
+                    logger().debug("curve {} has {} bone intersections", j, bone_intersection_points.size());
+                } 
 
-            if (bone_intersection_points.size() > 1)
-            {
-                // If we have intersection points, create new bone as the average of the others.
-                
-                // Calculate average intersection point
-                Eigen::Vector3d avg_intersection = Eigen::Vector3d::Zero();
-                for (const auto& point : bone_intersection_points) {
-                    avg_intersection += point;
+                if (bone_intersection_points.size() > 1)
+                {
+                    // If we have intersection points, create new bone as the average of the others.
+                    
+                    // Calculate average intersection point
+                    Eigen::Vector3d avg_intersection = Eigen::Vector3d::Zero();
+                    for (const auto& point : bone_intersection_points) {
+                        avg_intersection += point;
+                    }
+                    avg_intersection /= bone_intersection_points.size();
+
+                    // Create two vertices per bone
+                    const double bone_length = 0.1; // Small fixed length
+                    const Eigen::Vector3d start_point = avg_intersection - 0.5 * bone_length * curve_normal;
+                    const Eigen::Vector3d end_point = avg_intersection + 0.5 * bone_length * curve_normal;
+
+                    add_bone_to_both_skeletons_with_root_as_parent(start_point, end_point, source_skeleton_v_, target_skeleton_v_, skeleton_edges_);
                 }
-                avg_intersection /= bone_intersection_points.size();
-
-                // Create two vertices per bone
-                const double bone_length = 0.1; // Small fixed length
-                const Eigen::Vector3d start_point = avg_intersection - 0.5 * bone_length * curve_normal;
-                const Eigen::Vector3d end_point = avg_intersection + 0.5 * bone_length * curve_normal;
-
-                add_bone_to_both_skeletons_with_root_as_parent(start_point, end_point, source_skeleton_v_, target_skeleton_v_, skeleton_edges_);
             }
             // #########################################################
 

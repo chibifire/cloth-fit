@@ -406,5 +406,11 @@
         "default": 1,
         "type": "int",
         "doc": "export every skip_frame-th frames for time dependent simulations"
+    },
+    {
+        "pointer": "/curve_center_target_automatic_bone_generation",
+        "type": "bool",
+        "default": false,
+        "doc": "Set this value to true if the bone used by curve center target is automatically generated if more than 1 bone intersects with the plane fit to the curve loops (hem, collar, cuff, etc.)"
     }
 ]

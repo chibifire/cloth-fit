@@ -61,7 +61,8 @@ namespace polyfem::solver
 			const Eigen::MatrixXd &source_skeleton_v,
 			const Eigen::MatrixXd &target_skeleton_v,
 			const Eigen::MatrixXi &skeleton_edges,
-			const bool is_skirt = false);
+			const bool is_skirt = false,
+			const bool automatic_bone_generation = false);
 		virtual ~CurveTargetForm() = default;
 
 		std::string name() const override { return "curve-target"; }
@@ -92,5 +93,7 @@ namespace polyfem::solver
 
 		Eigen::VectorXi bones;
 		std::vector<Eigen::VectorXd> relative_positions;
+
+		const bool automatic_bone_generation_;
 	};
 }
