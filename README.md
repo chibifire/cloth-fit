@@ -63,6 +63,37 @@ cd garment-data/foxgirl_skirt
 - `target_avatar.obj`: target avatar geometry
 - `projected_avatar.obj`: projected target avatar on its skeleton
 
+## Blender Import Settings
+
+When importing the generated OBJ files into Blender for visualization, use the following settings to ensure correct display:
+
+### OBJ Import Options:
+1. **File > Import > Wavefront (.obj)**
+2. **Transform Settings:**
+   - **Forward Axis**: `-Z Forward` (or adjust based on your scene orientation)
+   - **Up Axis**: `Y Up` (default)
+   - **Scale**: `1.0` (adjust if meshes appear too large/small)
+
+3. **Geometry Settings:**
+   - ✅ **Smooth Groups**: Enable for proper shading
+   - ✅ **Lines**: Enable to import skeleton edges
+   - ✅ **Split by Object**: Enable to separate different mesh components
+   - ✅ **Split by Group**: Enable for better organization
+
+4. **Material Settings:**
+   - ✅ **Image Search**: Enable if textures are present
+   - **Material Import**: Enable for basic material support
+
+### Recommended Viewport Settings:
+- **Shading**: Use `Material Preview` or `Solid` mode for best visibility
+- **Overlays**: Enable `Wireframe` if you need to see mesh topology
+- **Viewport Shading**: Set `MatCap` to a neutral material for better geometry visualization
+
+### Notes:
+- Skeleton files (`.obj` with edge data) will import as wireframe meshes
+- Multiple optimization steps can be imported as separate objects for animation
+- Use Blender's Timeline to scrub through optimization sequences by toggling object visibility
+
 ## Script Settings
 
 The specification of each JSON configuration is described in `json-specs/input-spec.json`.
