@@ -15,7 +15,7 @@ namespace polyfem::solver
 	public:
 		// WARNING: V and curves should only contain garment mesh info
 		CurveCenterTargetForm(
-			const Eigen::MatrixXd &V, 
+			const Eigen::MatrixXd &V,
 			const std::vector<Eigen::VectorXi> &curves,
 			const Eigen::MatrixXd &source_skeleton_v,
 			const Eigen::MatrixXd &target_skeleton_v,
@@ -56,7 +56,7 @@ namespace polyfem::solver
 	public:
 		// WARNING: V and curves should only contain garment mesh info
 		CurveTargetForm(
-			const Eigen::MatrixXd &V, 
+			const Eigen::MatrixXd &V,
 			const std::vector<Eigen::VectorXi> &curves,
 			const Eigen::MatrixXd &source_skeleton_v,
 			const Eigen::MatrixXd &target_skeleton_v,

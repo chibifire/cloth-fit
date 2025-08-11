@@ -109,7 +109,7 @@ namespace polyfem::solver
 
     private:
 		const double c = 0.01;
-		
+
         std::vector<Eigen::MatrixXd> compute_angles(const Eigen::MatrixXd &V) const;
 
 		const Eigen::MatrixXd V_;

@@ -330,11 +330,11 @@ namespace polyfem::solver
 	}
 
     CurveCenterTargetForm::CurveCenterTargetForm(
-        const Eigen::MatrixXd &V, 
+        const Eigen::MatrixXd &V,
         const std::vector<Eigen::VectorXi> &curves,
         const Eigen::MatrixXd &source_skeleton_v,
         const Eigen::MatrixXd &target_skeleton_v,
-        const Eigen::MatrixXi &skeleton_edges): 
+        const Eigen::MatrixXi &skeleton_edges):
         V_(V), source_skeleton_v_(source_skeleton_v),
         target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges)
     {
@@ -402,11 +402,11 @@ namespace polyfem::solver
 
             const int id = bones(j);
             const double param0 = relative_positions(j);
-            
+
             const Eigen::Vector3d targetS = param0 * (source_skeleton_v_.row(skeleton_edges_(id, 1)) - source_skeleton_v_.row(skeleton_edges_(id, 0))) + source_skeleton_v_.row(skeleton_edges_(id, 0));
             const Eigen::Vector3d targetT = param0 * (target_skeleton_v_.row(skeleton_edges_(id, 1)) - target_skeleton_v_.row(skeleton_edges_(id, 0))) + target_skeleton_v_.row(skeleton_edges_(id, 0));
             const Eigen::Vector3d target = t * (targetT - targetS) + targetS;
-            
+
             const Eigen::Vector3d tmp = center - target;
             for (int i = 0; i < curve.size(); i++)
                 gradv.segment<3>(1 + curve(i) * 3) += tmp / curve.size();
@@ -431,11 +431,11 @@ namespace polyfem::solver
 
             const int id = bones(j);
             const double param0 = relative_positions(j);
-            
+
             const Eigen::Vector3d targetS = param0 * (source_skeleton_v_.row(skeleton_edges_(id, 1)) - source_skeleton_v_.row(skeleton_edges_(id, 0))) + source_skeleton_v_.row(skeleton_edges_(id, 0));
             const Eigen::Vector3d targetT = param0 * (target_skeleton_v_.row(skeleton_edges_(id, 1)) - target_skeleton_v_.row(skeleton_edges_(id, 0))) + target_skeleton_v_.row(skeleton_edges_(id, 0));
             const Eigen::Vector3d target = t * (targetT - targetS) + targetS;
-            
+
             Eigen::Matrix4d h = Eigen::Matrix4d::Zero();
             h(1, 1) = 1; h(2, 2) = 1; h(3, 3) = 1;
             h(0, 0) = (targetT - targetS).dot(targetT - targetS);
@@ -479,14 +479,14 @@ namespace polyfem::solver
 
 
     CurveTargetForm::CurveTargetForm(
-        const Eigen::MatrixXd &V, 
+        const Eigen::MatrixXd &V,
         const std::vector<Eigen::VectorXi> &curves,
         const Eigen::MatrixXd &source_skeleton_v,
         const Eigen::MatrixXd &target_skeleton_v,
         const Eigen::MatrixXi &skeleton_edges,
-		const bool is_skirt, 
+		const bool is_skirt,
 		const bool automatic_bone_generation
-    ): 
+    ):
         is_skirt_(is_skirt), V_(V), source_skeleton_v_(source_skeleton_v),
         target_skeleton_v_(target_skeleton_v), skeleton_edges_(skeleton_edges), automatic_bone_generation_(automatic_bone_generation)
     {
@@ -548,12 +548,12 @@ namespace polyfem::solver
                 if (bone_intersection_points.size() > 0)
                 {
                     logger().debug("curve {} has {} bone intersections", j, bone_intersection_points.size());
-                } 
+                }
 
                 if (bone_intersection_points.size() > 1)
                 {
                     // If we have intersection points, create new bone as the average of the others.
-                    
+
                     // Calculate average intersection point
                     Eigen::Vector3d avg_intersection = Eigen::Vector3d::Zero();
                     for (const auto& point : bone_intersection_points) {
@@ -592,9 +592,9 @@ namespace polyfem::solver
                     bones(j) = i;
                 }
             }
-            
+
             logger().debug("CurveTargetForm set curve center to bone {} - {}, direction is {}", skeleton_edges_(bones(j), 0), skeleton_edges_(bones(j), 1), sdirec.transpose());
-            
+
             relative_positions[j].resize(curves_[j].size());
             for (int i = 0; i < curves_[j].size(); i++)
             {

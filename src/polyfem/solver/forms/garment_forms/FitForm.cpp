@@ -97,10 +97,10 @@ namespace {
                     w = 3;
                 else                    // face node
                     w = 6;
-                
+
                 out.row(k) << i, j, N - i - j, w;
             }
-        
+
         out.template leftCols<3>() /= N;
         out.col(3) /= N * N;
         return out;
@@ -121,12 +121,12 @@ namespace polyfem::solver
         points.reserve(surface_v.rows());
         for (int i = 0; i < surface_v.rows(); i++)
             points.push_back(Vec3s(surface_v(i, 0), surface_v(i, 1), surface_v(i, 2)));
-        
+
         for (int i = 0; i < surface_f.rows(); i++)
             triangles.push_back(Vec3I(surface_f(i, 0), surface_f(i, 1), surface_f(i, 2)));
 
         grid = tools::meshToSignedDistanceField<DoubleGrid>(*xform, points, triangles, quads, 150, 1);
-        
+
         // build upsampling scheme on the garment mesh
         {
             Eigen::Matrix<double, n_loc_samples, 4> tmp = upsample_standard<n_refs>();
@@ -179,7 +179,7 @@ namespace polyfem::solver
     }
 
     template <int n_refs>
-    double FitForm<n_refs>::value_unweighted(const Eigen::VectorXd &x) const 
+    double FitForm<n_refs>::value_unweighted(const Eigen::VectorXd &x) const
     {
         const Eigen::MatrixXd V = unflatten(x, 3) + V_;
 
@@ -193,7 +193,7 @@ namespace polyfem::solver
 
                 if (std::isnan(tmp))
                     log_and_throw_error("Invalid sdf values!");
-                
+
                 if (tmp > initial_distance(f * n_loc_samples + i))
                     val += area * weights(i) * pow(tmp - initial_distance(f * n_loc_samples + i), power);
             }
@@ -203,7 +203,7 @@ namespace polyfem::solver
     }
 
     template <int n_refs>
-    void FitForm<n_refs>::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
+    void FitForm<n_refs>::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
     {
         POLYFEM_SCOPED_TIMER("fit gradient");
         const Eigen::MatrixXd V = unflatten(x, 3) + V_;
@@ -219,7 +219,7 @@ namespace polyfem::solver
                 const double area = (V_.row(F_(f, 1)) - V_.row(F_(f, 0))).template head<3>().cross((V_.row(F_(f, 2)) - V_.row(F_(f, 0))).template head<3>()).norm() / 2;
                 for (int i = 0; i < P.rows(); i++) {
                     const auto &tmp = totalP[f * n_loc_samples + i];
-                    
+
                     if (tmp.x > initial_distance(f * n_loc_samples + i))
                         for (int d = 0; d < 3; d++)
                             local_storage.mat(F_.row(f), d) += (pow(tmp.x - initial_distance(f * n_loc_samples + i), power-1) * power * area * weights(i) * tmp.g(d)) * P.row(i);
@@ -230,7 +230,7 @@ namespace polyfem::solver
 		// Serially merge local storages
 		for (const LocalThreadMatStorage &local_storage : storage)
 			g += local_storage.mat;
-        
+
         gradv = flatten(g);
     }
 
@@ -260,14 +260,14 @@ namespace polyfem::solver
     }
 
     template <int n_refs>
-    void FitForm<n_refs>::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const 
+    void FitForm<n_refs>::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
     {
         POLYFEM_SCOPED_TIMER("fit hessian");
         hessian.setZero();
-        hessian.resize(x.size(), x.size());   
+        hessian.resize(x.size(), x.size());
         if (!use_spline)
             return;
-        
+
         const Eigen::MatrixXd V = unflatten(x, 3) + V_;
 
         auto storage = create_thread_storage(LocalThreadSparseMatStorage(long(1e7), hessian.rows(), hessian.cols()));
@@ -286,11 +286,11 @@ namespace polyfem::solver
 
                     if (tmp.x <= initial_distance(f * n_loc_samples + i))
                         continue;
-                    
+
                     Eigen::Vector3d g;
                     g << tmp.g(0), tmp.g(1), tmp.g(2);
                     Eigen::Matrix3d h;
-                    h << tmp.h(0, 0), tmp.h(0, 1), tmp.h(0, 2), 
+                    h << tmp.h(0, 0), tmp.h(0, 1), tmp.h(0, 2),
                         tmp.h(1, 0), tmp.h(1, 1), tmp.h(1, 2),
                         tmp.h(2, 0), tmp.h(2, 1), tmp.h(2, 2);
                     h *= pow(tmp.x - initial_distance(f * n_loc_samples + i), power-1) * power;
@@ -432,12 +432,12 @@ namespace polyfem::solver
         points.reserve(surface_v.rows());
         for (int i = 0; i < surface_v.rows(); i++)
             points.push_back(Vec3s(surface_v(i, 0), surface_v(i, 1), surface_v(i, 2)));
-        
+
         for (int i = 0; i < surface_f.rows(); i++)
             triangles.push_back(Vec3I(surface_f(i, 0), surface_f(i, 1), surface_f(i, 2)));
 
         grid = tools::meshToSignedDistanceField<DoubleGrid>(*xform, points, triangles, quads, 150, 1);
-        
+
         // build upsampling scheme on the garment mesh
         {
             Eigen::Matrix<double, n_loc_samples, 4> tmp = upsample_standard<n_refs>();
@@ -447,7 +447,7 @@ namespace polyfem::solver
     }
 
     template <int n_refs>
-    double SDFCollisionForm<n_refs>::value_unweighted(const Eigen::VectorXd &x) const 
+    double SDFCollisionForm<n_refs>::value_unweighted(const Eigen::VectorXd &x) const
     {
         const Eigen::MatrixXd V = unflatten(x, 3) + V_;
 
@@ -461,7 +461,7 @@ namespace polyfem::solver
 
                 if (std::isnan(tmp))
                     log_and_throw_error("Invalid sdf values!");
-                
+
                 if (tmp < separation_dist_)
                     val += area * weights(i) * pow(separation_dist_-tmp, power);
             }
@@ -471,7 +471,7 @@ namespace polyfem::solver
     }
 
     template <int n_refs>
-    void SDFCollisionForm<n_refs>::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
+    void SDFCollisionForm<n_refs>::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
     {
         POLYFEM_SCOPED_TIMER("fit gradient");
         const Eigen::MatrixXd V = unflatten(x, 3) + V_;
@@ -486,7 +486,7 @@ namespace polyfem::solver
                 const double area = (V_.row(F_(f, 1)) - V_.row(F_(f, 0))).template head<3>().cross((V_.row(F_(f, 2)) - V_.row(F_(f, 0))).template head<3>()).norm() / 2;
                 for (int i = 0; i < P.rows(); i++) {
                     const auto &tmp = totalP[f * n_loc_samples + i];
-                    
+
                     if (tmp.x < separation_dist_)
                         for (int d = 0; d < 3; d++)
                             local_storage.mat(F_.row(f), d) -= (pow(separation_dist_-tmp.x, power-1) * power * area * weights(i) * tmp.g(d)) * P.row(i);
@@ -497,7 +497,7 @@ namespace polyfem::solver
 		// Serially merge local storages
 		for (const LocalThreadMatStorage &local_storage : storage)
 			g += local_storage.mat;
-        
+
         gradv = flatten(g);
     }
 
@@ -526,14 +526,14 @@ namespace polyfem::solver
     }
 
     template <int n_refs>
-    void SDFCollisionForm<n_refs>::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const 
+    void SDFCollisionForm<n_refs>::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
     {
         POLYFEM_SCOPED_TIMER("sdf collision hessian");
         hessian.setZero();
-        hessian.resize(x.size(), x.size());   
+        hessian.resize(x.size(), x.size());
         if (!use_spline)
             return;
-        
+
         const Eigen::MatrixXd V = unflatten(x, 3) + V_;
 
         auto storage = create_thread_storage(LocalThreadSparseMatStorage(long(1e7), hessian.rows(), hessian.cols()));
@@ -551,11 +551,11 @@ namespace polyfem::solver
 
                     if (tmp.x >= separation_dist_)
                         continue;
-                    
+
                     Eigen::Vector3d g;
                     g << tmp.g(0), tmp.g(1), tmp.g(2);
                     Eigen::Matrix3d h;
-                    h << tmp.h(0, 0), tmp.h(0, 1), tmp.h(0, 2), 
+                    h << tmp.h(0, 0), tmp.h(0, 1), tmp.h(0, 2),
                         tmp.h(1, 0), tmp.h(1, 1), tmp.h(1, 2),
                         tmp.h(2, 0), tmp.h(2, 1), tmp.h(2, 2);
                     h *= -pow(separation_dist_-tmp.x, power-1) * power;

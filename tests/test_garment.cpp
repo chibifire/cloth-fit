@@ -40,7 +40,7 @@ TEST_CASE("Garment forms invariance", "[form][form_derivatives][garment]")
 	Eigen::MatrixXd V;
 	Eigen::MatrixXi F;
     igl::read_triangle_mesh(POLYFEM_SOURCE_DIR + std::string("/tests/garment.obj"), V, F);
-	
+
 	auto curves = boundary_curves(F);
 
 	std::vector<std::unique_ptr<Form>> forms;
@@ -76,7 +76,7 @@ TEST_CASE("Garment full forms derivatives", "[form][form_derivatives][garment]")
     igl::read_triangle_mesh(POLYFEM_SOURCE_DIR + std::string("/tests/garment.obj"), V, F);
 
 	auto curves = boundary_curves(F);
-	
+
 	static const int n_rand = 5;
 	const double tol = 1e-5;
 
@@ -208,11 +208,11 @@ TEST_CASE("Garment forms derivatives", tagsdiff)
 		Eigen::MatrixXd avatar_v;
 		Eigen::MatrixXi avatar_f;
 		igl::read_triangle_mesh(POLYFEM_SOURCE_DIR + std::string("/tests/cage.obj"), avatar_v, avatar_f);
-		
+
 		forms.push_back(std::make_unique<FitForm<4>>(V, F, avatar_v, avatar_f, 0.1, std::vector<int>(), "."));
 		forms.push_back(std::make_unique<SDFCollisionForm<4>>(V, F, avatar_v, avatar_f, 0.1, 0.1));
 	}
-	
+
 	for (auto &form : forms)
 	{
 		Eigen::VectorXd x = Eigen::VectorXd::Zero(V.size());

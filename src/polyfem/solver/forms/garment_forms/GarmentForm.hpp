@@ -194,7 +194,7 @@ namespace polyfem::solver
 	private:
 		const Eigen::MatrixXd V_;
 		const Eigen::MatrixXi F_;
-		
+
 		Eigen::VectorXd orig_areas;
 	};
 
@@ -202,7 +202,7 @@ namespace polyfem::solver
 	// {
 	// public:
 	// 	GlobalPositionalForm(
-	// 		const Eigen::MatrixXd &V, 
+	// 		const Eigen::MatrixXd &V,
 	// 		const Eigen::MatrixXi &F,
 	// 		const Eigen::MatrixXd &source_skeleton_v,
 	// 		const Eigen::MatrixXd &target_skeleton_v,

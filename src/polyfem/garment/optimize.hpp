@@ -24,10 +24,10 @@ namespace polyfem {
         void read(const std::string &path);
         void write(const std::string &path);
     };
-    
+
     Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V);
 
-    class GarmentSolver 
+    class GarmentSolver
     {
     public:
         void check_intersections(
@@ -43,11 +43,11 @@ namespace polyfem {
             const std::string &source_skeleton_path,
             const std::string &target_skeleton_path,
             const std::string &target_avatar_skinning_weights_path);
-        
+
         void project_avatar_to_skeleton();
 
         void normalize_meshes();
-    
+
         void save_result(
             const std::string &path,
             const int index,
@@ -55,12 +55,12 @@ namespace polyfem {
             const Eigen::MatrixXd &V,
             const Eigen::MatrixXi &F,
             const Eigen::VectorXd &sol);
-        
+
         int n_garment_vertices() const { return garment.v.rows(); }
         int n_garment_faces() const { return garment.f.rows(); }
 
         std::string out_folder;
-    
+
         // Original avatar mesh
         Eigen::MatrixXd avatar_v;
         Eigen::MatrixXi avatar_f;

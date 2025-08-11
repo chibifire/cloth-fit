@@ -25,10 +25,10 @@ namespace polyfem::solver
         std::vector<Eigen::Triplet<double>> T;
         for (int i = 0; i < target_.size(); i++)
             T.emplace_back(i, 0, target_(i));
-        
+
         for (int i = 0; i < reduced_size_; i++)
             T.emplace_back(i + target_.size(), i + 1, 1.0);
-        
+
         P.setFromTriplets(T.begin(), T.end());
 	}
 
@@ -216,7 +216,7 @@ namespace polyfem::solver
 					if (it.row() > 0 && it.col() > 0)
 						T.emplace_back(it.row() - 1, it.col() - 1, it.value());
 				}
-			
+
 			reduced.setFromTriplets(T.begin(), T.end());
 		}
 	}

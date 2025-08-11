@@ -3,19 +3,19 @@
 #include <polyfem/utils/Timer.hpp>
 
 namespace polyfem::solver {
-    
-    double PointPenaltyForm::value_unweighted(const Eigen::VectorXd &x) const 
+
+    double PointPenaltyForm::value_unweighted(const Eigen::VectorXd &x) const
     {
         return (x(indices_) - target_).squaredNorm() / 2.;
     }
 
-    void PointPenaltyForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
+    void PointPenaltyForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
     {
         gradv.setZero(x.size());
         gradv(indices_) = x(indices_) - target_;
     }
 
-    void PointPenaltyForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const 
+    void PointPenaltyForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
     {
         POLYFEM_SCOPED_TIMER("penalty hessian");
         hessian.setZero();
@@ -27,18 +27,18 @@ namespace polyfem::solver {
     }
 
 
-    double PointLagrangianForm::value_unweighted(const Eigen::VectorXd &x) const 
+    double PointLagrangianForm::value_unweighted(const Eigen::VectorXd &x) const
     {
         return -lagr_mults_.transpose() * (x(indices_) - target_);
     }
 
-    void PointLagrangianForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const 
+    void PointLagrangianForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
     {
         gradv.setZero(x.size());
         gradv(indices_) = -lagr_mults_;
     }
 
-    void PointLagrangianForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const 
+    void PointLagrangianForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
     {
         hessian.setZero();
         hessian.resize(x.size(), x.size());

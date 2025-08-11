@@ -9,7 +9,7 @@
 
 namespace polyfem::utils
 {
-	/// abstract class used for caching 
+	/// abstract class used for caching
 	class MatrixCache
 	{
 	public:
@@ -83,7 +83,7 @@ namespace polyfem::utils
 		/// otherwise, save the value directly in the second cache
 		///     in this case, modfies values_
 		void add_value(const int e, const int i, const int j, const double value) override;
-		/// if the cache is yet to be constructed, save the 
+		/// if the cache is yet to be constructed, save the
 		/// cached (ordered) indices in inner_index_ and outer_index_
 		/// then fill in map and second_cache_
 		///     in this case, modifies inner_index_, outer_index_, map, and second_cache_ to reflect the matrix structure

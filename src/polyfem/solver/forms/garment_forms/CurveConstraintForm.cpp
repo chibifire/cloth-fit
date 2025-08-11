@@ -61,7 +61,7 @@ namespace polyfem::solver
 			return out;
 		}
 
-        template <class T> 
+        template <class T>
         T mollifier(const T &z)
         {
             if (z < 1)

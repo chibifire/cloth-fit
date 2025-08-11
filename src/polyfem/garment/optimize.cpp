@@ -98,7 +98,7 @@ namespace polyfem {
                 for (int j = 0; j < N; j++)
                     if (dist(i, j) > 0 && dist(i, j) <= N)
                         parents(i, j) = i;
-            
+
             for (int k = 0; k < N; k++)
             {
                 for (int i = 0; i < N; i++)
@@ -126,7 +126,7 @@ namespace polyfem {
                     const int p = parents(i, j);
                     if (dist(i, p) + G(p, j) != dist(i, j))
                         log_and_throw_error("[floydWarshall] Wrong closest distance!");
-                    
+
                     int cur = j;
                     while (parents(i, cur) != i)
                         cur = parents(i, cur);
@@ -140,7 +140,7 @@ namespace polyfem {
         {
             if (A.rows() != B.rows())
                 return false;
-            
+
             for (int i = 0; i < A.rows(); i++)
             {
                 bool flag = false;
@@ -280,7 +280,7 @@ namespace polyfem {
         garment.read(mesh_path);
 
         if (std::filesystem::exists(no_fit_spec_path))
-        {   
+        {
             Eigen::MatrixXi tmp_vids;
             io::read_matrix<int>(no_fit_spec_path, tmp_vids);
 
@@ -290,7 +290,7 @@ namespace polyfem {
             Eigen::VectorXi vmask = Eigen::VectorXi::Zero(garment.v.rows());
             for (int i = 0; i < tmp_vids.size(); i++)
                 vmask(tmp_vids(i)) = 1;
-                
+
             for (int i = 0; i < garment.f.rows(); i++)
                 if (vmask(garment.f(i, 0)) && vmask(garment.f(i, 1)) && vmask(garment.f(i, 2)))
                     not_fit_fids.push_back(i);
@@ -301,7 +301,7 @@ namespace polyfem {
         // if (std::filesystem::exists(path + "/skin.txt"))
         // {
         //     log_and_throw_error("Utilizing garment skinning weight is not supported!");
-            
+
         //     io::read_matrix(path + "/skin.txt", garment_skinning_weights);
         //     assert(garment_skinning_weights.rows() == skeleton_v.rows());
         //     assert(garment.v.rows() == garment_skinning_weights.cols());
@@ -312,7 +312,7 @@ namespace polyfem {
         //     while (n_refs-- > 0)
         //     {
         //         std::tie(garment.v, garment.f) = refine(garment.v, garment.f);
-                
+
         //         std::vector<int> not_fit_fids_new;
         //         for (int i = 0; i < not_fit_fids.size(); i++)
         //             for (int j = 0; j < 4; j++)
@@ -346,7 +346,7 @@ namespace polyfem {
             log_and_throw_error("Unable to solve, initial solution has intersections!");
         }
     }
-        
+
     void GarmentSolver::read_meshes(
         const std::string &avatar_mesh_path,
         const std::string &source_skeleton_path,
@@ -413,7 +413,7 @@ namespace polyfem {
             if (has_target_avatar_skin_weights)
                 new_skinning_weights = target_avatar_skinning_weights(Eigen::all, index_map);
         }
-        
+
 
         Eigen::VectorXi eid;
         Eigen::VectorXd coord;
@@ -491,7 +491,7 @@ namespace polyfem {
                     const int c = f * 3 + (le + 2) % 3;
 
                     bool edge_overlap_with_skeleton = false;
-                    for (int i = 0; i < target_skeleton_b.rows(); i++) 
+                    for (int i = 0; i < target_skeleton_b.rows(); i++)
                     {
                         Eigen::Vector3d vb = skinny_avatar_v.row(b);
                         Eigen::Vector3d va = skinny_avatar_v.row(a);
@@ -511,7 +511,7 @@ namespace polyfem {
 
                     if (edge_overlap_with_skeleton || source == cur)
                         continue;
-                    
+
                     if (dist(cur, source) > max_dist)
                     {
                         max_dist = dist(cur, source);
@@ -523,7 +523,7 @@ namespace polyfem {
                 {
                     if (max_dist_le != le)
                         continue;
-                    
+
                     const int a = f * 3 + le;
                     const int b = f * 3 + (le + 1) % 3;
                     const int c = f * 3 + (le + 2) % 3;
@@ -572,7 +572,7 @@ namespace polyfem {
                             tmp.block(skinny_avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].topRows(3);
                         std::swap(skinny_avatar_v, tmp);
                     }
-        
+
                     {
                         Eigen::MatrixXd tmp(nc_avatar_v.rows() + new_faces.size() * 3, 3);
                         tmp.topRows(nc_avatar_v.rows()) = nc_avatar_v;
@@ -580,14 +580,14 @@ namespace polyfem {
                             tmp.block(nc_avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].bottomRows(3);
                         std::swap(nc_avatar_v, tmp);
                     }
-        
+
                     skinny_avatar_f = Eigen::VectorXi::LinSpaced(skinny_avatar_v.rows(), 0, skinny_avatar_v.rows() - 1).reshaped(3, skinny_avatar_v.rows() / 3).transpose();
                     nc_avatar_f = skinny_avatar_f;
-                
+
                     // igl::write_triangle_mesh(out_folder + "/projected_avatar_new_" + std::to_string(save_iter) + ".obj", skinny_avatar_v, skinny_avatar_f);
                     // igl::write_triangle_mesh(out_folder + "/avatar_new_" + std::to_string(save_iter) + ".obj", nc_avatar_v, nc_avatar_f);
                     // save_iter++;
-                    
+
                     new_faces.clear();
                 }
             }
@@ -605,7 +605,7 @@ namespace polyfem {
             skinny_avatar_v = tmp_v.template rightCols<3>();
             skinny_avatar_f = nc_avatar_f;
         }
-        
+
         skinny_avatar_v += (nc_avatar_v - skinny_avatar_v) * 1e-2;
     }
 
@@ -694,10 +694,10 @@ namespace polyfem {
 		args = jse.inject_defaults(args_in, rules);
 
 		// Save output directory and resolve output paths dynamically
-		const std::string output_dir = utils::resolve_path(args["output"]["directory"], 
-            utils::is_param_valid(args, "root_path") ? args["root_path"].get<std::string>() : "", 
+		const std::string output_dir = utils::resolve_path(args["output"]["directory"],
+            utils::is_param_valid(args, "root_path") ? args["root_path"].get<std::string>() : "",
             false);
-        
+
 		if (!output_dir.empty())
 		{
 			std::filesystem::create_directories(output_dir);
@@ -710,7 +710,7 @@ namespace polyfem {
             spdlog::set_level(log_level);
 			logger().set_level(log_level);
 			ipc::logger().set_level(log_level);
-            
+
             spdlog::flush_every(std::chrono::seconds(3));
         }
 

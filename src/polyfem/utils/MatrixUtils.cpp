@@ -75,7 +75,7 @@ void polyfem::utils::vector2matrix(const Eigen::VectorXd &vec, Eigen::MatrixXd &
 		size = 2;
 	else
 		throw std::runtime_error("Invalid size in vector2matrix!");
-	
+
 	assert(size * size == vec.size());
 
 	mat = unflatten(vec, size);

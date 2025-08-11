@@ -57,4 +57,3 @@ function(polyfem_autogen MAIN_TARGET PYTHON_SCRIPT OUTPUT_BASE)
 
 	add_dependencies(${MAIN_TARGET} autogen_${OUTPUT_BASE})
 endfunction()
-

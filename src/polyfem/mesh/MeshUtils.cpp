@@ -18,8 +18,8 @@ using namespace polyfem::utils;
 ////////////////////////////////////////////////////////////////////////////////
 
 void polyfem::mesh::write_edge_mesh(
-	const std::string &path, 
-	const Eigen::MatrixXd &V, 
+	const std::string &path,
+	const Eigen::MatrixXd &V,
 	const Eigen::MatrixXi &E)
 {
 	std::ofstream outfile(path);

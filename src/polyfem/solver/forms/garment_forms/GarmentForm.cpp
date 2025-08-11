@@ -227,7 +227,7 @@ namespace polyfem::solver
 		hessian.setFromTriplets(triplets.begin(), triplets.end());
 	}
 
-	NormalForm::NormalForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : V_(V), F_(F) 
+	NormalForm::NormalForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) : V_(V), F_(F)
 	{
 		Eigen::MatrixXd normals = compute_normals(V, F_);
 		orig_areas = normals.rowwise().norm();

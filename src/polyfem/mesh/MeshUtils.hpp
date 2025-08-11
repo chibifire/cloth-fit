@@ -13,8 +13,8 @@ namespace polyfem
 		class Transformation {
 		public:
 			/// @brief y = A * x + b
-			/// @param A 
-			/// @param b 
+			/// @param A
+			/// @param b
 			Transformation(const Eigen::Matrix<double, dim, dim> &A, const Eigen::Vector<double, dim> &b) : A_(A), b_(b)
 			{
 			}
