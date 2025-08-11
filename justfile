@@ -25,6 +25,7 @@ run-all-examples: run-foxgirl-skirt run-mire-skirt run-goblin-jacket run-goblin-
 
 run-foxgirl-skirt: (_run-example "foxgirl_skirt")
 run-mire-skirt: (_run-example "mire_skirt")
+run-mire-jumpsuit: (_run-example "mire_Jumpsuit")
 run-goblin-jacket: (_run-example "Goblin_Jacket")
 run-goblin-jumpsuit: (_run-example "Goblin_Jumpsuit")
 run-trex-jacket: (_run-example "Trex_Jacket")
