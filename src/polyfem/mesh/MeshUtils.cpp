@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "MeshUtils.hpp"
 
-#include <polyfem/io/OBJReader.hpp>
+#include <polyfem/io/GLTFReader.hpp>
 #include <polyfem/utils/StringUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/utils/MatrixUtils.hpp>

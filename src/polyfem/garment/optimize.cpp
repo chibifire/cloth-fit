@@ -2,6 +2,8 @@
 
 #include <polyfem/solver/GarmentNLProblem.hpp>
 #include <polyfem/solver/forms/ContactForm.hpp>
+#include <polyfem/io/GLTFReader.hpp>
+#include <polyfem/io/GLTFWriter.hpp>
 #include <polyfem/io/OBJWriter.hpp>
 #include <polyfem/io/MatrixIO.hpp>
 #include <polyfem/mesh/MeshUtils.hpp>
@@ -197,12 +199,43 @@ namespace polyfem {
 
     void OBJMesh::read(const std::string &path)
     {
-        igl::readOBJ(path, v, tc, cn, f, ftc, fn);
+        if (path.substr(path.find_last_of(".") + 1) == "gltf" || path.substr(path.find_last_of(".") + 1) == "glb")
+        {
+            // Use GLTF reader
+            std::vector<std::vector<double>> vV, vTC, vN;
+            std::vector<std::vector<int>> vF, vFTC, vFN, vL;
+            io::GLTFReader::read(path, vV, vTC, vN, vF, vFTC, vFN, vL);
+            
+            // Convert to Eigen matrices
+            igl::list_to_matrix(vV, v);
+            igl::list_to_matrix(vF, f);
+            
+            if (!vTC.empty())
+                igl::list_to_matrix(vTC, tc);
+            if (!vN.empty())
+                igl::list_to_matrix(vN, cn);
+            if (!vFTC.empty())
+                igl::list_to_matrix(vFTC, ftc);
+            if (!vFN.empty())
+                igl::list_to_matrix(vFN, fn);
+        }
+        else
+        {
+            igl::readOBJ(path, v, tc, cn, f, ftc, fn);
+        }
     }
 
     void OBJMesh::write(const std::string &path)
     {
-        igl::writeOBJ(path, v, f, cn, fn, tc, ftc);
+        if (path.substr(path.find_last_of(".") + 1) == "gltf" || path.substr(path.find_last_of(".") + 1) == "glb")
+        {
+            // Use GLTF writer
+            io::GLTFWriter::write(path, v, f);
+        }
+        else
+        {
+            igl::writeOBJ(path, v, f, cn, fn, tc, ftc);
+        }
     }
 
     void GarmentSolver::save_result(

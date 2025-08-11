@@ -234,6 +234,10 @@ target_link_libraries(polyfem PUBLIC spdlog::spdlog)
 include(jse)
 target_link_libraries(polyfem PUBLIC jse::jse)
 
+# tinygltf library for glTF file format support
+include(tinygltf)
+target_link_libraries(polyfem PUBLIC tinygltf::tinygltf)
+
 ################################################################################
 # Optional libraries
 ################################################################################
