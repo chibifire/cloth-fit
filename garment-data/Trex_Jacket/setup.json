@@ -15,6 +15,7 @@
   "curve_size_weight": 0,
   "is_skirt": false,
   "voxel_size": 0.01,
+  "curve_center_target_automatic_bone_generation": true,
   "contact": {
     "enabled": true,
     "dhat": 0.002

@@ -2,7 +2,7 @@
   "incremental_steps": 2,
   "avatar_mesh_path": "../assets/avatars/FoxGirl/avatar.obj",
   "target_skeleton_path": "../assets/avatars/FoxGirl/skeleton.obj",
-  "avatar_skin_weights_path": "../assets/avatars/FoxGirl/skin.txt",
+  "avatar_skin_weights_path": "",
   "garment_mesh_path": "../assets/garments/LCL_Skirt_DressEvening_003/garment.obj",
   "no_fit_spec_path": "../assets/garments/LCL_Skirt_DressEvening_003/no-fit.txt",
   "source_skeleton_path": "../assets/garments/LCL_Skirt_DressEvening_003/skeleton.obj",
@@ -15,6 +15,7 @@
   "curve_size_weight": 0,
   "voxel_size": 0.01,
   "is_skirt": true,
+  "curve_center_target_automatic_bone_generation": true,
   "contact": {
     "enabled": true,
     "dhat": 0.002
