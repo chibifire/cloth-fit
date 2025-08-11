@@ -237,6 +237,7 @@ namespace polyfem::io
 
 	template bool write_matrix_ascii<Eigen::MatrixXd>(const std::string &, const Eigen::MatrixXd &);
 	template bool write_matrix_ascii<Eigen::MatrixXf>(const std::string &, const Eigen::MatrixXf &);
+	template bool write_matrix_ascii<Eigen::MatrixXi>(const std::string &, const Eigen::MatrixXi &);
 	template bool write_matrix_ascii<Eigen::VectorXd>(const std::string &, const Eigen::VectorXd &);
 	template bool write_matrix_ascii<Eigen::VectorXf>(const std::string &, const Eigen::VectorXf &);
 

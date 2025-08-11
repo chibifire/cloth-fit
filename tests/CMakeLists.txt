@@ -5,6 +5,8 @@
 set(test_sources
   test_garment.cpp
   test_tbb.cpp
+  test_io.cpp
+  test_mesh.cpp
 )
 
 add_executable(unit_tests ${test_sources})
