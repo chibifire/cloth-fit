@@ -121,16 +121,16 @@ create-avatar-directory name:
 
 # Setup any rigged avatar from GLB file
 setup-avatar-from-glb glb_path avatar_name: (create-avatar-directory avatar_name)
-    @echo "Setting up {{avatar_name}} avatar from GLB file..."
-    @if [ ! -f "{{glb_path}}" ]; then echo "Error: {{glb_path}} not found"; exit 1; fi
-    just convert-glb-to-obj "{{glb_path}}" "temp_avatar"
-    mv temp_avatar.obj garment-data/assets/avatars/{{avatar_name}}/avatar.obj
-    mv temp_avatar.mtl garment-data/assets/avatars/{{avatar_name}}/avatar.mtl 2>/dev/null || just generate-materials "garment-data/assets/avatars/{{avatar_name}}/avatar"
-    mv temp_avatar_skeleton.obj garment-data/assets/avatars/{{avatar_name}}/skeleton.obj
-    mv skin.txt garment-data/assets/avatars/{{avatar_name}}/skin.txt
-    just generate-materials "garment-data/assets/avatars/{{avatar_name}}/skeleton"
-    just validate-avatar-files {{avatar_name}}
-    @echo "✓ {{avatar_name}} avatar setup complete"
+	@echo "Setting up {{avatar_name}} avatar from GLB file..."
+	@if [ ! -f "{{glb_path}}" ]; then echo "Error: {{glb_path}} not found"; exit 1; fi
+	just convert-glb-to-obj "{{glb_path}}" "temp_avatar" "{{avatar_name}}" "skirt"
+	mv temp_avatar.obj garment-data/assets/avatars/{{avatar_name}}/avatar.obj
+	mv temp_avatar.mtl garment-data/assets/avatars/{{avatar_name}}/avatar.mtl 2>/dev/null || just generate-materials "garment-data/assets/avatars/{{avatar_name}}/avatar"
+	mv temp_avatar_skeleton.obj garment-data/assets/avatars/{{avatar_name}}/skeleton.obj
+	mv skin.txt garment-data/assets/avatars/{{avatar_name}}/skin.txt
+	just generate-materials "garment-data/assets/avatars/{{avatar_name}}/skeleton"
+	just validate-avatar-files {{avatar_name}}
+	@echo "✓ {{avatar_name}} avatar setup complete"
 
 # Setup Mire avatar (example usage of setup-avatar-from-glb)
 setup-mire-avatar:
