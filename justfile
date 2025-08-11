@@ -21,11 +21,9 @@ compile: configure
 
 build: compile
 
-run-all-examples: run-foxgirl-skirt run-mire-skirt run-goblin-jacket run-goblin-jumpsuit run-trex-jacket
+run-all-examples: run-foxgirl-skirt run-goblin-jacket run-goblin-jumpsuit run-trex-jacket
 
 run-foxgirl-skirt: (_run-example "foxgirl_skirt")
-run-mire-skirt: (_run-example "mire_skirt")
-run-mire-jumpsuit: (_run-example "mire_Jumpsuit")
 run-goblin-jacket: (_run-example "Goblin_Jacket")
 run-goblin-jumpsuit: (_run-example "Goblin_Jumpsuit")
 run-trex-jacket: (_run-example "Trex_Jacket")
@@ -133,10 +131,6 @@ setup-avatar-from-glb glb_path avatar_name: (create-avatar-directory avatar_name
 	just validate-avatar-files {{avatar_name}}
 	@echo "✓ {{avatar_name}} avatar setup complete"
 
-# Setup Mire avatar (example usage of setup-avatar-from-glb)
-setup-mire-avatar:
-    just setup-avatar-from-glb "../SK_mire_base_001.glb" "Mire"
-
 # Validate avatar files exist
 validate-avatar-files name:
     @echo "Validating avatar files for {{name}}..."
@@ -215,12 +209,6 @@ create-garment-project garment_name target_avatar project_name:
     @echo '{\n  "incremental_steps": 2,\n  "avatar_mesh_path": "../assets/avatars/{{target_avatar}}/avatar.obj",\n  "target_skeleton_path": "../assets/avatars/{{target_avatar}}/skeleton.obj",\n  "avatar_skin_weights_path": "",\n  "garment_mesh_path": "../assets/garments/{{garment_name}}/garment.obj",\n  "no_fit_spec_path": "../assets/garments/{{garment_name}}/no-fit.txt",\n  "source_skeleton_path": "../assets/garments/{{garment_name}}/skeleton_{{target_avatar}}_overlay.obj",\n  "similarity_penalty_weight": 1,\n  "curvature_penalty_weight": 0.01,\n  "twist_penalty_weight": 0.01,\n  "curve_center_target_weight": 1,\n  "fit_weight": 2,\n  "symmetry_weight": 0,\n  "curve_size_weight": 0,\n  "voxel_size": 0.01,\n  "is_skirt": true,\n  "curve_center_target_automatic_bone_generation": true,\n  "contact": {\n    "enabled": true,\n    "dhat": 0.002\n  },\n  "solver": {\n    "max_threads": 16,\n    "linear": {\n      "solver": [\n        "Eigen::PardisoLDLT",\n        "Eigen::AccelerateLDLT",\n        "Eigen::SimplicialLDLT"\n      ]\n    },\n    "augmented_lagrangian": {\n      "initial_weight": 1,\n      "max_weight": 1000000.0,\n      "eta": 1,\n      "nonlinear": {\n        "grad_norm": 1,\n        "max_iterations": 50\n      }\n    },\n    "nonlinear": {\n      "Newton": {\n        "use_psd_projection": true,\n        "use_psd_projection_in_regularized": true,\n        "reg_weight_max": 1e16,\n        "reg_weight_min": 1,\n        "reg_weight_inc": 10000.0\n      },\n      "grad_norm": 0.01,\n      "line_search": {\n        "max_step_size_limiter": 0.5,\n        "use_grad_norm_tol": 1e-4,\n        "method": "Backtracking",\n        "min_step_size": 1e-8\n      },\n      "max_iterations": 5000\n    },\n    "contact": {\n      "CCD": {\n        "broad_phase": "BVH",\n        "max_iterations": 200,\n        "tolerance": 1e-3\n      },\n      "barrier_stiffness": 1e8\n    }\n  },\n  "output": {\n    "skip_frame": 2,\n    "log": {\n      "level": "debug"\n    }\n  }\n}' > garment-data/{{project_name}}/setup.json
     @echo "✓ Created project {{project_name}} for {{garment_name}} -> {{target_avatar}}"
 
-# Fix the mire_skirt project by generating missing overlay skeleton
-fix-mire-skirt:
-    @echo "Fixing mire_skirt project by generating missing overlay skeleton..."
-    just generate-overlay-skeleton "LCL_Skirt_DressEvening_003" "Mire" "skirt"
-    @echo "✓ mire_skirt project should now have consistent skeletons"
-
 # Show help for avatar setup commands
 help-avatar-setup:
     @echo "Avatar Setup Commands:"
@@ -251,14 +239,9 @@ help-garment-setup:
     @echo "Setup garment from GLB file for specific avatar:"
     @echo "  just setup-garment-from-glb \"/path/to/garment.glb\" \"GarmentName\" \"AvatarName\" \"garment_type\""
     @echo ""
-    @echo "Example:"
-    @echo "  just setup-garment-from-glb \"../my_skirt.glb\" \"MySkirt\" \"Mire\" \"skirt\""
-    @echo ""
     @echo "Generate missing overlay skeleton:"
     @echo "  just generate-overlay-skeleton \"GarmentName\" \"AvatarName\" \"garment_type\""
     @echo ""
     @echo "Create fitting project:"
     @echo "  just create-garment-project \"GarmentName\" \"AvatarName\" \"ProjectName\""
     @echo ""
-    @echo "Fix mire_skirt project:"
-    @echo "  just fix-mire-skirt"
