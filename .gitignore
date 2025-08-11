@@ -87,3 +87,5 @@ scripts/*.txt
 scripts/*.json
 
 result/
+
+garment-data/*/log
