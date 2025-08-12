@@ -24,6 +24,7 @@ defmodule ClothFitCli.MixProject do
     [
       {:oban, "~> 2.15"},
       {:ecto_sqlite3, "~> 0.8"},
+      {:phoenix_pubsub, "~> 2.0"},
       {:igniter, "~> 0.6", only: [:dev, :test]}
     ]
   end

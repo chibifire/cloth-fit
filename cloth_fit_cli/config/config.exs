@@ -10,4 +10,7 @@ config :cloth_fit_cli, ClothFitCli.Repo,
 config :cloth_fit_cli, Oban,
   repo: ClothFitCli.Repo,
   plugins: [Oban.Plugins.Pruner],
-  queues: [default: 10]
+  queues: [default: 10],
+  notifier: Oban.Notifiers.Phoenix
+
+import_config "#{config_env()}.exs"
