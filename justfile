@@ -17,7 +17,7 @@ configure: setup-build-dir
     cd {{build_dir}} && cmake -DCMAKE_BUILD_TYPE={{build_type}} -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ..
 
 compile: configure
-    cd {{build_dir}} && make -j4
+    cd {{build_dir}} && make -j
 
 build: compile
 
