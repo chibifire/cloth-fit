@@ -8,9 +8,6 @@ defmodule ClothFitCli.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      ClothFitCli.Repo,
-      {Oban, repo: ClothFitCli.Repo},
-      {Phoenix.PubSub, name: ClothFitCli.PubSub}
       # Starts a worker by calling: ClothFitCli.Worker.start_link(arg)
       # {ClothFitCli.Worker, arg}
     ]

@@ -67,8 +67,14 @@ defmodule ClothFitCli.PolyFEM do
   def load_garment_info(garment_path) when is_binary(garment_path) do
     case PolyFem.load_garment_info(garment_path) do
       {:ok, payload} ->
-        # TODO: Parse payload and convert to Elixir data structures
-        {:ok, %{}}
+        try do
+          # Parse JSON payload from C++
+          json_string = payload
+          info = Jason.decode!(json_string)
+          {:ok, info}
+        rescue
+          Jason.DecodeError -> {:error, "Failed to parse garment info payload"}
+        end
       {:error, reason} ->
         {:error, reason}
     end
@@ -87,8 +93,14 @@ defmodule ClothFitCli.PolyFEM do
   def load_avatar_info(avatar_path) when is_binary(avatar_path) do
     case PolyFem.load_avatar_info(avatar_path) do
       {:ok, payload} ->
-        # TODO: Parse payload and convert to Elixir data structures
-        {:ok, %{}}
+        try do
+          # Parse JSON payload from C++
+          json_string = payload
+          info = Jason.decode!(json_string)
+          {:ok, info}
+        rescue
+          Jason.DecodeError -> {:error, "Failed to parse avatar info payload"}
+        end
       {:error, reason} ->
         {:error, reason}
     end

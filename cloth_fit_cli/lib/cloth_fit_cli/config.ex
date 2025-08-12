@@ -47,7 +47,7 @@ defmodule ClothFitCli.Config do
             {:ok, merged_config}
 
           {:error, reason} ->
-            Logger.warn("Failed to parse config file #{config_path}: #{reason}")
+            Logger.warning("Failed to parse config file #{config_path}: #{reason}")
             Logger.info("Using default configuration.")
             {:ok, @default_config}
         end
@@ -57,7 +57,7 @@ defmodule ClothFitCli.Config do
         {:ok, @default_config}
 
       {:error, reason} ->
-        Logger.warn("Failed to read config file #{config_path}: #{reason}")
+        Logger.warning("Failed to read config file #{config_path}: #{reason}")
         Logger.info("Using default configuration.")
         {:ok, @default_config}
     end
@@ -93,7 +93,6 @@ defmodule ClothFitCli.Config do
   def get(key, default \\ nil) do
     case load_config() do
       {:ok, config} -> Map.get(config, key, default)
-      {:error, _} -> default
     end
   end
 
@@ -105,9 +104,6 @@ defmodule ClothFitCli.Config do
       {:ok, config} ->
         updated_config = Map.put(config, key, value)
         save_config(updated_config)
-
-      {:error, reason} ->
-        {:error, reason}
     end
   end
 
@@ -128,9 +124,6 @@ defmodule ClothFitCli.Config do
           max_threads: config["max_threads"]
         }
         {:ok, merged}
-
-      {:error, reason} ->
-        {:error, reason}
     end
   end
 
@@ -148,10 +141,6 @@ defmodule ClothFitCli.Config do
         end)
 
         :ok
-
-      {:error, reason} ->
-        Logger.error("Failed to load configuration: #{reason}")
-        {:error, reason}
     end
   end
 
@@ -162,7 +151,7 @@ defmodule ClothFitCli.Config do
     config_path = config_file_path()
 
     if File.exists?(config_path) do
-      Logger.warn("Configuration file already exists at: #{config_path}")
+      Logger.warning("Configuration file already exists at: #{config_path}")
       Logger.info("Use 'show_config()' to view current settings.")
       {:error, :already_exists}
     else

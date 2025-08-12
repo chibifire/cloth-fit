@@ -22,60 +22,28 @@ defmodule ClothFitCli.CLI do
         # Input Validation
         case validate_inputs(garment, avatar, save_folder, forward_convention, up_convention, skeleton_correspond) do
           :ok ->
-            Logger.info("Inputs validated successfully. Enqueuing job...")
-            # Enqueue the job
-            Oban.insert(%Oban.Job{
-              worker: ClothFitWorker,
-              args: %{
-                garment: garment,
-                avatar: avatar,
-                save_folder: save_folder,
-                forward_convention: forward_convention,
-                up_convention: up_convention,
-                skeleton_correspond: skeleton_correspond
-              }
-            })
-            Logger.info("Job enqueued to Oban.")
+            Logger.info("Inputs validated successfully. Starting job...")
+            # Execute the job directly
+            case ClothFitWorker.perform(%{
+              garment: garment,
+              avatar: avatar,
+              save_folder: save_folder,
+              forward_convention: forward_convention,
+              up_convention: up_convention,
+              skeleton_correspond: skeleton_correspond
+            }) do
+              :ok ->
+                Logger.info("Job completed successfully.")
+              {:error, reason} ->
+                Logger.error("Job failed: #{reason}")
+                System.halt(1)
+            end
 
           {:error, message} ->
             Logger.error("Input validation failed: #{message}")
-            System.exit(1)
+            System.halt(1)
         end
 
-      {:error, reason} ->
-        Logger.error("Failed to load configuration: #{reason}")
-        Logger.info("Using command-line arguments only.")
-
-        # Fallback to command-line arguments only
-        garment = Keyword.get(opts, :garment)
-        avatar = Keyword.get(opts, :avatar)
-        save_folder = Keyword.get(opts, :save_folder)
-        forward_convention = Keyword.get(opts, :forward_convention)
-        up_convention = Keyword.get(opts, :up_convention)
-        skeleton_correspond = Keyword.get(opts, :skeleton_correspond)
-
-        # Input Validation
-        case validate_inputs(garment, avatar, save_folder, forward_convention, up_convention, skeleton_correspond) do
-          :ok ->
-            Logger.info("Inputs validated successfully. Enqueuing job...")
-            # Enqueue the job
-            Oban.insert(%Oban.Job{
-              worker: ClothFitWorker,
-              args: %{
-                garment: garment,
-                avatar: avatar,
-                save_folder: save_folder,
-                forward_convention: forward_convention,
-                up_convention: up_convention,
-                skeleton_correspond: skeleton_correspond
-              }
-            })
-            Logger.info("Job enqueued to Oban.")
-
-          {:error, message} ->
-            Logger.error("Input validation failed: #{message}")
-            System.exit(1)
-        end
     end
   end
 
@@ -93,7 +61,7 @@ defmodule ClothFitCli.CLI do
     case File.ls(garments_path) do
       {:ok, garments} ->
         if Enum.empty?(garments) do
-          Logger.warn("  No garments found in #{garments_path}")
+          Logger.warning("  No garments found in #{garments_path}")
         else
           Enum.each(garments, fn garment ->
             Logger.info("  - #{garment}")
@@ -110,7 +78,7 @@ defmodule ClothFitCli.CLI do
     case File.ls(avatars_path) do
       {:ok, avatars} ->
         if Enum.empty?(avatars) do
-          Logger.warn("  No avatars found in #{avatars_path}")
+          Logger.warning("  No avatars found in #{avatars_path}")
         else
           Enum.each(avatars, fn avatar ->
             Logger.info("  - #{avatar}")
@@ -130,21 +98,8 @@ defmodule ClothFitCli.CLI do
   Usage: mix run --eval "ClothFitCli.CLI.list_jobs()"
   """
   def list_jobs do
-    case Oban.Job |> ClothFitCli.Repo.all() do
-      jobs when is_list(jobs) ->
-        Logger.info("Current Jobs in Queue:")
-        if Enum.empty?(jobs) do
-          Logger.info("  No jobs in queue.")
-        else
-          Enum.each(jobs, fn job ->
-            Logger.info("  Job ID: #{job.id}, State: #{job.state}, Worker: #{job.worker}")
-            Logger.info("    Args: #{inspect(job.args)}")
-            Logger.info("    Inserted: #{job.inserted_at}")
-          end)
-        end
-      error ->
-        Logger.error("Failed to list jobs: #{inspect(error)}")
-    end
+    Logger.info("Job queue functionality has been removed.")
+    Logger.info("Jobs are now executed directly without queueing.")
   end
 
   @doc """
@@ -180,7 +135,7 @@ defmodule ClothFitCli.CLI do
             Logger.error("Failed to list files in results directory: #{reason}")
         end
       false ->
-        Logger.warn("Results directory does not exist: #{results_path}")
+        Logger.warning("Results directory does not exist: #{results_path}")
     end
   end
 

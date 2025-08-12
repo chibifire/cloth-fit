@@ -1,17 +1,15 @@
 defmodule ClothFitCli.Workers.ClothFitWorker do
   alias ClothFitCli.Config
   require Logger
-  use Oban.Worker, queue: :default, max_attempts: 3
 
-  @impl Oban.Worker
-  def perform(%Oban.Job{args: %{
+  def perform(%{
     garment: garment,
     avatar: avatar,
     save_folder: save_folder,
     forward_convention: forward_convention,
     up_convention: up_convention,
     skeleton_correspond: skeleton_correspond
-  }}) do
+  }) do
     # Get configuration values
     cloth_fit_root = Config.get("cloth_fit_root", "/home/fire/Developer/cloth-fit")
     max_threads = Config.get("max_threads", 16)
@@ -101,7 +99,7 @@ defmodule ClothFitCli.Workers.ClothFitWorker do
       :ok ->
         Logger.debug("Temporary setup file cleaned up: #{temp_setup_path}")
       {:error, reason} ->
-        Logger.warn("Failed to clean up temporary setup file #{temp_setup_path}: #{reason}")
+        Logger.warning("Failed to clean up temporary setup file #{temp_setup_path}: #{reason}")
     end
 
     result

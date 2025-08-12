@@ -14,6 +14,7 @@ defmodule PolyFem.BundlexProject do
         interface: [:nif, :cnode],
         preprocessor: Unifex,
         language: :cpp,
+        includes: ["../../src"],
         compiler_flags: ["-std=c++17", "-O2"],
         linker_flags: ["-lstdc++"]
       ]
