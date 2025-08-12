@@ -1,26 +1,26 @@
-# Cloth-Fit Project TODO
+# Cloth-Fit Library TODO
 
-This document outlines the roadmap for integrating Unifex NIFs directly with the C++ PolyFEM simulation engine.
+This document outlines the roadmap for creating a pure Elixir library with Unifex NIFs that integrate directly with the C++ PolyFEM simulation engine.
 
 ## Phase 1: Unifex C++ Integration Setup
 
 ### Direct C++ NIF Infrastructure
-*   [ ] Add Unifex dependency to `mix.exs`
-*   [ ] Create C++ NIF wrapper functions for PolyFEM
+*   [x] Add Unifex dependency to `mix.exs`
+*   [x] Create C++ NIF wrapper functions for PolyFEM
 *   [ ] Set up Unifex C++ build configuration in CMakeLists.txt
 *   [ ] Integrate NIF compilation with existing PolyFEM build system
 *   [ ] Configure cross-platform compilation (Linux, macOS, Windows)
 
 ### Basic NIF Scaffolding
-*   [ ] Create Unifex module structure in `native/polyfem_nif.cpp`
-*   [ ] Implement basic NIF initialization and cleanup
-*   [ ] Add C++ exception handling and Elixir error conversion
-*   [ ] Create Elixir module `ClothFitCli.PolyFEM` for NIF interface
+*   [x] Create Unifex module structure in `c_src/polyfem_nif/`
+*   [x] Implement basic NIF initialization and cleanup
+*   [x] Add C++ error handling without exceptions
+*   [x] Create Elixir module `ClothFit.PolyFEM` for NIF interface
 
 ## Phase 2: Core Simulation NIFs
 
 ### Simulation Execution
-*   [ ] Implement `polyfem_simulate/2` NIF (config_map, output_path)
+*   [x] Implement `simulate/2` NIF (config_payload, output_path)
 *   [ ] Add real-time progress reporting via Elixir processes
 *   [ ] Implement simulation cancellation mechanism
 *   [ ] Add comprehensive error propagation from C++ to Elixir
@@ -35,14 +35,14 @@ This document outlines the roadmap for integrating Unifex NIFs directly with the
 ## Phase 3: Enhanced Integration NIFs
 
 ### Mesh Validation NIFs
-*   [ ] Implement `validate_garment_mesh/1` NIF
-*   [ ] Implement `validate_avatar_mesh/1` NIF
+*   [x] Implement `validate_garment_mesh/1` NIF
+*   [x] Implement `validate_avatar_mesh/1` NIF
 *   [ ] Add mesh quality analysis functions
 *   [ ] Fast mesh compatibility checking
 
 ### Asset Management NIFs
-*   [ ] Implement `load_garment_info/1` NIF for metadata extraction
-*   [ ] Implement `load_avatar_info/1` NIF for skeleton analysis
+*   [x] Implement `load_garment_info/1` NIF for metadata extraction
+*   [x] Implement `load_avatar_info/1` NIF for skeleton analysis
 *   [ ] Add mesh statistics and property extraction
 *   [ ] Efficient asset discovery and indexing
 
@@ -52,27 +52,7 @@ This document outlines the roadmap for integrating Unifex NIFs directly with the
 *   [ ] Real-time mesh deformation preview
 *   [ ] Batch processing capabilities
 
-## Phase 4: CLI Modernization
-
-### Oban Worker Integration
-*   [ ] Update `ClothFitWorker` to use NIFs instead of external processes
-*   [ ] Implement job progress tracking via NIF callbacks
-*   [ ] Add real-time simulation monitoring dashboard
-*   [ ] Remove external process dependencies
-
-### Enhanced CLI Features
-*   [ ] Add interactive simulation preview mode
-*   [ ] Implement mesh validation commands using NIFs
-*   [ ] Add performance benchmarking tools
-*   [ ] Real-time asset compatibility checking
-
-### Configuration Management
-*   [ ] Update config system for NIF-specific settings
-*   [ ] Add C++ build configuration options
-*   [ ] Implement NIF-based asset path validation
-*   [ ] Add memory and performance tuning options
-
-## Phase 5: Testing & Validation
+## Phase 4: Testing & Validation
 
 ### Existing Garment Data Validation (Using NIFs)
 *   [ ] Test `jumpsuit_dense` garment via NIFs
@@ -91,24 +71,39 @@ This document outlines the roadmap for integrating Unifex NIFs directly with the
 *   [ ] Process `Trex_Jacket` setup via NIFs
 
 ### Performance & Reliability
-*   [ ] Benchmark NIF vs external process performance
+*   [ ] Benchmark NIF performance
 *   [ ] Test memory usage under load
 *   [ ] Validate error handling and recovery
 *   [ ] Cross-platform compatibility testing
 
+## Phase 5: Library API Design
+
+### Public API
+*   [ ] Design clean public API for simulation functions
+*   [ ] Add comprehensive documentation and examples
+*   [ ] Create usage guides for different simulation scenarios
+*   [ ] Add type specifications and dialyzer support
+
+### Integration Support
+*   [ ] Add support for Phoenix LiveView integration
+*   [ ] Create helpers for web application usage
+*   [ ] Add streaming/chunked result processing
+*   [ ] Support for background job libraries (if needed by consumers)
+
 ## Architecture Overview
 
 ```
-Elixir CLI Application (cloth_fit_cli)
+Elixir Library (cloth_fit)
     ↓ Unifex NIFs (C++)
 C++ PolyFEM Engine (src/polyfem)
 ```
 
-**Benefits of this direct approach:**
-- **Simplicity**: No intermediate Rust layer needed
+**Benefits of this library approach:**
+- **Simplicity**: Pure library without CLI complexity
 - **Performance**: Direct C++ to Elixir integration
 - **Maintainability**: Single language bridge (C++)
 - **Build Integration**: Leverages existing CMake build system
 - **Type Safety**: Unifex provides structured data exchange
-- **Error Handling**: Direct C++ exception to Elixir error conversion
+- **Error Handling**: Direct C++ error to Elixir error conversion
+- **Flexibility**: Can be used by any Elixir application
 - **Real-time Features**: Progress callbacks and cancellation support

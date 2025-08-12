@@ -7,7 +7,9 @@ defmodule ClothFitCli.MixProject do
       version: "0.1.0",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      compilers: [:bundlex] ++ Mix.compilers(),
+      aliases: aliases()
     ]
   end
 
@@ -25,7 +27,12 @@ defmodule ClothFitCli.MixProject do
       {:oban, "~> 2.15"},
       {:ecto_sqlite3, "~> 0.8"},
       {:phoenix_pubsub, "~> 2.0"},
+      {:unifex, "~> 1.0"},
       {:igniter, "~> 0.6", only: [:dev, :test]}
     ]
+  end
+
+  defp aliases do
+    []
   end
 end
