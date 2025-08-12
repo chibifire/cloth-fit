@@ -1,4 +1,4 @@
-#include "polyfem_nif.h"
+#include "polyfem.h"
 #include <string>
 #include <cstring>
 #include <memory>
@@ -68,13 +68,13 @@ UNIFEX_TERM load_garment_info(UnifexEnv* env, char* garment_path) {
     // TODO: Use error codes for file I/O failures
     
     // Placeholder implementation
-    UnifexPayload* info = unifex_payload_alloc(env, UNIFEX_PAYLOAD_BINARY, 1024);
-    if (!info) {
+    UnifexPayload info;
+    if (unifex_payload_alloc(env, UNIFEX_PAYLOAD_BINARY, 1024, &info) != 0) {
         return load_garment_info_result_error(env, "Failed to allocate payload");
     }
     
     // TODO: Fill payload with actual garment information
-    return load_garment_info_result_ok(env, info);
+    return load_garment_info_result_ok(env, &info);
 }
 
 UNIFEX_TERM load_avatar_info(UnifexEnv* env, char* avatar_path) {
@@ -88,11 +88,11 @@ UNIFEX_TERM load_avatar_info(UnifexEnv* env, char* avatar_path) {
     // TODO: Use error codes for file I/O failures
     
     // Placeholder implementation
-    UnifexPayload* info = unifex_payload_alloc(env, UNIFEX_PAYLOAD_BINARY, 1024);
-    if (!info) {
+    UnifexPayload info;
+    if (unifex_payload_alloc(env, UNIFEX_PAYLOAD_BINARY, 1024, &info) != 0) {
         return load_avatar_info_result_error(env, "Failed to allocate payload");
     }
     
     // TODO: Fill payload with actual avatar information
-    return load_avatar_info_result_ok(env, info);
+    return load_avatar_info_result_ok(env, &info);
 }

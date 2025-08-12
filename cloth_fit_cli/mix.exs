@@ -24,15 +24,23 @@ defmodule ClothFitCli.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:oban, "~> 2.15"},
-      {:ecto_sqlite3, "~> 0.8"},
-      {:phoenix_pubsub, "~> 2.0"},
       {:unifex, "~> 1.0"},
+      {:bundlex, "~> 1.0"},
+      {:ecto, "~> 3.12"},
+      {:ecto_sql, "~> 3.12"},
+      {:ecto_sqlite3, "~> 0.17"},
+      {:oban, "~> 2.18"},
+      {:jason, "~> 1.4"},
       {:igniter, "~> 0.6", only: [:dev, :test]}
     ]
   end
 
   defp aliases do
-    []
+    [
+      setup: ["deps.get", "ecto.setup"],
+      "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
+      "ecto.reset": ["ecto.drop", "ecto.setup"],
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"]
+    ]
   end
 end

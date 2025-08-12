@@ -1,4 +1,6 @@
-module ClothFitCli.PolyFemNif
+module PolyFem
+
+interface [NIF, CNode]
 
 spec simulate(config :: payload, output_path :: string) :: {:ok :: label, result :: string} | {:error :: label, reason :: string}
 spec validate_garment_mesh(mesh_path :: string) :: {:ok :: label, valid :: bool} | {:error :: label, reason :: string}

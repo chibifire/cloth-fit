@@ -8,8 +8,6 @@ defmodule ClothFitCli.PolyFEM do
   - Loading garment and avatar information
   """
 
-  use Unifex.Loader
-
   @doc """
   Run a cloth fitting simulation with the given configuration.
 
@@ -23,7 +21,7 @@ defmodule ClothFitCli.PolyFEM do
   """
   def simulate(config, output_path) when is_map(config) and is_binary(output_path) do
     config_payload = Jason.encode!(config)
-    ClothFitCli.PolyFEM.Native.simulate(config_payload, output_path)
+    PolyFem.simulate(config_payload, output_path)
   end
 
   @doc """
@@ -38,7 +36,7 @@ defmodule ClothFitCli.PolyFEM do
   - `{:error, reason}` on failure
   """
   def validate_garment_mesh(mesh_path) when is_binary(mesh_path) do
-    ClothFitCli.PolyFEM.Native.validate_garment_mesh(mesh_path)
+    PolyFem.validate_garment_mesh(mesh_path)
   end
 
   @doc """
@@ -53,7 +51,7 @@ defmodule ClothFitCli.PolyFEM do
   - `{:error, reason}` on failure
   """
   def validate_avatar_mesh(mesh_path) when is_binary(mesh_path) do
-    ClothFitCli.PolyFEM.Native.validate_avatar_mesh(mesh_path)
+    PolyFem.validate_avatar_mesh(mesh_path)
   end
 
   @doc """
@@ -67,7 +65,7 @@ defmodule ClothFitCli.PolyFEM do
   - `{:error, reason}` on failure
   """
   def load_garment_info(garment_path) when is_binary(garment_path) do
-    case ClothFitCli.PolyFEM.Native.load_garment_info(garment_path) do
+    case PolyFem.load_garment_info(garment_path) do
       {:ok, payload} ->
         # TODO: Parse payload and convert to Elixir data structures
         {:ok, %{}}
@@ -87,7 +85,7 @@ defmodule ClothFitCli.PolyFEM do
   - `{:error, reason}` on failure
   """
   def load_avatar_info(avatar_path) when is_binary(avatar_path) do
-    case ClothFitCli.PolyFEM.Native.load_avatar_info(avatar_path) do
+    case PolyFem.load_avatar_info(avatar_path) do
       {:ok, payload} ->
         # TODO: Parse payload and convert to Elixir data structures
         {:ok, %{}}
