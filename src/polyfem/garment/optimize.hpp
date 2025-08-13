@@ -1,5 +1,7 @@
 #pragma once
 #include <polyfem/Common.hpp>
+#include <polyfem/io/OBJData.hpp>
+#include <map>
 
 namespace ipc {
     class CollisionMesh;
@@ -21,9 +23,13 @@ namespace polyfem {
         Eigen::MatrixXi ftc;
         Eigen::MatrixXd tc;
 
+        // Material information
+        std::string mtl_filename;
+
         void read(const std::string &path);
         void write(const std::string &path);
     };
+
 
     Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V);
 
@@ -82,6 +88,23 @@ namespace polyfem {
         Eigen::MatrixXd garment_skinning_weights;
 
         std::vector<int> not_fit_fids;
+
+        // Avatar and garment material information
+        std::string avatar_mtl_filename;
+        std::string avatar_mtl_source_path;
+        std::string garment_mtl_source_path;
+
+        // Parsed material information
+        std::map<std::string, MTLMaterial> avatar_materials;
+        std::map<std::string, MTLMaterial> garment_materials;
+
+        // Avatar and garment group information
+        std::vector<OBJObject> avatar_objects;
+        std::vector<OBJObject> garment_objects;
+        std::vector<int> avatar_face_to_group;
+        std::vector<int> avatar_face_to_object;
+        std::vector<int> garment_face_to_group;
+        std::vector<int> garment_face_to_object;
     };
 
 	json init(const json &p_args_in, const bool strict_validation);

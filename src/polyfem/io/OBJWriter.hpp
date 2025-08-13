@@ -12,6 +12,7 @@
 #include <string>
 
 #include <Eigen/Core>
+#include "OBJData.hpp"
 
 namespace polyfem::io
 {
@@ -36,5 +37,13 @@ namespace polyfem::io
 			else
 				return write(path, v, Eigen::MatrixXi(), e_or_f);
 		}
+
+		/// @brief Write OBJ file with group and material information
+		/// @param path output file path
+		/// @param obj_data structure containing vertices, faces, groups, and materials
+		/// @returns true on success, false on errors
+		static bool write_with_groups(
+			const std::string &path,
+			const polyfem::OBJData &obj_data);
 	};
 } // namespace polyfem::io

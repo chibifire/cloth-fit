@@ -1,13 +1,15 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-**Table of Contents** _generated with [DocToc](https://github.com/thlorenz/doctoc)_
-
 - [[Siggraph 2025] Intersection-free Garment Retargeting](#siggraph-2025-intersection-free-garment-retargeting)
   - [Files](#files)
   - [Build](#build)
   - [Run](#run)
   - [Output Files](#output-files)
+  - [Blender Import Settings](#blender-import-settings)
+    - [OBJ Import Options:](#obj-import-options)
+    - [Recommended Viewport Settings:](#recommended-viewport-settings)
+    - [Notes:](#notes)
   - [Script Settings](#script-settings)
     - [Meshes](#meshes)
     - [Objectives and Weights](#objectives-and-weights)

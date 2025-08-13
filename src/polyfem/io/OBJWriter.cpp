@@ -46,4 +46,82 @@ namespace polyfem::io
 
 		return true;
 	}
+
+	bool OBJWriter::write_with_groups(
+		const std::string &path,
+		const polyfem::OBJData &obj_data)
+	{
+		std::ofstream obj(path, std::ios::out);
+		if (!obj.is_open())
+		{
+			logger().error("OBJWriter::write_with_groups: could not open file {:s} for writing", path);
+			return false;
+		}
+
+		// Write header comment
+		obj << fmt::format(
+			"# Vertices: {:d}\n# Faces: {:d}\n# Objects: {:d}\n",
+			obj_data.V.size(), obj_data.F.size(), obj_data.objects.size());
+
+		// Write MTL library reference if present
+		if (!obj_data.mtl_filename.empty())
+		{
+			obj << fmt::format("mtllib {}\n", obj_data.mtl_filename);
+		}
+
+		obj << "\n";
+
+		// Write all vertices first
+		for (const auto &vertex : obj_data.V)
+		{
+			obj << "v";
+			for (double coord : vertex)
+			{
+				obj << fmt::format(" {}", coord);
+			}
+			obj << "\n";
+		}
+
+		obj << "\n";
+
+		// Write objects and groups with their faces
+		for (size_t obj_idx = 0; obj_idx < obj_data.objects.size(); ++obj_idx)
+		{
+			const auto &object = obj_data.objects[obj_idx];
+
+			// Write object declaration
+			obj << fmt::format("o {}\n", object.name);
+
+			for (const auto &group : object.groups)
+			{
+				// Write group declaration if not default
+				if (group.name != "default")
+				{
+					obj << fmt::format("g {}\n", group.name);
+				}
+
+				// Write material usage if present
+				if (!group.material_name.empty())
+				{
+					obj << fmt::format("usemtl {}\n", group.material_name);
+				}
+
+				// Write faces belonging to this group
+				for (int face_idx : group.face_indices)
+				{
+					const auto &face = obj_data.F[face_idx];
+					obj << "f";
+					for (int vertex_idx : face)
+					{
+						obj << fmt::format(" {}", vertex_idx + 1); // OBJ uses 1-based indexing
+					}
+					obj << "\n";
+				}
+
+				obj << "\n";
+			}
+		}
+
+		return true;
+	}
 } // namespace polyfem::io

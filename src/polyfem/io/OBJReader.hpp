@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <Eigen/Core>
+#include "OBJData.hpp"
 
 namespace polyfem::io
 {
@@ -75,5 +76,13 @@ namespace polyfem::io
 			Eigen::MatrixXd &V,
 			Eigen::MatrixXi &E,
 			Eigen::MatrixXi &F);
+
+		/// @brief Read OBJ file with group and material information
+		/// @param obj_file_name path to .obj file
+		/// @param obj_data output structure containing vertices, faces, groups, and materials
+		/// @returns true on success, false on errors
+		static bool read_with_groups(
+			const std::string &obj_file_name,
+			polyfem::OBJData &obj_data);
 	};
 } // namespace polyfem::io

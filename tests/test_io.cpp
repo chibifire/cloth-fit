@@ -49,18 +49,18 @@ TEST_CASE_METHOD(TestFixture, "Matrix IO - ASCII format", "[io][matrix]")
                    9.9, 10.10, 11.11, 12.12;
 
         std::string filepath = temp_file("matrix_ascii.txt");
-        
+
         // Test write
         REQUIRE(io::write_matrix_ascii(filepath, original));
-        
+
         // Test read
         Eigen::MatrixXd loaded;
         REQUIRE(io::read_matrix_ascii<double>(filepath, loaded));
-        
+
         // Verify dimensions and values
         REQUIRE(loaded.rows() == original.rows());
         REQUIRE(loaded.cols() == original.cols());
-        
+
         for (int i = 0; i < original.rows(); ++i) {
             for (int j = 0; j < original.cols(); ++j) {
                 REQUIRE(loaded(i, j) == Catch::Approx(original(i, j)));
@@ -74,12 +74,12 @@ TEST_CASE_METHOD(TestFixture, "Matrix IO - ASCII format", "[io][matrix]")
                    4, 5, 6;
 
         std::string filepath = temp_file("matrix_int_ascii.txt");
-        
+
         REQUIRE(io::write_matrix_ascii(filepath, original));
-        
+
         Eigen::MatrixXi loaded;
         REQUIRE(io::read_matrix_ascii<int>(filepath, loaded));
-        
+
         REQUIRE(loaded.rows() == original.rows());
         REQUIRE(loaded.cols() == original.cols());
         REQUIRE(loaded == original);
@@ -88,9 +88,9 @@ TEST_CASE_METHOD(TestFixture, "Matrix IO - ASCII format", "[io][matrix]")
     SECTION("Empty matrix") {
         Eigen::MatrixXd empty(0, 0);
         std::string filepath = temp_file("empty_matrix.txt");
-        
+
         REQUIRE(io::write_matrix_ascii(filepath, empty));
-        
+
         Eigen::MatrixXd loaded;
         REQUIRE(io::read_matrix_ascii<double>(filepath, loaded));
         REQUIRE(loaded.rows() == 0);
@@ -100,11 +100,11 @@ TEST_CASE_METHOD(TestFixture, "Matrix IO - ASCII format", "[io][matrix]")
     SECTION("Single element matrix") {
         Eigen::MatrixXd single(1, 1);
         single << 42.0;
-        
+
         std::string filepath = temp_file("single_matrix.txt");
-        
+
         REQUIRE(io::write_matrix_ascii(filepath, single));
-        
+
         Eigen::MatrixXd loaded;
         REQUIRE(io::read_matrix_ascii<double>(filepath, loaded));
         REQUIRE(loaded.rows() == 1);
@@ -118,18 +118,18 @@ TEST_CASE_METHOD(TestFixture, "Matrix IO - Binary format", "[io][matrix]")
     SECTION("Large random matrix") {
         const int rows = 100;
         const int cols = 50;
-        
+
         Eigen::MatrixXd original = Eigen::MatrixXd::Random(rows, cols);
         std::string filepath = temp_file("matrix_binary.bin");
-        
+
         REQUIRE(io::write_matrix_binary(filepath, original));
-        
+
         Eigen::MatrixXd loaded;
         REQUIRE(io::read_matrix_binary<double>(filepath, loaded));
-        
+
         REQUIRE(loaded.rows() == rows);
         REQUIRE(loaded.cols() == cols);
-        
+
         for (int i = 0; i < rows; ++i) {
             for (int j = 0; j < cols; ++j) {
                 REQUIRE(loaded(i, j) == Catch::Approx(original(i, j)));
@@ -143,12 +143,12 @@ TEST_CASE_METHOD(TestFixture, "Matrix IO - Binary format", "[io][matrix]")
                    3.45678901234567, -4.56789012345678;
 
         std::string filepath = temp_file("precision_matrix.bin");
-        
+
         REQUIRE(io::write_matrix_binary(filepath, original));
-        
+
         Eigen::MatrixXd loaded;
         REQUIRE(io::read_matrix_binary<double>(filepath, loaded));
-        
+
         for (int i = 0; i < 2; ++i) {
             for (int j = 0; j < 2; ++j) {
                 REQUIRE(loaded(i, j) == Catch::Approx(original(i, j)).epsilon(1e-15));
@@ -162,15 +162,15 @@ TEST_CASE_METHOD(TestFixture, "Matrix IO - Generic interface", "[io][matrix]")
     SECTION("Auto-detect ASCII format") {
         Eigen::MatrixXd original = Eigen::MatrixXd::Random(5, 3);
         std::string filepath = temp_file("auto_ascii.txt");
-        
+
         REQUIRE(io::write_matrix(filepath, original));
-        
+
         Eigen::MatrixXd loaded;
         REQUIRE(io::read_matrix<double>(filepath, loaded));
-        
+
         REQUIRE(loaded.rows() == original.rows());
         REQUIRE(loaded.cols() == original.cols());
-        
+
         for (int i = 0; i < original.rows(); ++i) {
             for (int j = 0; j < original.cols(); ++j) {
                 REQUIRE(loaded(i, j) == Catch::Approx(original(i, j)));
@@ -181,15 +181,15 @@ TEST_CASE_METHOD(TestFixture, "Matrix IO - Generic interface", "[io][matrix]")
     SECTION("Auto-detect binary format") {
         Eigen::MatrixXd original = Eigen::MatrixXd::Random(5, 3);
         std::string filepath = temp_file("auto_binary.bin");
-        
+
         REQUIRE(io::write_matrix(filepath, original));
-        
+
         Eigen::MatrixXd loaded;
         REQUIRE(io::read_matrix<double>(filepath, loaded));
-        
+
         REQUIRE(loaded.rows() == original.rows());
         REQUIRE(loaded.cols() == original.cols());
-        
+
         for (int i = 0; i < original.rows(); ++i) {
             for (int j = 0; j < original.cols(); ++j) {
                 REQUIRE(loaded(i, j) == Catch::Approx(original(i, j)));
@@ -215,14 +215,14 @@ TEST_CASE_METHOD(TestFixture, "Sparse Matrix CSV export", "[io][sparse]")
         // Verify file exists and has content
         std::ifstream file(filepath);
         REQUIRE(file.is_open());
-        
+
         std::string line;
         std::getline(file, line);
         REQUIRE(line == "shape,4,4");  // First line is shape info
-        
+
         std::getline(file, line);
         REQUIRE(line == "Row,Col,Val");  // Second line is header
-        
+
         // Verify we have the expected number of non-zero entries
         int line_count = 0;
         while (std::getline(file, line)) {
@@ -233,20 +233,20 @@ TEST_CASE_METHOD(TestFixture, "Sparse Matrix CSV export", "[io][sparse]")
 
     SECTION("Empty sparse matrix") {
         Eigen::SparseMatrix<double> sparse(3, 3);
-        
+
         std::string filepath = temp_file("empty_sparse.csv");
         REQUIRE(io::write_sparse_matrix_csv(filepath, sparse));
 
         std::ifstream file(filepath);
         REQUIRE(file.is_open());
-        
+
         std::string line;
         std::getline(file, line);
         REQUIRE(line == "shape,3,3");  // First line is shape info
-        
+
         std::getline(file, line);
         REQUIRE(line == "Row,Col,Val");  // Second line is header
-        
+
         REQUIRE_FALSE(std::getline(file, line)); // Should be empty after header
     }
 }

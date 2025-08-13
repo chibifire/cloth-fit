@@ -1,3 +1,13 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+**Table of Contents** _generated with [DocToc](https://github.com/thlorenz/doctoc)_
+
+- [ClothFitCli](#clothfitcli)
+  - [Installation](#installation)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # ClothFitCli
 
 **TODO: Add description**
@@ -18,4 +28,3 @@ end
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at <https://hexdocs.pm/cloth_fit_cli>.
-

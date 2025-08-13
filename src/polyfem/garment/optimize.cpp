@@ -2,6 +2,7 @@
 
 #include <polyfem/solver/GarmentNLProblem.hpp>
 #include <polyfem/solver/forms/ContactForm.hpp>
+#include <polyfem/io/OBJReader.hpp>
 #include <polyfem/io/OBJWriter.hpp>
 #include <polyfem/io/MatrixIO.hpp>
 #include <polyfem/mesh/MeshUtils.hpp>
@@ -38,6 +39,10 @@
 
 #include <unordered_set>
 #include <filesystem>
+#include <fstream>
+#include <regex>
+#include <iomanip>
+#include <sstream>
 
 using namespace polyfem::solver;
 using namespace polyfem::mesh;
@@ -63,6 +68,218 @@ namespace spdlog::level
 }
 namespace polyfem {
     namespace {
+        /// @brief Parse MTL file and return materials map
+        std::map<std::string, MTLMaterial> parse_mtl_file(const std::string &mtl_path)
+        {
+            std::map<std::string, MTLMaterial> materials;
+
+            if (!std::filesystem::exists(mtl_path))
+            {
+                logger().warn("MTL file does not exist: {}", mtl_path);
+                return materials;
+            }
+
+            std::ifstream mtl_file(mtl_path);
+            if (!mtl_file.is_open())
+            {
+                logger().error("Failed to open MTL file: {}", mtl_path);
+                return materials;
+            }
+
+            MTLMaterial current_material;
+            bool has_current_material = false;
+            std::string line;
+
+            while (std::getline(mtl_file, line))
+            {
+                // Remove leading/trailing whitespace
+                line.erase(0, line.find_first_not_of(" \t"));
+                line.erase(line.find_last_not_of(" \t") + 1);
+
+                // Skip empty lines and comments
+                if (line.empty() || line[0] == '#')
+                    continue;
+
+                std::istringstream iss(line);
+                std::string token;
+                iss >> token;
+
+                if (token == "newmtl")
+                {
+                    // Save previous material if exists
+                    if (has_current_material && !current_material.name.empty())
+                    {
+                        materials[current_material.name] = current_material;
+                    }
+
+                    // Start new material
+                    current_material = MTLMaterial();
+                    iss >> current_material.name;
+                    has_current_material = true;
+                }
+                else if (has_current_material)
+                {
+                    if (token == "Ka")
+                    {
+                        iss >> current_material.Ka[0] >> current_material.Ka[1] >> current_material.Ka[2];
+                    }
+                    else if (token == "Kd")
+                    {
+                        iss >> current_material.Kd[0] >> current_material.Kd[1] >> current_material.Kd[2];
+                    }
+                    else if (token == "Ks")
+                    {
+                        iss >> current_material.Ks[0] >> current_material.Ks[1] >> current_material.Ks[2];
+                    }
+                    else if (token == "Ke")
+                    {
+                        iss >> current_material.Ke[0] >> current_material.Ke[1] >> current_material.Ke[2];
+                    }
+                    else if (token == "Ns")
+                    {
+                        iss >> current_material.Ns;
+                    }
+                    else if (token == "Ni")
+                    {
+                        iss >> current_material.Ni;
+                    }
+                    else if (token == "d")
+                    {
+                        iss >> current_material.d;
+                    }
+                    else if (token == "illum")
+                    {
+                        iss >> current_material.illum;
+                    }
+                    else if (token == "map_Kd")
+                    {
+                        // Read the rest of the line to handle filenames with spaces
+                        std::getline(iss, current_material.map_Kd);
+                        // Remove leading whitespace
+                        current_material.map_Kd.erase(0, current_material.map_Kd.find_first_not_of(" \t"));
+                    }
+                    else if (token == "map_d")
+                    {
+                        std::getline(iss, current_material.map_d);
+                        current_material.map_d.erase(0, current_material.map_d.find_first_not_of(" \t"));
+                    }
+                    else if (token == "map_Ks")
+                    {
+                        std::getline(iss, current_material.map_Ks);
+                        current_material.map_Ks.erase(0, current_material.map_Ks.find_first_not_of(" \t"));
+                    }
+                    else if (token == "map_Ka")
+                    {
+                        std::getline(iss, current_material.map_Ka);
+                        current_material.map_Ka.erase(0, current_material.map_Ka.find_first_not_of(" \t"));
+                    }
+                    else if (token == "bump")
+                    {
+                        std::getline(iss, current_material.bump);
+                        current_material.bump.erase(0, current_material.bump.find_first_not_of(" \t"));
+                    }
+                }
+            }
+
+            // Save last material
+            if (has_current_material && !current_material.name.empty())
+            {
+                materials[current_material.name] = current_material;
+            }
+
+            mtl_file.close();
+            logger().debug("Parsed {} materials from MTL file: {}", materials.size(), mtl_path);
+            return materials;
+        }
+
+        /// @brief Write MTL file with materials and copy referenced textures
+        bool write_mtl_file(const std::string &dest_mtl_path,
+                           const std::map<std::string, MTLMaterial> &materials,
+                           const std::string &source_mtl_dir = "")
+        {
+            try
+            {
+                // Create destination directory if it doesn't exist
+                std::filesystem::create_directories(std::filesystem::path(dest_mtl_path).parent_path());
+
+                std::ofstream mtl_file(dest_mtl_path);
+                if (!mtl_file.is_open())
+                {
+                    logger().error("Failed to create MTL file: {}", dest_mtl_path);
+                    return false;
+                }
+
+                // Write header comment
+                mtl_file << "# Generated MTL file by PolyFEM cloth-fit\n";
+                mtl_file << "# www.polyfem.github.io\n\n";
+
+                std::filesystem::path dest_dir = std::filesystem::path(dest_mtl_path).parent_path();
+
+                for (const auto &[name, material] : materials)
+                {
+                    mtl_file << "newmtl " << material.name << "\n";
+                    mtl_file << "Ns " << std::fixed << std::setprecision(6) << material.Ns << "\n";
+                    mtl_file << "Ka " << material.Ka[0] << " " << material.Ka[1] << " " << material.Ka[2] << "\n";
+                    mtl_file << "Kd " << material.Kd[0] << " " << material.Kd[1] << " " << material.Kd[2] << "\n";
+                    mtl_file << "Ks " << material.Ks[0] << " " << material.Ks[1] << " " << material.Ks[2] << "\n";
+                    mtl_file << "Ke " << material.Ke[0] << " " << material.Ke[1] << " " << material.Ke[2] << "\n";
+                    mtl_file << "Ni " << material.Ni << "\n";
+                    mtl_file << "d " << material.d << "\n";
+                    mtl_file << "illum " << material.illum << "\n";
+
+                    // Handle texture maps and copy texture files
+                    auto copy_texture = [&](const std::string &texture_name, const std::string &mtl_directive) {
+                        if (!texture_name.empty())
+                        {
+                            mtl_file << mtl_directive << " " << texture_name << "\n";
+
+                            // Copy texture file if source directory is provided
+                            if (!source_mtl_dir.empty())
+                            {
+                                std::filesystem::path source_texture_path = std::filesystem::path(source_mtl_dir) / texture_name;
+                                std::filesystem::path dest_texture_path = dest_dir / texture_name;
+
+                                if (std::filesystem::exists(source_texture_path))
+                                {
+                                    try
+                                    {
+                                        std::filesystem::copy_file(source_texture_path, dest_texture_path,
+                                                                  std::filesystem::copy_options::overwrite_existing);
+                                        logger().debug("Copied texture file: {} -> {}", source_texture_path.string(), dest_texture_path.string());
+                                    }
+                                    catch (const std::exception& e)
+                                    {
+                                        logger().warn("Failed to copy texture file {}: {}", source_texture_path.string(), e.what());
+                                    }
+                                }
+                                else
+                                {
+                                    logger().warn("Referenced texture file not found: {}", source_texture_path.string());
+                                }
+                            }
+                        }
+                    };
+
+                    copy_texture(material.map_Kd, "map_Kd");
+                    copy_texture(material.map_d, "map_d");
+                    copy_texture(material.map_Ks, "map_Ks");
+                    copy_texture(material.map_Ka, "map_Ka");
+                    copy_texture(material.bump, "bump");
+
+                    mtl_file << "\n";
+                }
+
+                mtl_file.close();
+                logger().debug("Wrote MTL file with {} materials: {}", materials.size(), dest_mtl_path);
+                return true;
+            }
+            catch (const std::exception& e)
+            {
+                logger().error("Failed to write MTL file {}: {}", dest_mtl_path, e.what());
+                return false;
+            }
+        }
+
         Eigen::Vector2d project_to_line(
             const Eigen::Vector3d &a,
             const Eigen::Vector3d &b,
@@ -262,10 +479,113 @@ namespace polyfem {
         }
 #endif
         garment.v = current_vertices.bottomRows(garment.v.rows());
-        garment.write(path + "/step_garment_" + std::to_string(index) + ".obj");
-        logger().debug("Save OBJ to {}", path + "/step_garment_" + std::to_string(index) + ".obj");
 
-        igl::write_triangle_mesh(path + "/step_avatar_" + std::to_string(index) + ".obj", current_vertices.topRows(nc_avatar_v.rows()), nc_avatar_f);
+        // Save garment with group information if available
+        if (!garment_objects.empty())
+        {
+            // Create OBJData structure with updated vertices
+            OBJData garment_output_data;
+            garment_output_data.V.resize(garment.v.rows());
+            for (int i = 0; i < garment.v.rows(); ++i)
+            {
+                garment_output_data.V[i] = {garment.v(i, 0), garment.v(i, 1), garment.v(i, 2)};
+            }
+
+            // Convert faces back to vector format
+            garment_output_data.F.resize(garment.f.rows());
+            for (int i = 0; i < garment.f.rows(); ++i)
+            {
+                garment_output_data.F[i] = {garment.f(i, 0), garment.f(i, 1), garment.f(i, 2)};
+            }
+
+            // Copy group structure
+            garment_output_data.objects = garment_objects;
+            garment_output_data.face_to_group = garment_face_to_group;
+            garment_output_data.face_to_object = garment_face_to_object;
+            garment_output_data.mtl_filename = garment.mtl_filename;
+
+            // Write with groups
+            if (io::OBJWriter::write_with_groups(path + "/step_garment_" + std::to_string(index) + ".obj", garment_output_data))
+            {
+                logger().debug("Saved garment OBJ with groups: {}", path + "/step_garment_" + std::to_string(index) + ".obj");
+            }
+            else
+            {
+                logger().warn("Failed to save garment with groups, falling back to basic OBJ");
+                garment.write(path + "/step_garment_" + std::to_string(index) + ".obj");
+            }
+        }
+        else
+        {
+            garment.write(path + "/step_garment_" + std::to_string(index) + ".obj");
+            logger().debug("Save OBJ to {}", path + "/step_garment_" + std::to_string(index) + ".obj");
+        }
+
+        // Write garment MTL file if materials exist
+        if (!garment_materials.empty() && !garment.mtl_filename.empty())
+        {
+            std::string garment_mtl_dest = path + "/step_garment_" + std::to_string(index) + ".mtl";
+            std::string source_dir = garment_mtl_source_path.empty() ? "" :
+                                   std::filesystem::path(garment_mtl_source_path).parent_path().string();
+            if (write_mtl_file(garment_mtl_dest, garment_materials, source_dir))
+            {
+                logger().debug("Saved garment MTL file: {}", garment_mtl_dest);
+            }
+        }
+
+        // Save avatar with group information if available
+        if (!avatar_objects.empty())
+        {
+            // Create OBJData structure with updated avatar vertices
+            OBJData avatar_output_data;
+            const Eigen::MatrixXd avatar_vertices = current_vertices.topRows(nc_avatar_v.rows());
+
+            avatar_output_data.V.resize(avatar_vertices.rows());
+            for (int i = 0; i < avatar_vertices.rows(); ++i)
+            {
+                avatar_output_data.V[i] = {avatar_vertices(i, 0), avatar_vertices(i, 1), avatar_vertices(i, 2)};
+            }
+
+            // Convert faces back to vector format
+            avatar_output_data.F.resize(nc_avatar_f.rows());
+            for (int i = 0; i < nc_avatar_f.rows(); ++i)
+            {
+                avatar_output_data.F[i] = {nc_avatar_f(i, 0), nc_avatar_f(i, 1), nc_avatar_f(i, 2)};
+            }
+
+            // Copy group structure
+            avatar_output_data.objects = avatar_objects;
+            avatar_output_data.face_to_group = avatar_face_to_group;
+            avatar_output_data.face_to_object = avatar_face_to_object;
+            avatar_output_data.mtl_filename = avatar_mtl_filename;
+
+            // Write with groups
+            if (io::OBJWriter::write_with_groups(path + "/step_avatar_" + std::to_string(index) + ".obj", avatar_output_data))
+            {
+                logger().debug("Saved avatar OBJ with groups: {}", path + "/step_avatar_" + std::to_string(index) + ".obj");
+            }
+            else
+            {
+                logger().warn("Failed to save avatar with groups, falling back to basic OBJ");
+                igl::write_triangle_mesh(path + "/step_avatar_" + std::to_string(index) + ".obj", avatar_vertices, nc_avatar_f);
+            }
+        }
+        else
+        {
+            igl::write_triangle_mesh(path + "/step_avatar_" + std::to_string(index) + ".obj", current_vertices.topRows(nc_avatar_v.rows()), nc_avatar_f);
+        }
+
+        // Write avatar MTL file if materials exist
+        if (!avatar_materials.empty() && !avatar_mtl_filename.empty())
+        {
+            std::string avatar_mtl_dest = path + "/step_avatar_" + std::to_string(index) + ".mtl";
+            std::string source_dir = avatar_mtl_source_path.empty() ? "" :
+                                   std::filesystem::path(avatar_mtl_source_path).parent_path().string();
+            if (write_mtl_file(avatar_mtl_dest, avatar_materials, source_dir))
+            {
+                logger().debug("Saved avatar MTL file: {}", avatar_mtl_dest);
+            }
+        }
     }
 
     Eigen::Vector3d bbox_size(const Eigen::Matrix<double, -1, 3> &V)
@@ -277,7 +597,79 @@ namespace polyfem {
         const std::string &mesh_path,
         const std::string &no_fit_spec_path)
 	{
-        garment.read(mesh_path);
+        // Read garment mesh with group information
+        OBJData garment_obj_data;
+        if (io::OBJReader::read_with_groups(mesh_path, garment_obj_data))
+        {
+            // Convert to Eigen matrices
+            garment.v.resize(garment_obj_data.V.size(), 3);
+            for (size_t i = 0; i < garment_obj_data.V.size(); ++i)
+            {
+                for (int j = 0; j < 3; ++j)
+                {
+                    garment.v(i, j) = garment_obj_data.V[i][j];
+                }
+            }
+
+            // Convert faces (assuming triangular faces)
+            std::vector<std::vector<int>> triangular_faces;
+            for (const auto &face : garment_obj_data.F)
+            {
+                if (face.size() == 3)
+                {
+                    triangular_faces.push_back(face);
+                }
+                else if (face.size() > 3)
+                {
+                    // Triangulate polygon faces
+                    for (size_t i = 1; i < face.size() - 1; ++i)
+                    {
+                        triangular_faces.push_back({face[0], face[i], face[i + 1]});
+                    }
+                }
+            }
+
+            garment.f.resize(triangular_faces.size(), 3);
+            for (size_t i = 0; i < triangular_faces.size(); ++i)
+            {
+                for (int j = 0; j < 3; ++j)
+                {
+                    garment.f(i, j) = triangular_faces[i][j];
+                }
+            }
+
+            // Store group information
+            garment_objects = garment_obj_data.objects;
+            garment_face_to_group = garment_obj_data.face_to_group;
+            garment_face_to_object = garment_obj_data.face_to_object;
+            garment.mtl_filename = garment_obj_data.mtl_filename;
+
+            // Load MTL file if present
+            if (!garment.mtl_filename.empty())
+            {
+                std::filesystem::path garment_dir = std::filesystem::path(mesh_path).parent_path();
+                garment_mtl_source_path = (garment_dir / garment.mtl_filename).string();
+                garment_materials = parse_mtl_file(garment_mtl_source_path);
+                logger().info("Loaded garment with {} objects, {} groups, MTL file: {} with {} materials",
+                             garment_objects.size(),
+                             std::accumulate(garment_objects.begin(), garment_objects.end(), 0,
+                                           [](int sum, const OBJObject& obj) { return sum + obj.groups.size(); }),
+                             garment.mtl_filename, garment_materials.size());
+            }
+            else
+            {
+                logger().info("Loaded garment with {} objects, {} groups (no MTL file)",
+                             garment_objects.size(),
+                             std::accumulate(garment_objects.begin(), garment_objects.end(), 0,
+                                           [](int sum, const OBJObject& obj) { return sum + obj.groups.size(); }));
+            }
+        }
+        else
+        {
+            // Fallback to basic reading if group reading fails
+            logger().warn("Failed to read garment with groups, falling back to basic OBJ reading");
+            garment.read(mesh_path);
+        }
 
         if (std::filesystem::exists(no_fit_spec_path))
         {
@@ -353,7 +745,79 @@ namespace polyfem {
         const std::string &target_skeleton_path,
         const std::string &target_avatar_skinning_weights_path)
     {
-        igl::read_triangle_mesh(avatar_mesh_path, avatar_v, avatar_f);
+        // Read avatar mesh with group information
+        OBJData avatar_obj_data;
+        if (io::OBJReader::read_with_groups(avatar_mesh_path, avatar_obj_data))
+        {
+            // Convert to Eigen matrices
+            avatar_v.resize(avatar_obj_data.V.size(), 3);
+            for (size_t i = 0; i < avatar_obj_data.V.size(); ++i)
+            {
+                for (int j = 0; j < 3; ++j)
+                {
+                    avatar_v(i, j) = avatar_obj_data.V[i][j];
+                }
+            }
+
+            // Convert faces (assuming triangular faces)
+            std::vector<std::vector<int>> triangular_faces;
+            for (const auto &face : avatar_obj_data.F)
+            {
+                if (face.size() == 3)
+                {
+                    triangular_faces.push_back(face);
+                }
+                else if (face.size() > 3)
+                {
+                    // Triangulate polygon faces
+                    for (size_t i = 1; i < face.size() - 1; ++i)
+                    {
+                        triangular_faces.push_back({face[0], face[i], face[i + 1]});
+                    }
+                }
+            }
+
+            avatar_f.resize(triangular_faces.size(), 3);
+            for (size_t i = 0; i < triangular_faces.size(); ++i)
+            {
+                for (int j = 0; j < 3; ++j)
+                {
+                    avatar_f(i, j) = triangular_faces[i][j];
+                }
+            }
+
+            // Store group information
+            avatar_objects = avatar_obj_data.objects;
+            avatar_face_to_group = avatar_obj_data.face_to_group;
+            avatar_face_to_object = avatar_obj_data.face_to_object;
+            avatar_mtl_filename = avatar_obj_data.mtl_filename;
+
+            // Load MTL file if present
+            if (!avatar_mtl_filename.empty())
+            {
+                std::filesystem::path avatar_dir = std::filesystem::path(avatar_mesh_path).parent_path();
+                avatar_mtl_source_path = (avatar_dir / avatar_mtl_filename).string();
+                avatar_materials = parse_mtl_file(avatar_mtl_source_path);
+                logger().info("Loaded avatar with {} objects, {} groups, MTL file: {} with {} materials",
+                             avatar_objects.size(),
+                             std::accumulate(avatar_objects.begin(), avatar_objects.end(), 0,
+                                           [](int sum, const OBJObject& obj) { return sum + obj.groups.size(); }),
+                             avatar_mtl_filename, avatar_materials.size());
+            }
+            else
+            {
+                logger().info("Loaded avatar with {} objects, {} groups (no MTL file)",
+                             avatar_objects.size(),
+                             std::accumulate(avatar_objects.begin(), avatar_objects.end(), 0,
+                                           [](int sum, const OBJObject& obj) { return sum + obj.groups.size(); }));
+            }
+        }
+        else
+        {
+            // Fallback to basic reading if group reading fails
+            logger().warn("Failed to read avatar with groups, falling back to basic OBJ reading");
+            igl::read_triangle_mesh(avatar_mesh_path, avatar_v, avatar_f);
+        }
 
         read_edge_mesh(source_skeleton_path, skeleton_v, skeleton_b);
         read_edge_mesh(target_skeleton_path, target_skeleton_v, target_skeleton_b);
@@ -405,14 +869,12 @@ namespace polyfem {
 
         const bool has_target_avatar_skin_weights = target_avatar_skinning_weights.size() > 0;
 
-        // explode avatar mesh
+        // Keep original mesh connectivity instead of exploding
+        nc_avatar_v = avatar_v;
+        nc_avatar_f = avatar_f;
         Eigen::MatrixXd new_skinning_weights;
-        {
-            Eigen::VectorXi index_map;
-            explode_trimesh(avatar_v, avatar_f, nc_avatar_v, nc_avatar_f, index_map);
-            if (has_target_avatar_skin_weights)
-                new_skinning_weights = target_avatar_skinning_weights(Eigen::all, index_map);
-        }
+        if (has_target_avatar_skin_weights)
+            new_skinning_weights = target_avatar_skinning_weights;
 
 
         Eigen::VectorXi eid;
@@ -427,7 +889,7 @@ namespace polyfem {
             eid = -Eigen::VectorXi::Ones(N);
             for (int i = 0; i < N; i++)
             {
-                Eigen::Index maxRow;
+                Eigen::Index maxRow = 0;
                 if (has_target_avatar_skin_weights)
                 {
                     Eigen::Index maxCol;
@@ -474,127 +936,9 @@ namespace polyfem {
         // igl::write_triangle_mesh(out_folder + "/projected_avatar_old_source.obj", skinny_avatar_v, nc_avatar_f);
         // igl::write_triangle_mesh(out_folder + "/projected_avatar_old_target.obj", skinny_avatar_v_debug, nc_avatar_f);
 
-        // iteratively reduce distance
-        int n_op = 0;
-        int save_iter = 0;
-        for (int iter = 0; iter < 10; iter++) {
-            const int n_faces = skinny_avatar_f.rows();
-            std::vector<Eigen::Matrix<double, 6, 3>> new_faces;
-            for (int f = 0; f < n_faces; f++)
-            {
-                int max_dist = 0;
-                int max_dist_le = -1;
-                for (int le = 0; le < 3; le++)
-                {
-                    const int a = f * 3 + le;
-                    const int b = f * 3 + (le + 1) % 3;
-                    const int c = f * 3 + (le + 2) % 3;
-
-                    bool edge_overlap_with_skeleton = false;
-                    for (int i = 0; i < target_skeleton_b.rows(); i++)
-                    {
-                        Eigen::Vector3d vb = skinny_avatar_v.row(b);
-                        Eigen::Vector3d va = skinny_avatar_v.row(a);
-                        Eigen::Vector3d b0 = skeleton_v.row(target_skeleton_b(i, 0));
-                        Eigen::Vector3d b1 = skeleton_v.row(target_skeleton_b(i, 1));
-
-                        if (ipc::point_line_distance(vb, b0, b1) < 1e-4 * (b1 - b0).squaredNorm() &&
-                            ipc::point_line_distance(va, b0, b1) < 1e-4 * (b1 - b0).squaredNorm())
-                        {
-                            edge_overlap_with_skeleton = true;
-                            break;
-                        }
-                    }
-
-                    int source = eid(b);
-                    int cur = eid(a);
-
-                    if (edge_overlap_with_skeleton || source == cur)
-                        continue;
-
-                    if (dist(cur, source) > max_dist)
-                    {
-                        max_dist = dist(cur, source);
-                        max_dist_le = le;
-                    }
-                }
-
-                for (int le = 0; le < 3; le++)
-                {
-                    if (max_dist_le != le)
-                        continue;
-
-                    const int a = f * 3 + le;
-                    const int b = f * 3 + (le + 1) % 3;
-                    const int c = f * 3 + (le + 2) % 3;
-
-                    int source = eid(b);
-                    int cur = eid(a);
-
-                    std::vector<std::array<int, 2>> inserted_tmp;
-                    while (cur != source)
-                    {
-                        std::array<int, 2> tmp{{shared_vtx(cur, parent(source, cur)), cur}};
-                        inserted_tmp.push_back(tmp);
-                        cur = parent(source, cur);
-                    }
-
-                    Eigen::RowVector3d p_prev = skinny_avatar_v.row(a);
-                    for (int k = 0; k < inserted_tmp.size(); k++)
-                    {
-                        Eigen::RowVector3d p = skeleton_v.row(inserted_tmp[k][0]);
-
-                        Eigen::Matrix<double, 6, 3> X;
-                        X << p_prev, p, skinny_avatar_v.row(c),
-                             nc_avatar_v.row(a) + (nc_avatar_v.row(b) - nc_avatar_v.row(a)) * ((double)k / (inserted_tmp.size() + 1)),
-                             nc_avatar_v.row(a) + (nc_avatar_v.row(b) - nc_avatar_v.row(a)) * ((double)(k+1) / (inserted_tmp.size() + 1)),
-                             nc_avatar_v.row(c);
-                        new_faces.push_back(X);
-                        eid.conservativeResize(eid.size() + 3);
-                        eid.tail(3) << (int)((k == 0) ? eid(a) : inserted_tmp[k-1][1]), inserted_tmp[k][1], eid(c);
-
-                        p_prev = p;
-                    }
-
-                    skinny_avatar_v.row(a) = p_prev;
-                    nc_avatar_v.row(a) += (nc_avatar_v.row(b) - nc_avatar_v.row(a)) * ((double)inserted_tmp.size() / (inserted_tmp.size() + 1));
-                    eid(a) = inserted_tmp.back()[1];
-                }
-
-                n_op++;
-
-                if (f == n_faces - 1 || new_faces.size() > 5)
-                {
-                    {
-                        Eigen::MatrixXd tmp(skinny_avatar_v.rows() + new_faces.size() * 3, 3);
-                        tmp.topRows(skinny_avatar_v.rows()) = skinny_avatar_v;
-                        for (int i = 0; i < new_faces.size(); i++)
-                            tmp.block(skinny_avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].topRows(3);
-                        std::swap(skinny_avatar_v, tmp);
-                    }
-
-                    {
-                        Eigen::MatrixXd tmp(nc_avatar_v.rows() + new_faces.size() * 3, 3);
-                        tmp.topRows(nc_avatar_v.rows()) = nc_avatar_v;
-                        for (int i = 0; i < new_faces.size(); i++)
-                            tmp.block(nc_avatar_v.rows() + 3 * i, 0, 3, 3) = new_faces[i].bottomRows(3);
-                        std::swap(nc_avatar_v, tmp);
-                    }
-
-                    skinny_avatar_f = Eigen::VectorXi::LinSpaced(skinny_avatar_v.rows(), 0, skinny_avatar_v.rows() - 1).reshaped(3, skinny_avatar_v.rows() / 3).transpose();
-                    nc_avatar_f = skinny_avatar_f;
-
-                    // igl::write_triangle_mesh(out_folder + "/projected_avatar_new_" + std::to_string(save_iter) + ".obj", skinny_avatar_v, skinny_avatar_f);
-                    // igl::write_triangle_mesh(out_folder + "/avatar_new_" + std::to_string(save_iter) + ".obj", nc_avatar_v, nc_avatar_f);
-                    // save_iter++;
-
-                    new_faces.clear();
-                }
-            }
-
-            if (n_faces == nc_avatar_f.rows())
-                break;
-        }
+        // Skip the iterative distance reduction that assumes exploded mesh
+        // This preserves the original mesh topology
+        logger().info("Preserving mesh topology - skipping iterative distance reduction");
 
         {
             Eigen::MatrixXd tmp_v(nc_avatar_v.rows(), nc_avatar_v.cols() + skinny_avatar_v.cols());

@@ -89,12 +89,12 @@ TEST_CASE_METHOD(MeshTestFixture, "OBJ File IO", "[mesh][obj][io]")
 
         std::string content((std::istreambuf_iterator<char>(file)),
                            std::istreambuf_iterator<char>());
-        
+
         // Check for vertex lines
         REQUIRE(content.find("v 0") != std::string::npos);
         REQUIRE(content.find("v 1") != std::string::npos);
         REQUIRE(content.find("v 0.5") != std::string::npos);
-        
+
         // Check for face line (OBJ uses 1-based indexing)
         REQUIRE(content.find("f 1 2 3") != std::string::npos);
 
@@ -162,7 +162,7 @@ TEST_CASE_METHOD(MeshTestFixture, "OBJ File IO", "[mesh][obj][io]")
         Eigen::MatrixXi F(0, 3);
 
         std::string filepath = temp_file("empty.obj");
-        
+
         REQUIRE(io::OBJWriter::write(filepath, V, F));
 
         Eigen::MatrixXd V_loaded;
@@ -188,7 +188,7 @@ TEST_CASE_METHOD(MeshTestFixture, "OBJ Error handling", "[mesh][obj][error]")
         Eigen::MatrixXd V(1, 3);
         V << 0.0, 0.0, 0.0;
         Eigen::MatrixXi F(0, 3);
-        
+
         REQUIRE_FALSE(io::OBJWriter::write("/invalid/path/file.obj", V, F));
     }
 
@@ -205,7 +205,7 @@ TEST_CASE_METHOD(MeshTestFixture, "OBJ Error handling", "[mesh][obj][error]")
         Eigen::MatrixXi F;
         // This should handle gracefully or return false
         io::OBJReader::read(filepath, V, E, F);
-        
+
         // If read succeeds, we should at least have read the valid vertex
         if (V.rows() > 0) {
             REQUIRE(V(0, 0) == Catch::Approx(1.0));

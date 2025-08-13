@@ -79,19 +79,19 @@ struct Vec3 {
 struct SimpleMesh {
     std::vector<Vec3> vertices;
     std::vector<std::vector<int>> faces;
-    
+
     bool load_obj(const std::string& filename) {
         std::ifstream file(filename);
         if (!file.is_open()) {
             return false;
         }
-        
+
         std::string line;
         while (std::getline(file, line)) {
             std::istringstream iss(line);
             std::string prefix;
             iss >> prefix;
-            
+
             if (prefix == "v") {
                 double x, y, z;
                 if (iss >> x >> y >> z) {
@@ -111,10 +111,10 @@ struct SimpleMesh {
                 }
             }
         }
-        
+
         return !vertices.empty() && !faces.empty();
     }
-    
+
     Vec3 get_bbox_min() const {
         if (vertices.empty()) return Vec3();
         Vec3 min_pt = vertices[0];
@@ -125,7 +125,7 @@ struct SimpleMesh {
         }
         return min_pt;
     }
-    
+
     Vec3 get_bbox_max() const {
         if (vertices.empty()) return Vec3();
         Vec3 max_pt = vertices[0];
@@ -136,7 +136,7 @@ struct SimpleMesh {
         }
         return max_pt;
     }
-    
+
     double calculate_surface_area() const {
         double total_area = 0.0;
         for (const auto& face : faces) {
@@ -157,14 +157,14 @@ UNIFEX_TERM simulate(UnifexEnv* env, UnifexPayload* config, char* output_path) {
     if (!config || !output_path) {
         return simulate_result_error(env, "Invalid parameters");
     }
-    
+
     if (strlen(output_path) == 0) {
         return simulate_result_error(env, "Output path cannot be empty");
     }
-    
+
     try {
         auto start_time = std::chrono::high_resolution_clock::now();
-        
+
         // Extract JSON configuration from payload
         std::string config_json;
         if (config->data && config->size > 0) {
@@ -172,7 +172,7 @@ UNIFEX_TERM simulate(UnifexEnv* env, UnifexPayload* config, char* output_path) {
         } else {
             return simulate_result_error(env, "Empty configuration payload");
         }
-        
+
         // Parse JSON configuration
         json in_args;
         try {
@@ -181,15 +181,15 @@ UNIFEX_TERM simulate(UnifexEnv* env, UnifexPayload* config, char* output_path) {
             std::string error_msg = "JSON parse error: " + std::string(e.what());
             return simulate_result_error(env, error_msg.c_str());
         }
-        
+
         // Create output directory
         std::string output_dir(output_path);
         std::filesystem::create_directories(output_dir);
-        
+
         // Set up logging to be less verbose for NIF usage
         spdlog::set_level(spdlog::level::warn);
         polyfem::logger().set_level(spdlog::level::warn);
-        
+
         // Initialize PolyFEM with the configuration
         json args;
         try {
@@ -198,11 +198,11 @@ UNIFEX_TERM simulate(UnifexEnv* env, UnifexPayload* config, char* output_path) {
             std::string error_msg = "PolyFEM initialization error: " + std::string(e.what());
             return simulate_result_error(env, error_msg.c_str());
         }
-        
+
         // Create GarmentSolver instance
         GarmentSolver gstate;
         gstate.out_folder = output_dir;
-        
+
         // Extract paths from configuration
         const std::string avatar_mesh_path = args["avatar_mesh_path"];
         const std::string garment_mesh_path = args["garment_mesh_path"];
@@ -210,7 +210,7 @@ UNIFEX_TERM simulate(UnifexEnv* env, UnifexPayload* config, char* output_path) {
         const std::string target_skeleton_path = args["target_skeleton_path"];
         const std::string avatar_skin_weights_path = args["avatar_skin_weights_path"];
         const bool self_collision = args["contact"]["enabled"];
-        
+
         // Validate input files exist
         if (!std::filesystem::exists(avatar_mesh_path)) {
             return simulate_result_error(env, ("Invalid avatar mesh path: " + avatar_mesh_path).c_str());
@@ -224,31 +224,31 @@ UNIFEX_TERM simulate(UnifexEnv* env, UnifexPayload* config, char* output_path) {
         if (!std::filesystem::exists(target_skeleton_path)) {
             return simulate_result_error(env, ("Invalid target skeleton path: " + target_skeleton_path).c_str());
         }
-        
+
         // Load meshes and prepare simulation
         gstate.read_meshes(avatar_mesh_path, source_skeleton_path, target_skeleton_path, avatar_skin_weights_path);
         gstate.load_garment_mesh(garment_mesh_path, args["no_fit_spec_path"]);
         gstate.normalize_meshes();
         gstate.project_avatar_to_skeleton();
-        
+
         // Save initial meshes
         igl::write_triangle_mesh(output_dir + "/target_avatar.obj", gstate.avatar_v, gstate.avatar_f);
         igl::write_triangle_mesh(output_dir + "/projected_avatar.obj", gstate.skinny_avatar_v, gstate.nc_avatar_f);
         write_edge_mesh(output_dir + "/target_skeleton.obj", gstate.target_skeleton_v, gstate.target_skeleton_b);
         write_edge_mesh(output_dir + "/source_skeleton.obj", gstate.skeleton_v, gstate.skeleton_b);
-        
+
         // Set up collision mesh
         Eigen::MatrixXi collision_triangles(gstate.nc_avatar_f.rows() + gstate.n_garment_faces(), gstate.garment.f.cols());
         collision_triangles << gstate.nc_avatar_f, gstate.garment.f.array() + gstate.nc_avatar_v.rows();
         Eigen::MatrixXi collision_edges;
         igl::edges(collision_triangles, collision_edges);
-        
+
         Eigen::MatrixXd collision_vertices(gstate.nc_avatar_v.rows() + gstate.n_garment_vertices(), gstate.garment.v.cols());
         collision_vertices << gstate.skinny_avatar_v, gstate.garment.v;
-        
+
         ipc::CollisionMesh collision_mesh;
         collision_mesh = ipc::CollisionMesh(collision_vertices, collision_edges, collision_triangles);
-        
+
         const int n_avatar_verts = gstate.nc_avatar_v.rows();
         collision_mesh.can_collide = [n_avatar_verts, self_collision](size_t vi, size_t vj) {
             if (self_collision)
@@ -256,157 +256,157 @@ UNIFEX_TERM simulate(UnifexEnv* env, UnifexPayload* config, char* output_path) {
             else
                 return (vi >= n_avatar_verts && vj < n_avatar_verts) || (vi < n_avatar_verts && vj >= n_avatar_verts);
         };
-        
+
         // Check for initial intersections
         gstate.check_intersections(collision_mesh, collision_vertices);
-        
+
         // Set up boundary curves and targets
         auto curves = boundary_curves(collision_triangles.bottomRows(gstate.n_garment_faces()));
         const Eigen::MatrixXd source_curve_centers = extract_curve_center_targets(collision_vertices, curves, gstate.skeleton_v, gstate.skeleton_b, gstate.skeleton_v);
         const Eigen::MatrixXd target_curve_centers = extract_curve_center_targets(collision_vertices, curves, gstate.skeleton_v, gstate.skeleton_b, gstate.target_skeleton_v);
-        
+
         const Eigen::MatrixXd initial_garment_v = gstate.garment.v;
         int save_id = 0;
         const int total_steps = args["incremental_steps"];
         const int stride = args["output"]["skip_frame"];
-        
+
         // Set up persistent forms
         std::vector<std::shared_ptr<Form>> persistent_forms;
         std::vector<std::shared_ptr<Form>> persistent_full_forms;
         std::shared_ptr<CurveSizeForm> curve_size_form;
-        
+
         // Similarity form
         auto similarity_form = std::make_shared<SimilarityForm>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()));
         similarity_form->set_weight(args["similarity_penalty_weight"]);
         persistent_forms.push_back(similarity_form);
-        
+
         // Optional forms based on configuration
         if (args["curvature_penalty_weight"] > 0) {
             auto curvature_form = std::make_shared<CurveCurvatureForm>(collision_vertices, curves);
             curvature_form->set_weight(args["curvature_penalty_weight"]);
             persistent_forms.push_back(curvature_form);
         }
-        
+
         if (args["twist_penalty_weight"] > 0) {
             auto twist_form = std::make_shared<CurveTorsionForm>(collision_vertices, curves);
             twist_form->set_weight(args["twist_penalty_weight"]);
             persistent_forms.push_back(twist_form);
         }
-        
+
         if (args["symmetry_weight"] > 0) {
             auto sym_form = std::make_shared<SymmetryForm>(collision_vertices, curves);
             sym_form->set_weight(args["symmetry_weight"]);
             if (sym_form->enabled())
                 persistent_forms.push_back(sym_form);
         }
-        
+
         if (args["curve_size_weight"] > 0) {
             curve_size_form = std::make_shared<CurveSizeForm>(collision_vertices, curves);
             curve_size_form->disable();
             curve_size_form->set_weight(args["curve_size_weight"]);
             persistent_forms.push_back(curve_size_form);
         }
-        
+
         // Contact form
         const double dhat = args["contact"]["dhat"];
         std::shared_ptr<ContactForm> contact_form = std::make_shared<ContactForm>(
-            collision_mesh, dhat, 1, false, false, false, false, 
-            args["solver"]["contact"]["CCD"]["broad_phase"], 
-            args["solver"]["contact"]["CCD"]["tolerance"], 
+            collision_mesh, dhat, 1, false, false, false, false,
+            args["solver"]["contact"]["CCD"]["broad_phase"],
+            args["solver"]["contact"]["CCD"]["tolerance"],
             args["solver"]["contact"]["CCD"]["max_iterations"]);
         contact_form->set_weight(1);
         contact_form->set_barrier_stiffness(args["solver"]["contact"]["barrier_stiffness"]);
         contact_form->save_ccd_debug_meshes = false;
         persistent_forms.push_back(contact_form);
-        
+
         // Curve target form
         const auto tmp_curves = boundary_curves(gstate.garment.f);
         auto center_target_form = std::make_shared<CurveTargetForm>(
-            initial_garment_v, tmp_curves, gstate.skeleton_v, gstate.target_skeleton_v, 
+            initial_garment_v, tmp_curves, gstate.skeleton_v, gstate.target_skeleton_v,
             gstate.skeleton_b, args["is_skirt"], args["curve_center_target_automatic_bone_generation"]);
         center_target_form->set_weight(args["curve_center_target_weight"]);
         persistent_full_forms.push_back(center_target_form);
-        
+
         // Main simulation loop
         Eigen::MatrixXd sol = Eigen::MatrixXd::Zero(1 + initial_garment_v.size(), 1);
-        
+
         for (int substep = 0; substep < total_steps; ++substep) {
             const double next_alpha = (substep + 1) / (double)total_steps;
-            
+
             // Continuation
             const Eigen::MatrixXd next_avatar_v = (gstate.nc_avatar_v - gstate.skinny_avatar_v) * next_alpha + gstate.skinny_avatar_v;
-            
+
             std::vector<std::shared_ptr<Form>> forms = persistent_forms;
             std::shared_ptr<PointPenaltyForm> pen_form;
             std::shared_ptr<PointLagrangianForm> lagr_form;
             std::shared_ptr<FitForm<4>> fit_form;
-            
+
             // Set up step-specific forms
             std::vector<int> indices(gstate.nc_avatar_v.size());
             for (int i = 0; i < indices.size(); i++)
                 indices[i] = i;
             pen_form = std::make_shared<PointPenaltyForm>(utils::flatten(next_avatar_v - gstate.skinny_avatar_v), indices);
             forms.push_back(pen_form);
-            
+
             lagr_form = std::make_shared<PointLagrangianForm>(utils::flatten(next_avatar_v - gstate.skinny_avatar_v), indices);
             forms.push_back(lagr_form);
-            
-            fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()), 
+
+            fit_form = std::make_shared<FitForm<4>>(collision_vertices, collision_triangles.bottomRows(gstate.n_garment_faces()),
                                                    gstate.avatar_v, gstate.avatar_f, args["voxel_size"], gstate.not_fit_fids, output_dir);
             fit_form->disable();
             fit_form->set_weight(args["fit_weight"]);
             forms.push_back(fit_form);
-            
+
             if (args["curve_size_weight"] > 0)
                 curve_size_form->disable();
-            
+
             // Create and solve NL problem
             GarmentNLProblem nl_problem(1 + initial_garment_v.size(), utils::flatten(gstate.nc_avatar_v - gstate.skinny_avatar_v), forms, persistent_full_forms);
             nl_problem.set_target_value(next_alpha);
-            
+
             nl_problem.line_search_begin(sol, sol);
             if (!std::isfinite(nl_problem.value(sol)) || !nl_problem.is_step_valid(sol, sol) || !nl_problem.is_step_collision_free(sol, sol)) {
                 return simulate_result_error(env, "Failed to apply boundary conditions!");
             }
-            
+
             // Set up solvers
             std::shared_ptr<polysolve::nonlinear::Solver> nl_solver = polysolve::nonlinear::Solver::create(
                 args["solver"]["augmented_lagrangian"]["nonlinear"], args["solver"]["linear"], 1., polyfem::logger());
-            
+
             double initial_weight = args["solver"]["augmented_lagrangian"]["initial_weight"];
             const double scaling = args["solver"]["augmented_lagrangian"]["scaling"];
             const double max_weight = args["solver"]["augmented_lagrangian"]["max_weight"].get<double>();
-            
+
             ALSolver<GarmentNLProblem, PointLagrangianForm, PointPenaltyForm> al_solver(
                 lagr_form, pen_form, initial_weight, scaling, max_weight,
                 args["solver"]["augmented_lagrangian"]["eta"],
                 args["solver"]["augmented_lagrangian"]["error_threshold"],
                 [](const Eigen::VectorXd &x) {});
-            
+
             // Set up save callback
             nl_problem.post_step_call_back = [&](const Eigen::VectorXd &sol) {
                 if (save_id % stride == 0)
                     gstate.save_result(output_dir, save_id / stride, nl_problem, collision_vertices, collision_triangles, sol);
                 ++save_id;
             };
-            
+
             // Solve AL problem
             al_solver.solve_al(nl_solver, nl_problem, sol);
-            
+
             // Enable fit form and solve reduced problem
             fit_form->enable();
             if (args["curve_size_weight"] > 0 && substep == total_steps - 1)
                 curve_size_form->enable();
-            
+
             nl_solver = polysolve::nonlinear::Solver::create(args["solver"]["nonlinear"], args["solver"]["linear"], 1., polyfem::logger());
             al_solver.solve_reduced(nl_solver, nl_problem, sol);
         }
-        
+
         // Calculate simulation time
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
         double simulation_time = duration.count() / 1000.0;
-        
+
         // Create result JSON
         json result;
         result["status"] = "completed";
@@ -418,10 +418,10 @@ UNIFEX_TERM simulate(UnifexEnv* env, UnifexPayload* config, char* output_path) {
         result["avatar_vertices"] = gstate.nc_avatar_v.rows();
         result["garment_vertices"] = gstate.n_garment_vertices();
         result["total_vertices"] = gstate.nc_avatar_v.rows() + gstate.n_garment_vertices();
-        
+
         std::string result_str = result.dump();
         return simulate_result_ok(env, result_str.c_str());
-        
+
     } catch (const std::exception& e) {
         std::string error_msg = "Simulation error: " + std::string(e.what());
         return simulate_result_error(env, error_msg.c_str());
@@ -433,40 +433,40 @@ UNIFEX_TERM validate_garment_mesh(UnifexEnv* env, char* mesh_path) {
     if (!mesh_path || strlen(mesh_path) == 0) {
         return validate_garment_mesh_result_error(env, "Invalid mesh path");
     }
-    
+
     try {
         // Load mesh using simple OBJ reader
         SimpleMesh mesh;
         if (!mesh.load_obj(std::string(mesh_path))) {
             return validate_garment_mesh_result_error(env, "Failed to read mesh file");
         }
-        
+
         // Basic validation checks for garment meshes
         bool is_valid = true;
         std::string validation_errors;
-        
+
         // Check if mesh has vertices and faces
         if (mesh.vertices.empty()) {
             is_valid = false;
             validation_errors += "No vertices found. ";
         }
-        
+
         if (mesh.faces.empty()) {
             is_valid = false;
             validation_errors += "No faces found. ";
         }
-        
+
         // Check for reasonable mesh size (garments should have some complexity)
         if (mesh.vertices.size() < 10) {
             is_valid = false;
             validation_errors += "Too few vertices for a garment mesh. ";
         }
-        
+
         if (mesh.faces.size() < 10) {
             is_valid = false;
             validation_errors += "Too few faces for a garment mesh. ";
         }
-        
+
         // Check for valid face indices
         for (const auto& face : mesh.faces) {
             for (int vertex_idx : face) {
@@ -478,7 +478,7 @@ UNIFEX_TERM validate_garment_mesh(UnifexEnv* env, char* mesh_path) {
             }
             if (!is_valid) break;
         }
-        
+
         // Check for degenerate faces (faces with zero area)
         int degenerate_count = 0;
         for (const auto& face : mesh.faces) {
@@ -492,29 +492,29 @@ UNIFEX_TERM validate_garment_mesh(UnifexEnv* env, char* mesh_path) {
                 }
             }
         }
-        
+
         if (degenerate_count > static_cast<int>(mesh.faces.size()) * 0.1) { // More than 10% degenerate faces
             is_valid = false;
             validation_errors += "Too many degenerate faces. ";
         }
-        
+
         // Check bounding box (garment should have reasonable dimensions)
         Vec3 bbox_min = mesh.get_bbox_min();
         Vec3 bbox_max = mesh.get_bbox_max();
         Vec3 bbox_size = bbox_max - bbox_min;
-        
+
         double max_dimension = std::max({bbox_size.x, bbox_size.y, bbox_size.z});
         if (max_dimension < 1e-6) {
             is_valid = false;
             validation_errors += "Mesh has zero or near-zero dimensions. ";
         }
-        
+
         if (!is_valid) {
             return validate_garment_mesh_result_error(env, validation_errors.c_str());
         }
-        
+
         return validate_garment_mesh_result_ok(env, is_valid);
-        
+
     } catch (const std::exception& e) {
         std::string error_msg = "Error validating garment mesh: " + std::string(e.what());
         return validate_garment_mesh_result_error(env, error_msg.c_str());
@@ -526,40 +526,40 @@ UNIFEX_TERM validate_avatar_mesh(UnifexEnv* env, char* mesh_path) {
     if (!mesh_path || strlen(mesh_path) == 0) {
         return validate_avatar_mesh_result_error(env, "Invalid mesh path");
     }
-    
+
     try {
         // Load mesh using simple OBJ reader
         SimpleMesh mesh;
         if (!mesh.load_obj(std::string(mesh_path))) {
             return validate_avatar_mesh_result_error(env, "Failed to read mesh file");
         }
-        
+
         // Basic validation checks for avatar meshes
         bool is_valid = true;
         std::string validation_errors;
-        
+
         // Check if mesh has vertices and faces
         if (mesh.vertices.empty()) {
             is_valid = false;
             validation_errors += "No vertices found. ";
         }
-        
+
         if (mesh.faces.empty()) {
             is_valid = false;
             validation_errors += "No faces found. ";
         }
-        
+
         // Avatar meshes should be more complex than garment meshes
         if (mesh.vertices.size() < 100) {
             is_valid = false;
             validation_errors += "Too few vertices for an avatar mesh. ";
         }
-        
+
         if (mesh.faces.size() < 100) {
             is_valid = false;
             validation_errors += "Too few faces for an avatar mesh. ";
         }
-        
+
         // Check for valid face indices
         for (const auto& face : mesh.faces) {
             for (int vertex_idx : face) {
@@ -571,25 +571,25 @@ UNIFEX_TERM validate_avatar_mesh(UnifexEnv* env, char* mesh_path) {
             }
             if (!is_valid) break;
         }
-        
+
         // Check bounding box and proportions (avatar should be humanoid-like)
         Vec3 bbox_min = mesh.get_bbox_min();
         Vec3 bbox_max = mesh.get_bbox_max();
         Vec3 bbox_size = bbox_max - bbox_min;
-        
+
         double max_dimension = std::max({bbox_size.x, bbox_size.y, bbox_size.z});
         if (max_dimension < 1e-6) {
             is_valid = false;
             validation_errors += "Mesh has zero or near-zero dimensions. ";
         }
-        
+
         // Check for reasonable aspect ratios (relaxed for various avatar types)
         double height_to_width = bbox_size.y / std::max(bbox_size.x, bbox_size.z);
         if (height_to_width < 0.2 || height_to_width > 20.0) {
             is_valid = false;
             validation_errors += "Extreme aspect ratio for avatar mesh. ";
         }
-        
+
         // Check for degenerate faces
         int degenerate_count = 0;
         for (const auto& face : mesh.faces) {
@@ -603,24 +603,24 @@ UNIFEX_TERM validate_avatar_mesh(UnifexEnv* env, char* mesh_path) {
                 }
             }
         }
-        
+
         if (degenerate_count > static_cast<int>(mesh.faces.size()) * 0.05) { // More than 5% degenerate faces
             is_valid = false;
             validation_errors += "Too many degenerate faces. ";
         }
-        
+
         // Check mesh complexity (avatars should have reasonable detail)
         if (mesh.vertices.size() > 100000) {
             // Very high poly count - might cause performance issues
             // For now we'll allow it, but could add warnings
         }
-        
+
         if (!is_valid) {
             return validate_avatar_mesh_result_error(env, validation_errors.c_str());
         }
-        
+
         return validate_avatar_mesh_result_ok(env, is_valid);
-        
+
     } catch (const std::exception& e) {
         std::string error_msg = "Error validating avatar mesh: " + std::string(e.what());
         return validate_avatar_mesh_result_error(env, error_msg.c_str());
@@ -632,23 +632,23 @@ UNIFEX_TERM load_garment_info(UnifexEnv* env, char* garment_path) {
     if (!garment_path || strlen(garment_path) == 0) {
         return load_garment_info_result_error(env, "Invalid garment path");
     }
-    
+
     try {
         // Load garment mesh using simple OBJ reader
         SimpleMesh mesh;
         if (!mesh.load_obj(std::string(garment_path))) {
             return load_garment_info_result_error(env, "Failed to read garment mesh file");
         }
-        
+
         // Calculate mesh statistics
         int vertex_count = static_cast<int>(mesh.vertices.size());
         int face_count = static_cast<int>(mesh.faces.size());
-        
+
         // Calculate bounding box
         Vec3 bbox_min = mesh.get_bbox_min();
         Vec3 bbox_max = mesh.get_bbox_max();
         Vec3 bbox_size = bbox_max - bbox_min;
-        
+
         // Create JSON response with mesh information using nlohmann::json
         json info_json;
         info_json["vertex_count"] = vertex_count;
@@ -658,10 +658,10 @@ UNIFEX_TERM load_garment_info(UnifexEnv* env, char* garment_path) {
         info_json["bounding_box"]["size"] = {bbox_size.x, bbox_size.y, bbox_size.z};
         info_json["mesh_type"] = "garment";
         info_json["file_path"] = std::string(garment_path);
-        
+
         std::string info_str = info_json.dump();
         return load_garment_info_result_ok(env, info_str.c_str());
-        
+
     } catch (const std::exception& e) {
         std::string error_msg = "Error loading garment info: " + std::string(e.what());
         return load_garment_info_result_error(env, error_msg.c_str());
@@ -673,30 +673,30 @@ UNIFEX_TERM load_avatar_info(UnifexEnv* env, char* avatar_path) {
     if (!avatar_path || strlen(avatar_path) == 0) {
         return load_avatar_info_result_error(env, "Invalid avatar path");
     }
-    
+
     try {
         // Load avatar mesh using simple OBJ reader
         SimpleMesh mesh;
         if (!mesh.load_obj(std::string(avatar_path))) {
             return load_avatar_info_result_error(env, "Failed to read avatar mesh file");
         }
-        
+
         // Calculate mesh statistics
         int vertex_count = static_cast<int>(mesh.vertices.size());
         int face_count = static_cast<int>(mesh.faces.size());
-        
+
         // Calculate bounding box
         Vec3 bbox_min = mesh.get_bbox_min();
         Vec3 bbox_max = mesh.get_bbox_max();
         Vec3 bbox_size = bbox_max - bbox_min;
-        
+
         // Calculate additional avatar-specific metrics
         double surface_area = mesh.calculate_surface_area();
-        
+
         // Check if this looks like a valid avatar mesh (basic heuristics)
-        bool is_likely_avatar = (vertex_count > 1000 && face_count > 1000 && 
+        bool is_likely_avatar = (vertex_count > 1000 && face_count > 1000 &&
                                 bbox_size.y > bbox_size.x && bbox_size.y > bbox_size.z);
-        
+
         // Create JSON response with mesh information using nlohmann::json
         json info_json;
         info_json["vertex_count"] = vertex_count;
@@ -708,10 +708,10 @@ UNIFEX_TERM load_avatar_info(UnifexEnv* env, char* avatar_path) {
         info_json["mesh_type"] = "avatar";
         info_json["is_likely_avatar"] = is_likely_avatar;
         info_json["file_path"] = std::string(avatar_path);
-        
+
         std::string info_str = info_json.dump();
         return load_avatar_info_result_ok(env, info_str.c_str());
-        
+
     } catch (const std::exception& e) {
         std::string error_msg = "Error loading avatar info: " + std::string(e.what());
         return load_avatar_info_result_error(env, error_msg.c_str());
