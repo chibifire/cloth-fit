@@ -111,12 +111,12 @@ namespace polyfem::io
 					const auto &face = obj_data.F[face_idx];
 					const auto &face_tex = (face_idx < obj_data.FT.size()) ? obj_data.FT[face_idx] : std::vector<int>();
 					const auto &face_norm = (face_idx < obj_data.FN.size()) ? obj_data.FN[face_idx] : std::vector<int>();
-					
+
 					obj << "f";
 					for (size_t i = 0; i < face.size(); ++i)
 					{
 						obj << fmt::format(" {}", face[i] + 1); // OBJ uses 1-based indexing
-						
+
 						// Add texture coordinate index if available
 						if (i < face_tex.size() && !obj_data.VT.empty())
 						{
@@ -126,7 +126,7 @@ namespace polyfem::io
 						{
 							obj << "/"; // Empty texture coordinate slot
 						}
-						
+
 						// Add normal index if available
 						if (i < face_norm.size() && !obj_data.VN.empty())
 						{

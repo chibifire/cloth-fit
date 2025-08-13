@@ -70,11 +70,11 @@ TEST_CASE_METHOD(MeshTestFixture, "Mesh Utils", "[mesh][utils]")
 // Helper function to create a simple OBJData structure for testing
 OBJData create_simple_triangle_objdata() {
     OBJData data;
-    
+
     // Create a simple triangle
     data.V = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.5, 1.0, 0.0}};
     data.F = {{0, 1, 2}};
-    
+
     // Create default object and group
     OBJObject obj;
     obj.name = "triangle";
@@ -83,42 +83,42 @@ OBJData create_simple_triangle_objdata() {
     group.face_indices = {0};
     obj.groups.push_back(group);
     data.objects.push_back(obj);
-    
+
     // Set face mappings
     data.face_to_object = {0};
     data.face_to_group = {0};
-    
+
     return data;
 }
 
 // Helper function to create a quad mesh with groups
 OBJData create_quad_with_groups_objdata() {
     OBJData data;
-    
+
     // Create a quad (4 vertices, 2 triangles)
     data.V = {{0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {2.0, 2.0, 0.0}, {0.0, 2.0, 0.0}};
     data.F = {{0, 1, 2}, {0, 2, 3}};
-    
+
     // Create object with two groups
     OBJObject obj;
     obj.name = "quad";
-    
+
     OBJGroup group1;
     group1.name = "triangle1";
     group1.face_indices = {0};
-    
+
     OBJGroup group2;
     group2.name = "triangle2";
     group2.face_indices = {1};
-    
+
     obj.groups.push_back(group1);
     obj.groups.push_back(group2);
     data.objects.push_back(obj);
-    
+
     // Set face mappings
     data.face_to_object = {0, 0};
     data.face_to_group = {0, 1};
-    
+
     return data;
 }
 
@@ -141,7 +141,7 @@ TEST_CASE_METHOD(MeshTestFixture, "OBJ File IO with Groups", "[mesh][obj][io][gr
         // Verify vertex data
         REQUIRE(loaded_data.V.size() == 3);
         REQUIRE(loaded_data.F.size() == 1);
-        
+
         for (size_t i = 0; i < 3; ++i) {
             for (size_t j = 0; j < 3; ++j) {
                 REQUIRE(loaded_data.V[i][j] == Catch::Approx(original_data.V[i][j]));
@@ -233,7 +233,7 @@ TEST_CASE_METHOD(MeshTestFixture, "OBJ Error Handling", "[mesh][obj][error]")
         OBJData data;
         // The reader should handle this gracefully
         bool result = io::OBJReader::read_with_groups(filepath, data);
-        
+
         // If read succeeds, we should at least have read the valid vertex
         if (result && !data.V.empty()) {
             REQUIRE(data.V[0][0] == Catch::Approx(1.0));
@@ -312,7 +312,7 @@ TEST_CASE_METHOD(MeshTestFixture, "OBJ Texture Coordinates and Normals", "[mesh]
         // Verify texture coordinates are preserved
         REQUIRE(loaded_data.VT.size() == 3);
         REQUIRE(loaded_data.FT.size() == 1);
-        
+
         for (size_t i = 0; i < 3; ++i) {
             for (size_t j = 0; j < 2; ++j) {
                 REQUIRE(loaded_data.VT[i][j] == Catch::Approx(original_data.VT[i][j]));
@@ -348,7 +348,7 @@ TEST_CASE_METHOD(MeshTestFixture, "OBJ Texture Coordinates and Normals", "[mesh]
         // Verify normals are preserved
         REQUIRE(loaded_data.VN.size() == 3);
         REQUIRE(loaded_data.FN.size() == 1);
-        
+
         for (size_t i = 0; i < 3; ++i) {
             for (size_t j = 0; j < 3; ++j) {
                 REQUIRE(loaded_data.VN[i][j] == Catch::Approx(original_data.VN[i][j]));

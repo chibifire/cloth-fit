@@ -150,7 +150,7 @@ namespace polyfem::solver
         {
             fit_faces_data.V[i] = {V(i, 0), V(i, 1), V(i, 2)};
         }
-        
+
         // Add only the fit faces
         Eigen::MatrixXi fit_faces = F(fit_faces_ids, Eigen::all);
         fit_faces_data.F.resize(fit_faces.rows());
@@ -158,7 +158,7 @@ namespace polyfem::solver
         {
             fit_faces_data.F[i] = {fit_faces(i, 0), fit_faces(i, 1), fit_faces(i, 2)};
         }
-        
+
         // Create default object and group
         OBJObject fit_obj;
         fit_obj.name = "fit_faces";
@@ -170,11 +170,11 @@ namespace polyfem::solver
         }
         fit_obj.groups.push_back(fit_group);
         fit_faces_data.objects.push_back(fit_obj);
-        
+
         // Set face mappings
         fit_faces_data.face_to_object.resize(fit_faces_data.F.size(), 0);
         fit_faces_data.face_to_group.resize(fit_faces_data.F.size(), 0);
-        
+
         io::OBJWriter::write_with_groups(out_dir + "/fit-faces-debug.obj", fit_faces_data);
 
         // {
@@ -212,13 +212,13 @@ namespace polyfem::solver
 			{
 				sdf_data.V[i] = {outpoints(i, 0), outpoints(i, 1), outpoints(i, 2)};
 			}
-			
+
 			sdf_data.F.resize(outtriangles.rows());
 			for (int i = 0; i < outtriangles.rows(); ++i)
 			{
 				sdf_data.F[i] = {outtriangles(i, 0), outtriangles(i, 1), outtriangles(i, 2)};
 			}
-			
+
 			// Create default object and group
 			OBJObject sdf_obj;
 			sdf_obj.name = "sdf";
@@ -230,11 +230,11 @@ namespace polyfem::solver
 			}
 			sdf_obj.groups.push_back(sdf_group);
 			sdf_data.objects.push_back(sdf_obj);
-			
+
 			// Set face mappings
 			sdf_data.face_to_object.resize(sdf_data.F.size(), 0);
 			sdf_data.face_to_group.resize(sdf_data.F.size(), 0);
-			
+
 			io::OBJWriter::write_with_groups(out_dir + "/sdf.obj", sdf_data);
         }
     }

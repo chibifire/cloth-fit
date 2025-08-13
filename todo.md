@@ -1,8 +1,6 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-**Table of Contents** _generated with [DocToc](https://github.com/thlorenz/doctoc)_
-
 - [Cloth-Fit Library TODO](#cloth-fit-library-todo)
   - [🎉 Current Status: Phase 4 Complete + Ready for Simulation Testing!](#-current-status-phase-4-complete--ready-for-simulation-testing)
   - [Implementation Approach](#implementation-approach)

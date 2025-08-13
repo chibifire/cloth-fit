@@ -136,7 +136,7 @@ namespace polyfem::io
 					std::vector<int> face;
 					std::vector<int> face_tex;
 					std::vector<int> face_norm;
-					
+
 					// Read each "word" after type
 					char word[LINE_MAX_LEN];
 					int offset;
@@ -204,7 +204,7 @@ namespace polyfem::io
 					obj_data.F.push_back(face);
 					obj_data.FT.push_back(face_tex);
 					obj_data.FN.push_back(face_norm);
-					
+
 					int face_index = obj_data.F.size() - 1;
 
 					obj_data.face_to_object.push_back(current_object_index);

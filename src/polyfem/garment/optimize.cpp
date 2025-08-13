@@ -410,6 +410,62 @@ namespace polyfem {
                 }
             }
         }
+
+        /// @brief Compute vertex normals from mesh geometry
+        std::vector<std::array<double, 3>> compute_vertex_normals(
+            const Eigen::MatrixXd &vertices,
+            const Eigen::MatrixXi &faces)
+        {
+            std::vector<std::array<double, 3>> normals(vertices.rows(), {{0.0, 0.0, 0.0}});
+
+            // Compute face normals and accumulate to vertices
+            for (int f = 0; f < faces.rows(); ++f)
+            {
+                const int v0 = faces(f, 0);
+                const int v1 = faces(f, 1);
+                const int v2 = faces(f, 2);
+
+                // Compute face normal using cross product
+                Eigen::Vector3d edge1 = vertices.row(v1) - vertices.row(v0);
+                Eigen::Vector3d edge2 = vertices.row(v2) - vertices.row(v0);
+                Eigen::Vector3d face_normal = edge1.cross(edge2);
+
+                // Normalize face normal
+                double length = face_normal.norm();
+                if (length > 1e-12) // Avoid division by zero
+                {
+                    face_normal /= length;
+
+                    // Add to vertex normals (weighted by face area)
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        int vid = faces(f, i);
+                        normals[vid][0] += face_normal[0];
+                        normals[vid][1] += face_normal[1];
+                        normals[vid][2] += face_normal[2];
+                    }
+                }
+            }
+
+            // Normalize vertex normals
+            for (auto &normal : normals)
+            {
+                double length = std::sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+                if (length > 1e-12)
+                {
+                    normal[0] /= length;
+                    normal[1] /= length;
+                    normal[2] /= length;
+                }
+                else
+                {
+                    // Default normal if computation fails
+                    normal = {{0.0, 0.0, 1.0}};
+                }
+            }
+
+            return normals;
+        }
     }
 
     void OBJMesh::read(const std::string &path)
@@ -559,11 +615,27 @@ namespace polyfem {
             avatar_output_data.face_to_object = avatar_face_to_object;
             avatar_output_data.mtl_filename = avatar_mtl_filename;
 
-            // Copy texture coordinates and normals (preserved from original avatar)
+            // Copy texture coordinates (preserved from original avatar)
             avatar_output_data.VT = avatar_VT;
-            avatar_output_data.VN = avatar_VN;
             avatar_output_data.FT = avatar_FT;
-            avatar_output_data.FN = avatar_FN;
+
+            // Recompute normals based on the deformed geometry to fix artifacts
+            logger().debug("Recomputing normals for deformed avatar geometry");
+            std::vector<std::array<double, 3>> recomputed_normals = compute_vertex_normals(avatar_vertices, nc_avatar_f);
+
+            // Convert recomputed normals to OBJ format (convert from array to vector)
+            avatar_output_data.VN.resize(recomputed_normals.size());
+            for (size_t i = 0; i < recomputed_normals.size(); ++i)
+            {
+                avatar_output_data.VN[i] = {recomputed_normals[i][0], recomputed_normals[i][1], recomputed_normals[i][2]};
+            }
+
+            // Create face normal indices that match the vertex indices (1:1 mapping)
+            avatar_output_data.FN.resize(avatar_output_data.F.size());
+            for (size_t i = 0; i < avatar_output_data.F.size(); ++i)
+            {
+                avatar_output_data.FN[i] = avatar_output_data.F[i]; // Same indices as vertices
+            }
 
             // Write with groups
             if (io::OBJWriter::write_with_groups(path + "/step_avatar_" + std::to_string(index) + ".obj", avatar_output_data))
@@ -738,14 +810,14 @@ namespace polyfem {
             {
                 intersection_data.V[i] = {collision_vertices(i, 0), collision_vertices(i, 1), collision_vertices(i, 2)};
             }
-            
+
             // Add faces
             intersection_data.F.resize(collision_mesh.faces().rows());
             for (int i = 0; i < collision_mesh.faces().rows(); ++i)
             {
                 intersection_data.F[i] = {collision_mesh.faces()(i, 0), collision_mesh.faces()(i, 1), collision_mesh.faces()(i, 2)};
             }
-            
+
             // Create default object and group
             OBJObject default_obj;
             default_obj.name = "intersection";
@@ -757,20 +829,20 @@ namespace polyfem {
             }
             default_obj.groups.push_back(default_group);
             intersection_data.objects.push_back(default_obj);
-            
+
             // Set face mappings
             intersection_data.face_to_object.resize(intersection_data.F.size(), 0);
             intersection_data.face_to_group.resize(intersection_data.F.size(), 0);
-            
+
             io::OBJWriter::write_with_groups(out_folder + "/intersection.obj", intersection_data);
-            
+
             // Create intersecting pair data
             OBJData pair_data;
             pair_data.V = intersection_data.V; // Same vertices
-            
+
             // Add the specific intersecting edge and face
             pair_data.F.push_back({ids[2], ids[3], ids[4]}); // Face
-            
+
             OBJObject pair_obj;
             pair_obj.name = "intersecting_pair";
             OBJGroup pair_group;
@@ -778,10 +850,10 @@ namespace polyfem {
             pair_group.face_indices.push_back(0);
             pair_obj.groups.push_back(pair_group);
             pair_data.objects.push_back(pair_obj);
-            
+
             pair_data.face_to_object.push_back(0);
             pair_data.face_to_group.push_back(0);
-            
+
             io::OBJWriter::write_with_groups(out_folder + "/intersecting_pair.obj", pair_data);
             log_and_throw_error("Unable to solve, initial solution has intersections!");
         }
@@ -926,11 +998,12 @@ namespace polyfem {
         // Keep original mesh connectivity instead of exploding
         nc_avatar_v = avatar_v;
         nc_avatar_f = avatar_f;
-        
-        // IMPORTANT: Preserve texture coordinates and normals during projection
-        // The avatar projection should maintain all the rich visual data
-        logger().info("Preserving texture coordinates, normals, and material data during avatar projection");
-        
+
+        // IMPORTANT: Preserve texture coordinates during projection, but recompute normals
+        // The avatar projection dramatically changes vertex positions, making original normals incorrect
+        logger().info("Preserving texture coordinates and material data during avatar projection");
+        logger().info("Normals will be recomputed after projection to match the new geometry");
+
         Eigen::MatrixXd new_skinning_weights;
         if (has_target_avatar_skin_weights)
             new_skinning_weights = target_avatar_skinning_weights;
