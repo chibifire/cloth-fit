@@ -559,6 +559,12 @@ namespace polyfem {
             avatar_output_data.face_to_object = avatar_face_to_object;
             avatar_output_data.mtl_filename = avatar_mtl_filename;
 
+            // Copy texture coordinates and normals (preserved from original avatar)
+            avatar_output_data.VT = avatar_VT;
+            avatar_output_data.VN = avatar_VN;
+            avatar_output_data.FT = avatar_FT;
+            avatar_output_data.FN = avatar_FN;
+
             // Write with groups
             if (io::OBJWriter::write_with_groups(path + "/step_avatar_" + std::to_string(index) + ".obj", avatar_output_data))
             {
@@ -725,16 +731,58 @@ namespace polyfem {
         auto ids = ipc::my_has_intersections(collision_mesh, collision_vertices, ipc::BroadPhaseMethod::BVH);
         if (ids[0] >= 0)
         {
-            io::OBJWriter::write(
-                out_folder + "/intersection.obj", collision_vertices,
-                collision_mesh.edges(), collision_mesh.faces());
-            Eigen::MatrixXi edge(1, 2);
-            edge << ids[0], ids[1];
-            Eigen::MatrixXi face(1, 3);
-            face << ids[2], ids[3], ids[4];
-            io::OBJWriter::write(
-                out_folder + "/intersecting_pair.obj", collision_vertices,
-                edge, face);
+            // Create basic OBJData for intersection debugging
+            OBJData intersection_data;
+            intersection_data.V.resize(collision_vertices.rows());
+            for (int i = 0; i < collision_vertices.rows(); ++i)
+            {
+                intersection_data.V[i] = {collision_vertices(i, 0), collision_vertices(i, 1), collision_vertices(i, 2)};
+            }
+            
+            // Add faces
+            intersection_data.F.resize(collision_mesh.faces().rows());
+            for (int i = 0; i < collision_mesh.faces().rows(); ++i)
+            {
+                intersection_data.F[i] = {collision_mesh.faces()(i, 0), collision_mesh.faces()(i, 1), collision_mesh.faces()(i, 2)};
+            }
+            
+            // Create default object and group
+            OBJObject default_obj;
+            default_obj.name = "intersection";
+            OBJGroup default_group;
+            default_group.name = "default";
+            for (int i = 0; i < intersection_data.F.size(); ++i)
+            {
+                default_group.face_indices.push_back(i);
+            }
+            default_obj.groups.push_back(default_group);
+            intersection_data.objects.push_back(default_obj);
+            
+            // Set face mappings
+            intersection_data.face_to_object.resize(intersection_data.F.size(), 0);
+            intersection_data.face_to_group.resize(intersection_data.F.size(), 0);
+            
+            io::OBJWriter::write_with_groups(out_folder + "/intersection.obj", intersection_data);
+            
+            // Create intersecting pair data
+            OBJData pair_data;
+            pair_data.V = intersection_data.V; // Same vertices
+            
+            // Add the specific intersecting edge and face
+            pair_data.F.push_back({ids[2], ids[3], ids[4]}); // Face
+            
+            OBJObject pair_obj;
+            pair_obj.name = "intersecting_pair";
+            OBJGroup pair_group;
+            pair_group.name = "default";
+            pair_group.face_indices.push_back(0);
+            pair_obj.groups.push_back(pair_group);
+            pair_data.objects.push_back(pair_obj);
+            
+            pair_data.face_to_object.push_back(0);
+            pair_data.face_to_group.push_back(0);
+            
+            io::OBJWriter::write_with_groups(out_folder + "/intersecting_pair.obj", pair_data);
             log_and_throw_error("Unable to solve, initial solution has intersections!");
         }
     }
@@ -791,6 +839,12 @@ namespace polyfem {
             avatar_face_to_group = avatar_obj_data.face_to_group;
             avatar_face_to_object = avatar_obj_data.face_to_object;
             avatar_mtl_filename = avatar_obj_data.mtl_filename;
+
+            // Store texture coordinates and normals
+            avatar_VT = avatar_obj_data.VT;
+            avatar_VN = avatar_obj_data.VN;
+            avatar_FT = avatar_obj_data.FT;
+            avatar_FN = avatar_obj_data.FN;
 
             // Load MTL file if present
             if (!avatar_mtl_filename.empty())
@@ -872,6 +926,11 @@ namespace polyfem {
         // Keep original mesh connectivity instead of exploding
         nc_avatar_v = avatar_v;
         nc_avatar_f = avatar_f;
+        
+        // IMPORTANT: Preserve texture coordinates and normals during projection
+        // The avatar projection should maintain all the rich visual data
+        logger().info("Preserving texture coordinates, normals, and material data during avatar projection");
+        
         Eigen::MatrixXd new_skinning_weights;
         if (has_target_avatar_skin_weights)
             new_skinning_weights = target_avatar_skinning_weights;

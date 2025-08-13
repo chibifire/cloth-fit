@@ -40,6 +40,7 @@ __pycache__
 
 # Mesh files
 *.obj
+*.mtl
 *.off
 *.ply
 *.msh

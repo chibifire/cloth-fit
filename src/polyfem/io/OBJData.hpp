@@ -41,12 +41,16 @@ namespace polyfem {
 
     /// @brief Structure to hold complete OBJ data with groups and materials
     struct OBJData {
-        std::vector<std::vector<double>> V;  // Vertices
-        std::vector<std::vector<int>> F;     // Faces
-        std::vector<OBJObject> objects;      // Objects with groups
-        std::vector<int> face_to_group;      // Face index to group index mapping
-        std::vector<int> face_to_object;     // Face index to object index mapping
-        std::string mtl_filename;            // Referenced MTL file
+        std::vector<std::vector<double>> V;   // Vertices (positions)
+        std::vector<std::vector<double>> VT;  // Texture coordinates
+        std::vector<std::vector<double>> VN;  // Vertex normals
+        std::vector<std::vector<int>> F;      // Face vertex indices
+        std::vector<std::vector<int>> FT;     // Face texture coordinate indices
+        std::vector<std::vector<int>> FN;     // Face normal indices
+        std::vector<OBJObject> objects;       // Objects with groups
+        std::vector<int> face_to_group;       // Face index to group index mapping
+        std::vector<int> face_to_object;      // Face index to object index mapping
+        std::string mtl_filename;             // Referenced MTL file
     };
 
 } // namespace polyfem

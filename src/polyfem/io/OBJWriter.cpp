@@ -15,37 +15,6 @@
 
 namespace polyfem::io
 {
-	bool OBJWriter::write(const std::string &path, const Eigen::MatrixXd &v, const Eigen::MatrixXi &e, const Eigen::MatrixXi &f)
-	{
-		const Eigen::IOFormat OBJ_VERTEX_FORMAT(
-			/*precision=*/Eigen::FullPrecision,
-			/*flags=*/Eigen::DontAlignCols,
-			/*coeffSeparator=*/" ",
-			/*rowSeparator=*/"",
-			/*rowPrefix=*/"v ",
-			/*rowSuffix=*/v.cols() == 2 ? " 0\n" : "\n",
-			/*matPrefix=*/"",
-			/*fill=*/"");
-
-		std::ofstream obj(path, std::ios::out);
-		if (!obj.is_open())
-			return false;
-
-		obj << fmt::format(
-			"# Vertices: {:d}\n# Edges: {:d}\n# Faces: {:d}\n",
-			v.rows(), e.rows(), f.rows());
-
-		for (int i = 0; i < v.rows(); ++i)
-			obj << v.row(i).format(OBJ_VERTEX_FORMAT);
-
-		for (int i = 0; i < e.rows(); ++i)
-			obj << fmt::format("l {} {}\n", e(i, 0) + 1, e(i, 1) + 1);
-
-		for (int i = 0; i < f.rows(); ++i)
-			obj << fmt::format("f {} {} {}\n", f(i, 0) + 1, f(i, 1) + 1, f(i, 2) + 1);
-
-		return true;
-	}
 
 	bool OBJWriter::write_with_groups(
 		const std::string &path,
@@ -84,6 +53,36 @@ namespace polyfem::io
 
 		obj << "\n";
 
+		// Write texture coordinates if present
+		if (!obj_data.VT.empty())
+		{
+			for (const auto &tex_coord : obj_data.VT)
+			{
+				obj << "vt";
+				for (double coord : tex_coord)
+				{
+					obj << fmt::format(" {}", coord);
+				}
+				obj << "\n";
+			}
+			obj << "\n";
+		}
+
+		// Write vertex normals if present
+		if (!obj_data.VN.empty())
+		{
+			for (const auto &normal : obj_data.VN)
+			{
+				obj << "vn";
+				for (double coord : normal)
+				{
+					obj << fmt::format(" {}", coord);
+				}
+				obj << "\n";
+			}
+			obj << "\n";
+		}
+
 		// Write objects and groups with their faces
 		for (size_t obj_idx = 0; obj_idx < obj_data.objects.size(); ++obj_idx)
 		{
@@ -110,10 +109,29 @@ namespace polyfem::io
 				for (int face_idx : group.face_indices)
 				{
 					const auto &face = obj_data.F[face_idx];
+					const auto &face_tex = (face_idx < obj_data.FT.size()) ? obj_data.FT[face_idx] : std::vector<int>();
+					const auto &face_norm = (face_idx < obj_data.FN.size()) ? obj_data.FN[face_idx] : std::vector<int>();
+					
 					obj << "f";
-					for (int vertex_idx : face)
+					for (size_t i = 0; i < face.size(); ++i)
 					{
-						obj << fmt::format(" {}", vertex_idx + 1); // OBJ uses 1-based indexing
+						obj << fmt::format(" {}", face[i] + 1); // OBJ uses 1-based indexing
+						
+						// Add texture coordinate index if available
+						if (i < face_tex.size() && !obj_data.VT.empty())
+						{
+							obj << fmt::format("/{}", face_tex[i] + 1);
+						}
+						else if (!face_norm.empty() || (!obj_data.VN.empty() && i < face_norm.size()))
+						{
+							obj << "/"; // Empty texture coordinate slot
+						}
+						
+						// Add normal index if available
+						if (i < face_norm.size() && !obj_data.VN.empty())
+						{
+							obj << fmt::format("/{}", face_norm[i] + 1);
+						}
 					}
 					obj << "\n";
 				}

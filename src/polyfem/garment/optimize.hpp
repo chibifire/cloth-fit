@@ -105,6 +105,12 @@ namespace polyfem {
         std::vector<int> avatar_face_to_object;
         std::vector<int> garment_face_to_group;
         std::vector<int> garment_face_to_object;
+
+        // Avatar texture coordinates and normals (preserved during projection)
+        std::vector<std::vector<double>> avatar_VT;  // Texture coordinates
+        std::vector<std::vector<double>> avatar_VN;  // Vertex normals
+        std::vector<std::vector<int>> avatar_FT;     // Face texture coordinate indices
+        std::vector<std::vector<int>> avatar_FN;     // Face normal indices
     };
 
 	json init(const json &p_args_in, const bool strict_validation);

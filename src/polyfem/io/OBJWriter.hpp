@@ -21,22 +21,6 @@ namespace polyfem::io
 	public:
 		OBJWriter() = delete;
 
-		static bool write(
-			const std::string &path,
-			const Eigen::MatrixXd &v,
-			const Eigen::MatrixXi &e,
-			const Eigen::MatrixXi &f);
-
-		static bool write(
-			const std::string &path,
-			const Eigen::MatrixXd &v,
-			const Eigen::MatrixXi &e_or_f)
-		{
-			if (e_or_f.cols() == 2)
-				return write(path, v, e_or_f, Eigen::MatrixXi());
-			else
-				return write(path, v, Eigen::MatrixXi(), e_or_f);
-		}
 
 		/// @brief Write OBJ file with group and material information
 		/// @param path output file path
