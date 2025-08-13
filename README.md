@@ -73,7 +73,7 @@ When importing the generated OBJ files into Blender for visualization, use the f
 2. **Transform Settings:**
 
    - **Forward Axis**: `-Z Forward` (or adjust based on your scene orientation)
-   - **Up Axis**: `Z Up`
+   - **Up Axis**: `Y Up`
    - **Scale**: `1.0` (adjust if meshes appear too large/small)
 
 3. **Geometry Settings:**
