@@ -411,61 +411,6 @@ namespace polyfem {
             }
         }
 
-        /// @brief Compute vertex normals from mesh geometry
-        std::vector<std::array<double, 3>> compute_vertex_normals(
-            const Eigen::MatrixXd &vertices,
-            const Eigen::MatrixXi &faces)
-        {
-            std::vector<std::array<double, 3>> normals(vertices.rows(), {{0.0, 0.0, 0.0}});
-
-            // Compute face normals and accumulate to vertices
-            for (int f = 0; f < faces.rows(); ++f)
-            {
-                const int v0 = faces(f, 0);
-                const int v1 = faces(f, 1);
-                const int v2 = faces(f, 2);
-
-                // Compute face normal using cross product
-                Eigen::Vector3d edge1 = vertices.row(v1) - vertices.row(v0);
-                Eigen::Vector3d edge2 = vertices.row(v2) - vertices.row(v0);
-                Eigen::Vector3d face_normal = edge1.cross(edge2);
-
-                // Normalize face normal
-                double length = face_normal.norm();
-                if (length > 1e-12) // Avoid division by zero
-                {
-                    face_normal /= length;
-
-                    // Add to vertex normals (weighted by face area)
-                    for (int i = 0; i < 3; ++i)
-                    {
-                        int vid = faces(f, i);
-                        normals[vid][0] += face_normal[0];
-                        normals[vid][1] += face_normal[1];
-                        normals[vid][2] += face_normal[2];
-                    }
-                }
-            }
-
-            // Normalize vertex normals
-            for (auto &normal : normals)
-            {
-                double length = std::sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
-                if (length > 1e-12)
-                {
-                    normal[0] /= length;
-                    normal[1] /= length;
-                    normal[2] /= length;
-                }
-                else
-                {
-                    // Default normal if computation fails
-                    normal = {{0.0, 0.0, 1.0}};
-                }
-            }
-
-            return normals;
-        }
     }
 
     void OBJMesh::read(const std::string &path)
@@ -619,23 +564,9 @@ namespace polyfem {
             avatar_output_data.VT = avatar_VT;
             avatar_output_data.FT = avatar_FT;
 
-            // Recompute normals based on the deformed geometry to fix artifacts
-            logger().debug("Recomputing normals for deformed avatar geometry");
-            std::vector<std::array<double, 3>> recomputed_normals = compute_vertex_normals(avatar_vertices, nc_avatar_f);
-
-            // Convert recomputed normals to OBJ format (convert from array to vector)
-            avatar_output_data.VN.resize(recomputed_normals.size());
-            for (size_t i = 0; i < recomputed_normals.size(); ++i)
-            {
-                avatar_output_data.VN[i] = {recomputed_normals[i][0], recomputed_normals[i][1], recomputed_normals[i][2]};
-            }
-
-            // Create face normal indices that match the vertex indices (1:1 mapping)
-            avatar_output_data.FN.resize(avatar_output_data.F.size());
-            for (size_t i = 0; i < avatar_output_data.F.size(); ++i)
-            {
-                avatar_output_data.FN[i] = avatar_output_data.F[i]; // Same indices as vertices
-            }
+            // Skip writing normals to avoid artifacts from deformed geometry
+            // Rendering engines will compute correct normals automatically from the mesh
+            logger().debug("Skipping normals in output - will be computed automatically by rendering engines");
 
             // Write with groups
             if (io::OBJWriter::write_with_groups(path + "/step_avatar_" + std::to_string(index) + ".obj", avatar_output_data))
